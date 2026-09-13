@@ -1,0 +1,49 @@
+{
+  "additionalProperties": false,
+  "description": "Non-authoritative security metadata carried with a message.\n\nReceiving services MUST validate authorization against an authoritative policy service;\nthese fields never grant privileges by themselves.",
+  "properties": {
+    "actor_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Actor Id"
+    },
+    "actor_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Actor Type"
+    },
+    "approval_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approval Id"
+    },
+    "data_classification": {
+      "default": "INTERNAL",
+      "title": "Data Classification",
+      "type": "string"
+    }
+  },
+  "title": "SecurityContext",
+  "type": "object"
+}

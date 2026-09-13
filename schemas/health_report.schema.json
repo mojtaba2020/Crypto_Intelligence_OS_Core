@@ -1,0 +1,77 @@
+{
+  "$defs": {
+    "HealthState": {
+      "enum": [
+        "HEALTHY",
+        "DEGRADED",
+        "UNHEALTHY",
+        "QUARANTINED",
+        "UNAVAILABLE",
+        "RETIRED"
+      ],
+      "title": "HealthState",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "checked_at": {
+      "format": "date-time",
+      "title": "Checked At",
+      "type": "string"
+    },
+    "component_id": {
+      "maxLength": 128,
+      "minLength": 2,
+      "title": "Component Id",
+      "type": "string"
+    },
+    "component_version": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Component Version",
+      "type": "string"
+    },
+    "details": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "title": "Details",
+      "type": "object"
+    },
+    "reason_codes": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Reason Codes",
+      "type": "array"
+    },
+    "state": {
+      "$ref": "#/$defs/HealthState"
+    }
+  },
+  "required": [
+    "component_id",
+    "component_version",
+    "state"
+  ],
+  "title": "HealthReport",
+  "type": "object"
+}

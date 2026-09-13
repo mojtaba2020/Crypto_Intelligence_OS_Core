@@ -1,0 +1,24 @@
+{
+  "additionalProperties": false,
+  "description": "Identifies the component that produced a message.",
+  "properties": {
+    "component_id": {
+      "maxLength": 128,
+      "minLength": 2,
+      "title": "Component Id",
+      "type": "string"
+    },
+    "component_version": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Component Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "component_id",
+    "component_version"
+  ],
+  "title": "ProducerRef",
+  "type": "object"
+}
