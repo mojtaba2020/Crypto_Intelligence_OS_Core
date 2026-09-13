@@ -28,7 +28,7 @@ jobs:
           import shutil
           import zipfile
 
-          archive = Path("Crypto_Intelligence_OS_Phase0_v0_1.zip")
+          archive = Path("Crypto_Intelligence_OS_Phase0_v0_1_fixed.zip")
           prefix = "Crypto_Intelligence_OS_Phase0_v0_1/"
           root = Path.cwd().resolve()
 
