@@ -1,0 +1,170 @@
+name: Apply Development Bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      archive:
+        description: Bundle ZIP filename in repository root
+        required: true
+        type: string
+      expected_sha256:
+        description: Optional expected SHA-256 for the ZIP
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-stage:
+    runs-on: ubuntu-slim
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Verify and apply bundle safely
+        env:
+          BUNDLE_ARCHIVE: ${{ inputs.archive }}
+          EXPECTED_SHA256: ${{ inputs.expected_sha256 }}
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import os
+          import stat
+          import zipfile
+          from pathlib import Path, PurePosixPath
+
+          archive_name = os.environ["BUNDLE_ARCHIVE"].strip()
+          expected_sha256 = os.environ.get("EXPECTED_SHA256", "").strip().lower()
+          root = Path.cwd().resolve()
+
+          archive = Path(archive_name)
+          if not archive_name or archive.name != archive_name or archive.suffix.lower() != ".zip":
+              raise SystemExit("archive must be a plain .zip filename in the repository root")
+          if not archive.is_file():
+              raise SystemExit(f"Bundle archive not found: {archive_name}")
+
+          actual_archive_hash = hashlib.sha256(archive.read_bytes()).hexdigest()
+          if expected_sha256 and actual_archive_hash != expected_sha256:
+              raise SystemExit(
+                  f"Bundle SHA-256 mismatch: expected {expected_sha256}, got {actual_archive_hash}"
+              )
+          print(f"Bundle SHA-256: {actual_archive_hash}")
+
+          with zipfile.ZipFile(archive) as zf:
+              infos = zf.infolist()
+              file_infos = [info for info in infos if not info.is_dir()]
+              if not file_infos:
+                  raise SystemExit("Bundle is empty")
+
+              top_levels = {PurePosixPath(info.filename).parts[0] for info in file_infos}
+              if len(top_levels) != 1:
+                  raise SystemExit("Bundle must contain exactly one top-level directory")
+              prefix = next(iter(top_levels)) + "/"
+
+              manifest_name = prefix + "bundle_manifest.json"
+              try:
+                  manifest = json.loads(zf.read(manifest_name))
+              except KeyError as exc:
+                  raise SystemExit("bundle_manifest.json is missing") from exc
+
+              if manifest.get("bundle_format_version") != "1.0":
+                  raise SystemExit("Unsupported bundle format version")
+
+              declared: dict[str, dict[str, object]] = {}
+              for entry in manifest.get("files", []):
+                  rel = PurePosixPath(str(entry["path"]))
+                  if rel.is_absolute() or ".." in rel.parts or not rel.parts:
+                      raise SystemExit(f"Unsafe manifest path: {rel}")
+                  if rel.parts[0] == ".github" or rel.name == "README.md":
+                      raise SystemExit(f"Protected path is not allowed in a bundle: {rel}")
+                  declared[rel.as_posix()] = entry
+
+              actual_files: dict[str, zipfile.ZipInfo] = {}
+              for info in file_infos:
+                  if not info.filename.startswith(prefix):
+                      raise SystemExit(f"Unexpected ZIP entry: {info.filename}")
+                  relative_name = info.filename[len(prefix):]
+                  if relative_name == "bundle_manifest.json":
+                      continue
+                  rel = PurePosixPath(relative_name)
+                  if rel.is_absolute() or ".." in rel.parts or not rel.parts:
+                      raise SystemExit(f"Unsafe ZIP path: {rel}")
+                  if rel.parts[0] == ".github" or rel.name == "README.md":
+                      raise SystemExit(f"Protected path is not allowed in a bundle: {rel}")
+
+                  mode = info.external_attr >> 16
+                  if stat.S_ISLNK(mode):
+                      raise SystemExit(f"Symlinks are not allowed in bundles: {rel}")
+                  actual_files[rel.as_posix()] = info
+
+              if set(actual_files) != set(declared):
+                  missing = sorted(set(declared) - set(actual_files))
+                  extra = sorted(set(actual_files) - set(declared))
+                  raise SystemExit(f"Manifest mismatch. Missing={missing}, extra={extra}")
+
+              for rel_name, info in sorted(actual_files.items()):
+                  entry = declared[rel_name]
+                  content = zf.read(info)
+                  digest = hashlib.sha256(content).hexdigest()
+                  if digest != entry.get("sha256"):
+                      raise SystemExit(f"File hash mismatch: {rel_name}")
+                  if len(content) != entry.get("size"):
+                      raise SystemExit(f"File size mismatch: {rel_name}")
+
+                  target = (root / rel_name).resolve()
+                  if target != root and root not in target.parents:
+                      raise SystemExit(f"Unsafe extraction target: {target}")
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(content)
+                  print(f"Applied: {rel_name}")
+
+          archive.unlink()
+          print(f"Validated and applied bundle: {manifest['bundle_id']}")
+          PY
+
+      - name: Install project and validation tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run complete quality gate
+        run: python scripts/quality_gate.py
+
+      - name: Create validated bundle branch
+        env:
+          BUNDLE_ARCHIVE: ${{ inputs.archive }}
+        run: |
+          BRANCH="automation/bundle-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Apply validated development bundle: ${BUNDLE_ARCHIVE}"
+          git push --set-upstream origin "$BRANCH"
+
+          {
+            echo "## Validated bundle staged"
+            echo
+            echo "Branch: \`$BRANCH\`"
+            echo
+            echo "Open a pull request from this branch into \`main\`."
+          } >> "$GITHUB_STEP_SUMMARY"
