@@ -1,0 +1,90 @@
+{
+  "$defs": {
+    "AssetClass": {
+      "description": "High-level asset taxonomy used by the Stable Core.",
+      "enum": [
+        "NATIVE_CRYPTO",
+        "TOKEN",
+        "FIAT",
+        "STABLECOIN",
+        "INDEX"
+      ],
+      "title": "AssetClass",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Provider-neutral identity for an asset.\n\n``asset_id`` is authoritative inside Crypto Intelligence OS.  ``symbol`` is only a\nhuman-facing label because the same ticker can refer to different assets.",
+  "properties": {
+    "active": {
+      "default": true,
+      "title": "Active",
+      "type": "boolean"
+    },
+    "asset_class": {
+      "$ref": "#/$defs/AssetClass"
+    },
+    "asset_id": {
+      "title": "Asset Id",
+      "type": "string"
+    },
+    "contract_address": {
+      "anyOf": [
+        {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Contract Address"
+    },
+    "decimals": {
+      "anyOf": [
+        {
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Decimals"
+    },
+    "name": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "network_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Network Id"
+    },
+    "symbol": {
+      "title": "Symbol",
+      "type": "string"
+    }
+  },
+  "required": [
+    "asset_id",
+    "symbol",
+    "name",
+    "asset_class"
+  ],
+  "title": "CanonicalAsset",
+  "type": "object"
+}

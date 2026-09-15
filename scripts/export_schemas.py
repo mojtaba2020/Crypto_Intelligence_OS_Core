@@ -8,9 +8,15 @@ import json
 from pathlib import Path
 from typing import Any
 
+from crypto_intelligence_os.assets.models import CanonicalAsset
 from crypto_intelligence_os.contracts.base import DictEnvelope, ProducerRef, SecurityContext
 from crypto_intelligence_os.contracts.errors import ErrorEnvelope
 from crypto_intelligence_os.contracts.health import HealthReport
+from crypto_intelligence_os.market_data.contracts import (
+    MarketDataSnapshot,
+    MarketInstrument,
+    OHLCVBar,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_DIR = ROOT / "schemas"
@@ -21,6 +27,10 @@ REGISTRY = {
     "security_context.schema.json": SecurityContext,
     "error_envelope.schema.json": ErrorEnvelope,
     "health_report.schema.json": HealthReport,
+    "canonical_asset.schema.json": CanonicalAsset,
+    "market_instrument.schema.json": MarketInstrument,
+    "ohlcv_bar.schema.json": OHLCVBar,
+    "market_data_snapshot.schema.json": MarketDataSnapshot,
 }
 
 

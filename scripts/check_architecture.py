@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 STABLE_DIRS = [
     ROOT / "src" / "crypto_intelligence_os" / "core",
     ROOT / "src" / "crypto_intelligence_os" / "contracts",
+    ROOT / "src" / "crypto_intelligence_os" / "assets",
+    ROOT / "src" / "crypto_intelligence_os" / "market_data",
 ]
 
 # These belong behind adapters/runtime boundaries, not in the Stable Core.

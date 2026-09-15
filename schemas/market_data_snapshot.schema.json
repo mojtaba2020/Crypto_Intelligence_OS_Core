@@ -1,0 +1,251 @@
+{
+  "$defs": {
+    "BarStatus": {
+      "enum": [
+        "PARTIAL",
+        "FINAL"
+      ],
+      "title": "BarStatus",
+      "type": "string"
+    },
+    "DataQualityState": {
+      "enum": [
+        "GOOD",
+        "DEGRADED",
+        "POOR",
+        "UNKNOWN"
+      ],
+      "title": "DataQualityState",
+      "type": "string"
+    },
+    "MarketInstrument": {
+      "additionalProperties": false,
+      "description": "Canonical identity of a tradable or observed market.",
+      "properties": {
+        "base_asset_id": {
+          "title": "Base Asset Id",
+          "type": "string"
+        },
+        "instrument_id": {
+          "title": "Instrument Id",
+          "type": "string"
+        },
+        "market_type": {
+          "$ref": "#/$defs/MarketType"
+        },
+        "quote_asset_id": {
+          "title": "Quote Asset Id",
+          "type": "string"
+        },
+        "symbol": {
+          "maxLength": 64,
+          "minLength": 3,
+          "title": "Symbol",
+          "type": "string"
+        },
+        "venue_id": {
+          "title": "Venue Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "instrument_id",
+        "venue_id",
+        "base_asset_id",
+        "quote_asset_id",
+        "market_type",
+        "symbol"
+      ],
+      "title": "MarketInstrument",
+      "type": "object"
+    },
+    "MarketType": {
+      "enum": [
+        "SPOT",
+        "PERPETUAL",
+        "FUTURE",
+        "OPTION",
+        "INDEX"
+      ],
+      "title": "MarketType",
+      "type": "string"
+    },
+    "OHLCVBar": {
+      "additionalProperties": false,
+      "description": "One provider-neutral OHLCV bar with explicit knowledge timing.\n\n``available_at`` is the earliest time the canonical record was eligible to influence\nthe system.  Historical replay must never use a record whose ``available_at`` is after\nthe replay cutoff.",
+      "properties": {
+        "available_at": {
+          "format": "date-time",
+          "title": "Available At",
+          "type": "string"
+        },
+        "bar_id": {
+          "title": "Bar Id",
+          "type": "string"
+        },
+        "close": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Close"
+        },
+        "close_time": {
+          "format": "date-time",
+          "title": "Close Time",
+          "type": "string"
+        },
+        "high": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "High"
+        },
+        "ingested_at": {
+          "format": "date-time",
+          "title": "Ingested At",
+          "type": "string"
+        },
+        "instrument_id": {
+          "title": "Instrument Id",
+          "type": "string"
+        },
+        "low": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Low"
+        },
+        "open": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Open"
+        },
+        "open_time": {
+          "format": "date-time",
+          "title": "Open Time",
+          "type": "string"
+        },
+        "quality": {
+          "$ref": "#/$defs/DataQualityState",
+          "default": "GOOD"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/BarStatus",
+          "default": "FINAL"
+        },
+        "timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        },
+        "volume": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Volume"
+        }
+      },
+      "required": [
+        "instrument_id",
+        "timeframe",
+        "open_time",
+        "close_time",
+        "available_at",
+        "ingested_at",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "source_id"
+      ],
+      "title": "OHLCVBar",
+      "type": "object"
+    },
+    "Timeframe": {
+      "enum": [
+        "1m",
+        "5m",
+        "15m",
+        "1h",
+        "4h",
+        "1d",
+        "1w"
+      ],
+      "title": "Timeframe",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Immutable point-in-time package used by research, backtests, and predictions.",
+  "properties": {
+    "bars": {
+      "items": {
+        "$ref": "#/$defs/OHLCVBar"
+      },
+      "title": "Bars",
+      "type": "array"
+    },
+    "data_cutoff_time": {
+      "format": "date-time",
+      "title": "Data Cutoff Time",
+      "type": "string"
+    },
+    "instrument": {
+      "$ref": "#/$defs/MarketInstrument"
+    },
+    "snapshot_id": {
+      "title": "Snapshot Id",
+      "type": "string"
+    },
+    "timeframe": {
+      "$ref": "#/$defs/Timeframe"
+    }
+  },
+  "required": [
+    "instrument",
+    "timeframe",
+    "data_cutoff_time",
+    "bars"
+  ],
+  "title": "MarketDataSnapshot",
+  "type": "object"
+}

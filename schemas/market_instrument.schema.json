@@ -1,0 +1,54 @@
+{
+  "$defs": {
+    "MarketType": {
+      "enum": [
+        "SPOT",
+        "PERPETUAL",
+        "FUTURE",
+        "OPTION",
+        "INDEX"
+      ],
+      "title": "MarketType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Canonical identity of a tradable or observed market.",
+  "properties": {
+    "base_asset_id": {
+      "title": "Base Asset Id",
+      "type": "string"
+    },
+    "instrument_id": {
+      "title": "Instrument Id",
+      "type": "string"
+    },
+    "market_type": {
+      "$ref": "#/$defs/MarketType"
+    },
+    "quote_asset_id": {
+      "title": "Quote Asset Id",
+      "type": "string"
+    },
+    "symbol": {
+      "maxLength": 64,
+      "minLength": 3,
+      "title": "Symbol",
+      "type": "string"
+    },
+    "venue_id": {
+      "title": "Venue Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "instrument_id",
+    "venue_id",
+    "base_asset_id",
+    "quote_asset_id",
+    "market_type",
+    "symbol"
+  ],
+  "title": "MarketInstrument",
+  "type": "object"
+}
