@@ -60,6 +60,18 @@ class BTCArchive:
         rows = self._connection.execute("SELECT record FROM candles ORDER BY open_time").fetchall()
         return tuple(OHLCVBar.model_validate_json(row[0]) for row in rows)
 
+    def bars_known_as_of(self, cutoff: datetime) -> tuple[OHLCVBar, ...]:
+        """Replay only final bars actually ingested and market-available by cutoff.
+
+        This is an ingestion-aware historical view, not a reconstructed price history.
+        A candle first collected later must not appear in an earlier system replay.
+        """
+        from crypto_intelligence_os.core.time import ensure_utc
+        from crypto_intelligence_os.market_data.point_in_time import bars_known_by_system_as_of
+
+        normalized_cutoff = ensure_utc(cutoff)
+        return bars_known_by_system_as_of(self.all_bars(), normalized_cutoff)
+
     def integrity_check(self) -> None:
         row = self._connection.execute("PRAGMA integrity_check").fetchone()
         if not row or row[0] != "ok":
