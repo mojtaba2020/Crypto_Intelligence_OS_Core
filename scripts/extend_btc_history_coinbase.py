@@ -33,7 +33,7 @@ def _fetch(start: date, end: date) -> dict[date, str]:
         f"{API_URL}?{params}",
         headers={"User-Agent": "Crypto-Intelligence-OS/0.3 research"},
     )
-    with urllib.request.urlopen(request, timeout=60) as response:
+    with urllib.request.urlopen(  # noqa: S310 -- request URL is fixed HTTPS above\n        request, timeout=60\n    ) as response:
         payload = json.loads(response.read().decode("utf-8"))
     if not isinstance(payload, list):
         raise ValueError("Unexpected Coinbase response")
@@ -84,7 +84,7 @@ def extend(database: Path, *, completed_through: date, overlap_days: int = 4) ->
             raise ValueError("No source-overlap dates available for transition check")
         max_overlap = max(value for _, value in overlap_diffs)
         if max_overlap > 5.0:
-            raise ValueError(f"Coinbase/Coin Metrics overlap divergence too large: {max_overlap:.3f}%")
+            raise ValueError(\n                "Coinbase/Coin Metrics overlap divergence too large: "\n                f"{max_overlap:.3f}%"\n            )
 
         extension_start = historical_last + timedelta(days=1)
         extension_days = [
