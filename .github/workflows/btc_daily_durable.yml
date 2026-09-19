@@ -111,28 +111,5 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish actual results in GitHub Actions summary
-        run: |
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          result = json.loads(Path("data/btc_ingestion_report.json").read_text())
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
-              out.write(
-                  "## CEO Control Tower · completed BTC data mission\n\n"
-                  "> Real deterministic worker run; not an autonomous AI agent.\n\n"
-                  f"- Status: **{result['status']}**\n"
-                  f"- Validated this run: **{result['fetched_count']}** daily candles\n"
-                  f"- Newly stored: **{result['inserted_count']}**\n"
-                  f"- Total persistent candles: **{result['archive_total_count']}**\n"
-                  f"- First / last candle: {result['first_archived_bar_utc']} / "
-                  f"{result['last_archived_bar_utc']}\n"
-                  f"- Source time UTC: {result['source_time_utc']}\n"
-                  f"- Private data branch: `data/btc-usd-daily`\n"
-                  f"- SQLite SHA-256: `{result['sqlite_sha256']}`\n"
-                  "- A static HTML CEO snapshot is attached for 14 days. "
-                  "The **database itself is committed** to the private data branch.\n"
-              )
-          PY
+      - name: Publish verified mobile CEO mission board to private GitHub run summary
+        run: python -m scripts.render_ceo_mission_board
