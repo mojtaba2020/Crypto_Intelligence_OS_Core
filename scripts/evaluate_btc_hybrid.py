@@ -44,7 +44,7 @@ def evaluate(database: Path, *, horizon: int, holdout_days: int, step: int) -> d
             raise ValueError("Missing daily observation")
     first = max(365 + horizon + 365 - 1, len(observations) - holdout_days)
     last = len(observations) - horizon - 1
-    errors: list[tuple[float, ...]] = []
+    errors: list[tuple[float, ...]] = []\n    regime_errors: dict[str, list[tuple[float, ...]]] = {\n        "up_90d": [], "down_90d": [], "flat_90d": []\n    }
     for origin in range(first, last + 1, step):
         history = observations[: origin + 1]
         hybrid = train_hybrid(history, horizon_days=horizon)
@@ -81,7 +81,7 @@ def evaluate(database: Path, *, horizon: int, holdout_days: int, step: int) -> d
         "first_test_origin": observations[first].day.isoformat(),
         "last_test_origin": observations[first + (count - 1) * step].day.isoformat(),
         "source_transition_day": transition,
-        "metrics": metrics,
+        "metrics": metrics,\n        "regimes": regimes,\n        "regime_definition": "90-day trailing return: >10% up, <-10% down, otherwise flat",
         "research_only": True,
     }
 
