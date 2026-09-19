@@ -69,10 +69,18 @@ def evaluate(
             predict(baseline, history),
             history[-1].close,
         )
-        errors.append(
+        row = (
             tuple(abs(estimate - actual) for estimate in predictions)
             + tuple(100 * abs(estimate - actual) / actual for estimate in predictions)
         )
+        errors.append(row)
+        change_90d = history[-1].close / history[-91].close - 1
+        regime = (
+            "up_90d" if change_90d > 0.10
+            else "down_90d" if change_90d < -0.10
+            else "flat_90d"
+        )
+        regime_errors[regime].append(row)
     if not errors:
         raise ValueError("No resolved out-of-sample examples")
     count = len(errors)
@@ -82,6 +90,16 @@ def evaluate(
             "mae_usd": sum(row[index] for row in errors) / count,
             "mape_pct": sum(row[index + 3] for row in errors) / count,
         }
+    regimes = {
+        name: {
+            "test_examples": len(group),
+            "mae_usd": {
+                model: sum(row[index] for row in group) / len(group)
+                for index, model in enumerate(("hybrid", "linear", "persistence"))
+            },
+        }
+        for name, group in regime_errors.items() if group
+    }
     return {
         "status": "HYBRID_WALK_FORWARD_EVALUATED",
         "first_day": rows[0][0],
