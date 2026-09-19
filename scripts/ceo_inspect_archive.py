@@ -89,7 +89,7 @@ def main() -> int:
         f"| Last completed daily candle | {facts['last_archived_bar_utc']} |\n"
         f"| Previous successful ingestion | {facts['last_ingestion_completed_at_utc']} |\n"
         f"| Previous ingestion run ID | {facts['last_ingestion_run_id']} |\n\n"
-        f"**SQLite checksum (SHA-256):** \`{facts['sqlite_sha256']}\`\n\n"
+        f"**SQLite checksum (SHA-256):** `{facts['sqlite_sha256']}`\n\n"
         f"[Inspect current mission and live job states]({run_url}) · "
         f"[Browse persisted data in private branch]({source_url})\n\n"
         "**No autonomous AI agents are deployed.** This mission only audits the "
