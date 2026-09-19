@@ -50,6 +50,13 @@ class DataQualityState(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
+class SnapshotKnowledgeMode(StrEnum):
+    """How a snapshot interprets point-in-time knowledge."""
+
+    SYSTEM_KNOWN = "SYSTEM_KNOWN"
+    RECONSTRUCTED_MARKET_VIEW = "RECONSTRUCTED_MARKET_VIEW"
+
+
 class MarketInstrument(StrictContract):
     """Canonical identity of a tradable or observed market."""
 
@@ -155,6 +162,7 @@ class MarketDataSnapshot(StrictContract):
     instrument: MarketInstrument
     timeframe: Timeframe
     data_cutoff_time: datetime
+    knowledge_mode: SnapshotKnowledgeMode = SnapshotKnowledgeMode.SYSTEM_KNOWN
     bars: tuple[OHLCVBar, ...]
 
     @field_validator("data_cutoff_time")
@@ -173,6 +181,11 @@ class MarketDataSnapshot(StrictContract):
                 raise ValueError("All bars must use the snapshot timeframe.")
             if bar.available_at > self.data_cutoff_time:
                 raise ValueError("Snapshot contains data unavailable at data_cutoff_time.")
+            if (
+                self.knowledge_mode is SnapshotKnowledgeMode.SYSTEM_KNOWN
+                and bar.ingested_at > self.data_cutoff_time
+            ):
+                raise ValueError("Snapshot contains data not yet known by the system.")
             if bar.bar_id in seen_bar_ids:
                 raise ValueError("Snapshot contains a duplicate bar_id.")
             if previous_open is not None and bar.open_time <= previous_open:

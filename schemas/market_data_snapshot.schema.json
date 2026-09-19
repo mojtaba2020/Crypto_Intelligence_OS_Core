@@ -200,6 +200,15 @@
       "title": "OHLCVBar",
       "type": "object"
     },
+    "SnapshotKnowledgeMode": {
+      "description": "How a snapshot interprets point-in-time knowledge.",
+      "enum": [
+        "SYSTEM_KNOWN",
+        "RECONSTRUCTED_MARKET_VIEW"
+      ],
+      "title": "SnapshotKnowledgeMode",
+      "type": "string"
+    },
     "Timeframe": {
       "enum": [
         "1m",
@@ -231,6 +240,10 @@
     },
     "instrument": {
       "$ref": "#/$defs/MarketInstrument"
+    },
+    "knowledge_mode": {
+      "$ref": "#/$defs/SnapshotKnowledgeMode",
+      "default": "SYSTEM_KNOWN"
     },
     "snapshot_id": {
       "title": "Snapshot Id",
