@@ -28,7 +28,9 @@ class HybridModel:
     feature_group: str = "all"
 
 
-def features(\n    history: tuple[Observation, ...], index: int, *, group: str = "all"\n) -> tuple[float, ...]:
+def features(
+    history: tuple[Observation, ...], index: int, *, group: str = "all"
+) -> tuple[float, ...]:
     if index < 365:
         raise ValueError("At least 366 completed daily closes required")
     current = history[index].close
@@ -44,7 +46,18 @@ def features(\n    history: tuple[Observation, ...], index: int, *, group: str =
     known_halvings = [day for day in HALVINGS if day <= history[index].day]
     days_since = (history[index].day - known_halvings[-1]).days if known_halvings else 0
     result.extend((days_since / 1461.0, days_since * days_since / (1461.0**2)))
-    if group == "all":\n        return tuple(result)\n    if group == "no_halving":\n        return tuple(result[:-2])\n    if group == "no_extrema":\n        return tuple(result[:6] + result[-2:])\n    if group == "momentum_only":\n        return tuple(result[:5])\n    raise ValueError(f"Unknown feature group: {group}")\n\n\ndef _fit(
+    if group == "all":
+        return tuple(result)
+    if group == "no_halving":
+        return tuple(result[:-2])
+    if group == "no_extrema":
+        return tuple(result[:6] + result[-2:])
+    if group == "momentum_only":
+        return tuple(result[:5])
+    raise ValueError(f"Unknown feature group: {group}")
+
+
+def _fit(
     examples: list[tuple[tuple[float, ...], float]],
     *,
     ridge: float,
@@ -93,7 +106,9 @@ def train_hybrid(
     *,
     horizon_days: int = 7,
     ridge: float = 100.0,
-    minimum_examples: int = 365,\n    feature_group: str = "all",\n) -> HybridModel:
+    minimum_examples: int = 365,
+    feature_group: str = "all",
+) -> HybridModel:
     _validate(history)
     if horizon_days < 1 or ridge <= 0 or minimum_examples < 30:
         raise ValueError("Invalid hybrid configuration")
@@ -131,7 +146,8 @@ def train_hybrid(
         scales=scales,
         blend=blend,
         train_examples=len(examples),
-        last_training_target=history[cutoff].day,\n        feature_group=feature_group,
+        last_training_target=history[cutoff].day,
+        feature_group=feature_group,
     )
 
 
