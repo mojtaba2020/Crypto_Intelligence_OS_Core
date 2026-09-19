@@ -216,11 +216,17 @@ def price_band_stabilization(
         episodes_by_band: dict[str, list[StabilizationEpisode]] = {
             band.label: [] for band in bands
         }
+        entries_by_band = {band.label: 0 for band in bands}
+        exits_by_band = {band.label: 0 for band in bands}
         current_band: PriceBand | None = None
         episode_start: date | None = None
         previous_day: date | None = None
 
-        def close_episode(end_day: date | None) -> None:
+        def close_episode(
+            end_day: date | None,
+            *,
+            observed_exit: bool = False,
+        ) -> None:
             nonlocal current_band, episode_start
             if current_band is None or episode_start is None or end_day is None:
                 return
@@ -233,19 +239,26 @@ def price_band_stabilization(
                     days=days,
                 )
             )
+            if observed_exit:
+                exits_by_band[current_band.label] += 1
             current_band = None
             episode_start = None
 
         for day in ordered_days:
             band = _band_for_price(source_days[day], bands)
             is_gap = previous_day is not None and day != previous_day + timedelta(days=1)
+            previous_band = current_band
             if is_gap:
                 close_episode(previous_day)
+                previous_band = None
             if band != current_band:
-                close_episode(previous_day)
+                if current_band is not None:
+                    close_episode(previous_day, observed_exit=True)
                 if band is not None:
                     current_band = band
                     episode_start = day
+                    if previous_day is not None and not is_gap and previous_band != band:
+                        entries_by_band[band.label] += 1
             previous_day = day
         close_episode(previous_day)
 
@@ -266,8 +279,8 @@ def price_band_stabilization(
                     longest_episode_days=max((episode.days for episode in episodes), default=0),
                     stable_episode_count=len(stable),
                     stable_days=sum(episode.days for episode in stable),
-                    entries=len(episodes),
-                    exits=len(episodes),
+                    entries=entries_by_band[band.label],
+                    exits=exits_by_band[band.label],
                     episodes=episodes,
                 )
             )
