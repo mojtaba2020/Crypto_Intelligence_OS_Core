@@ -6,10 +6,47 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import urllib.parse
+import urllib.request
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
-from extend_btc_history_coinbase import API_URL, _fetch
+API_URL = "https://api.exchange.coinbase.com/products/BTC-USD/candles"
+
+
+def _fetch(start: date, end: date) -> dict[date, tuple[float, float, float, float, float]]:
+    params = urllib.parse.urlencode(
+        {
+            "granularity": 86400,
+            "start": f"{start.isoformat()}T00:00:00Z",
+            "end": f"{(end + timedelta(days=1)).isoformat()}T00:00:00Z",
+        }
+    )
+    request = urllib.request.Request(  # noqa: S310 -- fixed HTTPS Coinbase URL
+        f"{API_URL}?{params}",
+        headers={"User-Agent": "Crypto-Intelligence-OS/0.3 research"},
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310
+        payload = json.loads(response.read().decode("utf-8"))
+    if not isinstance(payload, list):
+        raise ValueError("Unexpected Coinbase response")
+    result: dict[date, tuple[float, float, float, float, float]] = {}
+    for candle in payload:
+        if not isinstance(candle, list) or len(candle) < 6:
+            raise ValueError("Malformed Coinbase candle")
+        day = datetime.fromtimestamp(int(candle[0]), UTC).date()
+        if start <= day <= end:
+            result[day] = (
+                float(candle[1]),
+                float(candle[2]),
+                float(candle[3]),
+                float(candle[4]),
+                float(candle[5]),
+            )
+    expected = {start + timedelta(days=index) for index in range((end - start).days + 1)}
+    if expected != set(result):
+        raise ValueError("Missing Coinbase OHLCV days")
+    return result
 
 
 def download(database: Path, *, start: date, end: date) -> dict[str, object]:
@@ -20,7 +57,7 @@ def download(database: Path, *, start: date, end: date) -> dict[str, object]:
     current = start
     while current <= end:
         chunk_end = min(end, current + timedelta(days=199))
-        candles = _fetch(current, chunk_end, full_candles=True)
+        candles = _fetch(current, chunk_end)
         for day in sorted(candles):
             low, high, opening, closing, volume = candles[day]
             if not (0 < low <= min(opening, closing) <= max(opening, closing) <= high):
