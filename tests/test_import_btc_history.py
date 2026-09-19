@@ -15,9 +15,10 @@ def test_import_preserves_missing_days_and_provenance(tmp_path):
     assert report["missing_ranges"] == [{"start": "2011-01-02", "end": "2011-01-02"}]
     with sqlite3.connect(target) as connection:
         assert connection.execute("SELECT COUNT(*) FROM daily_price").fetchone()[0] == 2
-        assert connection.execute(
-            "SELECT value FROM provenance WHERE key = 'metric'"
-        ).fetchone()[0] == "BTC PriceUSD daily aggregate; not Coinbase OHLCV"
+        assert (
+            connection.execute("SELECT value FROM provenance WHERE key = 'metric'").fetchone()[0]
+            == "BTC PriceUSD daily aggregate; not Coinbase OHLCV"
+        )
 
 
 def test_import_rejects_invalid_prices(tmp_path):
