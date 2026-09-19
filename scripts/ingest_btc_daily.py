@@ -28,7 +28,7 @@ def main() -> int:
         last_open = store.last_open_time()
         # First run: 90 complete days. Later runs: overlap by 2 days to detect revisions.
         start = (
-            max(last_open - timedelta(days=2), end - timedelta(days=90))
+            last_open - timedelta(days=2)
             if last_open is not None
             else end - timedelta(days=90)
         )
