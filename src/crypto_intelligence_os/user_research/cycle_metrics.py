@@ -5,11 +5,10 @@ This module measures ratios, calendar-day gaps, halving distances, and price-ban
 occupancy. It does not infer extrema and does not claim predictive probability.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from itertools import pairwise
 from typing import Literal
 
 
@@ -140,10 +139,10 @@ def extremum_relationships(
     output: list[ExtremumRatio] = []
     for kind in ("peak", "trough"):
         same_kind = [point for point in ordered if point.kind == kind]
-        for first, second in zip(same_kind, same_kind[1:], strict=False):
+        for first, second in pairwise(same_kind):
             output.append(_ratio(first, second, f"{kind}_to_{kind}"))
 
-    for first, second in zip(ordered, ordered[1:], strict=False):
+    for first, second in pairwise(ordered):
         if first.kind == second.kind:
             continue
         output.append(_ratio(first, second, f"{first.kind}_to_{second.kind}"))
