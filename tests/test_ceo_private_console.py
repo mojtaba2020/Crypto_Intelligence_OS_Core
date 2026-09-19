@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
-
 from scripts.render_ceo_private_console import render_console
+
+import pytest
 
 
 def facts() -> dict[str, str | int]:
