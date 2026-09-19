@@ -6,10 +6,10 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from scripts.archive_btc_90d import validate_daily_bars
 
 from crypto_intelligence_os.adapters.market_data import COINBASE_BTC_USD, COINBASE_SOURCE_ID
 from crypto_intelligence_os.market_data import BarStatus, OHLCVBar, Timeframe
-from scripts.archive_btc_90d import validate_daily_bars
 
 
 def sample_bar(start: datetime, *, ingested_at: datetime) -> OHLCVBar:
