@@ -62,6 +62,19 @@ jobs:
           python -m pip install -e .
           python -m scripts.ceo_inspect_archive
 
+      - name: "Mission 6 · Generate private CEO iPad console from audited archive"
+        if: ${{ github.event_name == 'push' || inputs.mission == 'inspect_archive' }}
+        run: python -m scripts.render_ceo_private_console
+
+      - name: "Mission 7 · Attach private CEO console to this run"
+        if: ${{ github.event_name == 'push' || inputs.mission == 'inspect_archive' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ceo-private-console-${{ github.run_id }}
+          path: ceo_private_console.html
+          if-no-files-found: error
+          retention-days: 7
+
       - name: "Mission 4 · Fetch live public BTC/USD market sample"
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.mission == 'verify_live_feed' }}
         run: |
