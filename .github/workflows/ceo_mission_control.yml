@@ -88,7 +88,7 @@ jobs:
             echo "1. **[Open this run's Artifacts section](${RUN_URL}#artifacts)** and download **${ARTIFACT_NAME}** (ZIP)."
             echo "2. On iPad, open the ZIP in Files and open **ceo_private_console.html**."
             echo "3. This is a **historical snapshot**, not a live dashboard; it does not start or cancel jobs."
-            echo "4. **[See current mission status and start an approved read-only mission](${WORKFLOW_URL)** in authenticated GitHub."
+            echo "4. **[See current mission status and start an approved read-only mission](${WORKFLOW_URL})** in authenticated GitHub."
             echo
             echo "Artifact retention: 7 days. The repository and artifact remain private to authorized GitHub users."
           } >> "$GITHUB_STEP_SUMMARY"
