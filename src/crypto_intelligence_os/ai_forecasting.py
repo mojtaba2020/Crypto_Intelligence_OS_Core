@@ -123,22 +123,17 @@ def train(
     means = [sum(features[j] for _, features, _ in rows) / len(rows) for j in range(3)]
     scales = [
         max(
-            sqrt(
-                sum((features[j] - means[j]) ** 2 for _, features, _ in rows)
-                / len(rows)
-            ),
+            sqrt(sum((features[j] - means[j]) ** 2 for _, features, _ in rows) / len(rows)),
             1e-8,
         )
         for j in range(3)
     ]
     design = [
-        [1.0, *((features[j] - means[j]) / scales[j] for j in range(3))]
-        for _, features, _ in rows
+        [1.0, *((features[j] - means[j]) / scales[j] for j in range(3))] for _, features, _ in rows
     ]
     matrix = [
         [
-            sum(vector[i] * vector[j] for vector in design)
-            + (ridge if i == j and i > 0 else 0.0)
+            sum(vector[i] * vector[j] for vector in design) + (ridge if i == j and i > 0 else 0.0)
             for j in range(4)
         ]
         for i in range(4)
@@ -159,17 +154,14 @@ def train(
     )
 
 
-def predict(
-    model: TrainedModel, history: tuple[Observation, ...]
-) -> float:
+def predict(model: TrainedModel, history: tuple[Observation, ...]) -> float:
     """Predict future close using the most recent completed daily observation."""
     _validate(history)
     if len(history) < 15:
         raise ValueError("At least 15 completed daily closes required")
     features = _features(history, len(history) - 1)
     predicted_log_return = model.intercept + sum(
-        weight * feature
-        for weight, feature in zip(model.coefficients, features, strict=True)
+        weight * feature for weight, feature in zip(model.coefficients, features, strict=True)
     )
     return history[-1].close * exp(predicted_log_return)
 
