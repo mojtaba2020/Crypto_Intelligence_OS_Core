@@ -143,7 +143,7 @@ def train(
         for i in range(4)
     ]
     weights = _solve(matrix, rhs)
-    coefficients = tuple(weights[j + 1] / scales[j] for j in range(3))
+    coefficients = (weights[1] / scales[0], weights[2] / scales[1], weights[3] / scales[2])
     intercept = weights[0] - sum(coefficients[j] * means[j] for j in range(3))
     return TrainedModel(
         horizon_days=horizon_days,
