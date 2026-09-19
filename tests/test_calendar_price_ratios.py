@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from crypto_intelligence_os.market_data.calendar_price_ratios import (
+from crypto_intelligence_os.user_research.calendar_price_ratios import (
     PERIODS,
     PricePoint,
     advance_calendar,
