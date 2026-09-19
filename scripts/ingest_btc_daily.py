@@ -30,11 +30,7 @@ def main() -> int:
     with BTCArchive(DB_PATH) as store:
         last_open = store.last_open_time()
         # First run: 90 complete days. Later runs: overlap by 2 days to detect revisions.
-        start = (
-            last_open - timedelta(days=2)
-            if last_open is not None
-            else end - timedelta(days=90)
-        )
+        start = last_open - timedelta(days=2) if last_open is not None else end - timedelta(days=90)
         if start >= end:
             raise ValueError("Stored last candle is in the future")
         bars = source.fetch_final_bars(
@@ -54,9 +50,7 @@ def main() -> int:
         archived = store.all_bars()
         if not archived:
             raise ValueError("Archive contains no rows")
-        validate_daily_bars(
-            archived, start=archived[0].open_time, end=end, cutoff=completed_at
-        )
+        validate_daily_bars(archived, start=archived[0].open_time, end=end, cutoff=completed_at)
         count = store.count()
     checksum = hashlib.sha256(DB_PATH.read_bytes()).hexdigest()
     report: dict[str, str | int] = {
