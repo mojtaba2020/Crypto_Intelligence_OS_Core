@@ -16,12 +16,8 @@ from typing import Any
 
 REPORT_PATH = Path("data/btc_ingestion_report.json")
 REPOSITORY = "mojtaba2020/Crypto_Intelligence_OS_Core"
-DATA_BRANCH_URL = (
-    f"https://github.com/{REPOSITORY}/tree/data/btc-usd-daily/data"
-)
-WORKFLOW_URL = (
-    f"https://github.com/{REPOSITORY}/actions/workflows/btc_daily_durable.yml"
-)
+DATA_BRANCH_URL = f"https://github.com/{REPOSITORY}/tree/data/btc-usd-daily/data"
+WORKFLOW_URL = f"https://github.com/{REPOSITORY}/actions/workflows/btc_daily_durable.yml"
 
 
 def build_mission_board(report: dict[str, Any], *, run_id: str) -> str:
