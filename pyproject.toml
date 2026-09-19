@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crypto-intelligence-os"
-version = "0.2.0"
-description = "Provider-neutral core and point-in-time market-data foundations for Crypto Intelligence OS"
+version = "0.3.0"
+description = "Provider-neutral core with point-in-time-safe live Bitcoin market-data ingestion"
 readme = "README.md"
 requires-python = ">=3.13,<3.15"
 license = { text = "Proprietary" }
