@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - "scripts/import_btc_history.py"
-      - "scripts/evaluate_btc_long_history.py"
+      - "scripts/extend_btc_history_coinbase.py"\n      - "scripts/evaluate_btc_long_history.py"
       - ".github/workflows/btc_long_history_ai.yml"
 permissions:
   contents: read
@@ -36,5 +36,5 @@ jobs:
           name: btc-long-history-evaluation
           path: |
             .research/import_report.json
-            .research/evaluation_report.json
+            .research/coinbase_extension_report.json\n            .research/evaluation_7d_1y.json\n            .research/evaluation_7d_full.json\n            .research/evaluation_30d_4y.json
           retention-days: 30
