@@ -29,14 +29,18 @@ def _fetch(start: date, end: date) -> dict[date, str]:
             "end": f"{(end + timedelta(days=1)).isoformat()}T00:00:00Z",
         }
     )
-    request = urllib.request.Request(
+    request = urllib.request.Request(  # noqa: S310 -- fixed HTTPS Coinbase URL
         f"{API_URL}?{params}",
         headers={"User-Agent": "Crypto-Intelligence-OS/0.3 research"},
     )
-    with urllib.request.urlopen(  # noqa: S310 -- request URL is fixed HTTPS above\n        request, timeout=60\n    ) as response:
+    with urllib.request.urlopen(  # noqa: S310 -- fixed HTTPS request above
+        request,
+        timeout=60,
+    ) as response:
         payload = json.loads(response.read().decode("utf-8"))
     if not isinstance(payload, list):
         raise ValueError("Unexpected Coinbase response")
+
     prices: dict[date, str] = {}
     for candle in payload:
         if not isinstance(candle, list) or len(candle) < 6:
@@ -47,25 +51,37 @@ def _fetch(start: date, end: date) -> dict[date, str]:
             if float(close) <= 0:
                 raise ValueError(f"Invalid Coinbase close on {day}")
             prices[day] = close
-    expected = {start + timedelta(days=index) for index in range((end - start).days + 1)}
+
+    expected = {
+        start + timedelta(days=index)
+        for index in range((end - start).days + 1)
+    }
     missing = sorted(expected - set(prices))
     if missing:
         raise ValueError(f"Coinbase daily candles missing: {missing[:5]}")
     return prices
 
 
-def extend(database: Path, *, completed_through: date, overlap_days: int = 4) -> dict:
+def extend(
+    database: Path,
+    *,
+    completed_through: date,
+    overlap_days: int = 4,
+) -> dict[str, object]:
     if overlap_days < 1:
         raise ValueError("overlap_days must be positive")
+
     with sqlite3.connect(database) as connection:
         last_row = connection.execute(
             "SELECT day, price_usd FROM daily_price ORDER BY day DESC LIMIT 1"
         ).fetchone()
         if not last_row:
             raise ValueError("Historical archive is empty")
+
         historical_last = date.fromisoformat(last_row[0])
         if completed_through <= historical_last:
             raise ValueError("No Coinbase extension days requested")
+
         fetch_start = historical_last - timedelta(days=overlap_days - 1)
         prices = _fetch(fetch_start, completed_through)
 
@@ -73,24 +89,30 @@ def extend(database: Path, *, completed_through: date, overlap_days: int = 4) ->
             "SELECT day, price_usd FROM daily_price WHERE day >= ? ORDER BY day",
             (fetch_start.isoformat(),),
         ).fetchall()
-        overlap_diffs = []
+        overlap_diffs: list[tuple[date, float]] = []
         for raw_day, raw_price in overlap_rows:
             day = date.fromisoformat(raw_day)
             if day in prices:
                 reference = float(raw_price)
                 difference = 100 * abs(float(prices[day]) - reference) / reference
                 overlap_diffs.append((day, difference))
+
         if not overlap_diffs:
             raise ValueError("No source-overlap dates available for transition check")
+
         max_overlap = max(value for _, value in overlap_diffs)
         if max_overlap > 5.0:
-            raise ValueError(\n                "Coinbase/Coin Metrics overlap divergence too large: "\n                f"{max_overlap:.3f}%"\n            )
+            raise ValueError(
+                "Coinbase/Coin Metrics overlap divergence too large: "
+                f"{max_overlap:.3f}%"
+            )
 
         extension_start = historical_last + timedelta(days=1)
         extension_days = [
             extension_start + timedelta(days=index)
             for index in range((completed_through - extension_start).days + 1)
         ]
+
         with connection:
             connection.executemany(
                 "INSERT INTO daily_price(day, price_usd, source) VALUES (?, ?, ?)",
@@ -111,6 +133,7 @@ def extend(database: Path, *, completed_through: date, overlap_days: int = 4) ->
                 "INSERT OR REPLACE INTO provenance(key, value) VALUES (?, ?)",
                 provenance.items(),
             )
+
         integrity = connection.execute("PRAGMA integrity_check").fetchone()
         if not integrity or integrity[0] != "ok":
             raise ValueError("Extended SQLite integrity check failed")
@@ -140,9 +163,14 @@ def main() -> int:
         default=datetime.now(UTC).date() - timedelta(days=1),
     )
     arguments = parser.parse_args()
-    report = extend(arguments.database, completed_through=arguments.completed_through)
+    report = extend(
+        arguments.database,
+        completed_through=arguments.completed_through,
+    )
     arguments.report.parent.mkdir(parents=True, exist_ok=True)
-    arguments.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    arguments.report.write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n"
+    )
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0
 
