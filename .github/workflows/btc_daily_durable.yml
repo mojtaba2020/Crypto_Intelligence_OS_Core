@@ -83,6 +83,9 @@ jobs:
           DATA_BRANCH="data/btc-usd-daily"
           cp data/btc_usd_daily.sqlite "$RUNNER_TEMP/btc_usd_daily.sqlite"
           cp data/btc_ingestion_report.json "$RUNNER_TEMP/btc_ingestion_report.json"
+          # Moving the generated untracked files avoids a checkout collision with the
+          # already-tracked database and report on an existing data branch.
+          rm -f data/btc_usd_daily.sqlite data/btc_ingestion_report.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git show-ref --verify --quiet "refs/remotes/origin/$DATA_BRANCH"; then
