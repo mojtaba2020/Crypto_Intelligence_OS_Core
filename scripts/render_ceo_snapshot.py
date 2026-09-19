@@ -50,9 +50,12 @@ live dashboard or an autonomous AI agent. The collector and validator ran as
 deterministic Python software.</p>
 <div class="grid">
 <div class="panel"><small>Task status</small><div class="value">{field("status")}</div></div>
-<div class="panel"><small>Archived BTC/USD candles</small><div class="value">{field("archive_total_count")}</div></div>
-<div class="panel"><small>Newly archived</small><div class="value">{field("inserted_count")}</div></div>
-<div class="panel"><small>Validated this run</small><div class="value">{field("fetched_count")}</div></div>
+<div class="panel"><small>Archived BTC/USD candles</small>
+<div class="value">{field("archive_total_count")}</div></div>
+<div class="panel"><small>Newly archived</small>
+<div class="value">{field("inserted_count")}</div></div>
+<div class="panel"><small>Validated this run</small>
+<div class="value">{field("fetched_count")}</div></div>
 </div>
 <section class="panel"><h2>Mission trace</h2><dl>
 <dt>Run ID</dt><dd>{field("run_id")}</dd>
