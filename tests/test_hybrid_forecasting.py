@@ -11,8 +11,7 @@ from crypto_intelligence_os.hybrid_forecasting import features, predict_hybrid, 
 def _history(days: int = 1000) -> tuple[Observation, ...]:
     start = date(2020, 1, 1)
     return tuple(
-        Observation(start + timedelta(days=index), 10000.0 + index * 10.0)
-        for index in range(days)
+        Observation(start + timedelta(days=index), 10000.0 + index * 10.0) for index in range(days)
     )
 
 
@@ -33,8 +32,7 @@ def test_features_do_not_look_into_future() -> None:
 def test_future_target_is_not_used_in_training() -> None:
     history = _history()
     modified = history[:-7] + tuple(
-        Observation(point.day, point.close * 100)
-        for point in history[-7:]
+        Observation(point.day, point.close * 100) for point in history[-7:]
     )
     original = train_hybrid(history[:-7])
     changed = train_hybrid(modified[:-7])
