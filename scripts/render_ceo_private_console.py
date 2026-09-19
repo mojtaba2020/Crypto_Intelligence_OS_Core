@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: E501
 """Offline, private CEO mobile console generated from one verified completed mission.
 
 Never publish this HTML to public Pages: download the artifact from the private run.
@@ -7,11 +8,9 @@ Never publish this HTML to public Pages: download the artifact from the private 
 from __future__ import annotations
 
 import html
-import json
 import os
 import re
 from pathlib import Path
-from typing import Any
 
 from scripts.ceo_inspect_archive import inspect_archive
 
