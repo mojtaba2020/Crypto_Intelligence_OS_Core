@@ -8,6 +8,9 @@ on:
     branches: ["main"]
     paths:
       - ".github/workflows/btc_daily_durable.yml"
+      - "scripts/ingest_btc_daily.py"
+      - "scripts/render_ceo_snapshot.py"
+      - "src/crypto_intelligence_os/adapters/market_data/btc_archive.py"
 
 permissions:
   contents: write
