@@ -1,0 +1,108 @@
+name: CEO Mission Control — live run and cancel
+
+on:
+  workflow_dispatch:
+    inputs:
+      mission:
+        description: "CEO-approved research mission (read-only; no trading)"
+        required: true
+        type: choice
+        default: inspect_archive
+        options:
+          - inspect_archive
+          - verify_live_feed
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/ceo_mission_control.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ceo-mission:
+    name: "CEO mission · verified public BTC/USD research"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "Mission 1 · CEO starts bounded read-only research"
+        env:
+          SELECTED_MISSION: ${{ inputs.mission || 'inspect_archive' }}
+        run: |
+          set -euo pipefail
+          case "$SELECTED_MISSION" in
+            inspect_archive|verify_live_feed) ;;
+            *) echo "Unsupported mission"; exit 1 ;;
+          esac
+          echo "CEO requested mission: $SELECTED_MISSION"
+          echo "Execution run: $GITHUB_RUN_ID"
+          echo "Use this GitHub Actions run page to watch real job/step status and cancel if necessary."
+          echo "No autonomous AI agent, exchange account, trading, or financial action is involved."
+
+      - name: "Mission 2 · Check out the approved private research code"
+        uses: actions/checkout@v4
+
+      - name: "Mission 3 · Set up audited Python runtime"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: "Mission 4 · Fetch actual private BTC/USD archive"
+        if: ${{ github.event_name == 'push' || inputs.mission == 'inspect_archive' }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin             "refs/heads/data/btc-usd-daily:refs/remotes/origin/data/btc-usd-daily"
+          mkdir -p data
+          git show "origin/data/btc-usd-daily:data/btc_usd_daily.sqlite" > data/btc_usd_daily.sqlite
+          git show "origin/data/btc-usd-daily:data/btc_ingestion_report.json" > data/btc_ingestion_report.json
+
+      - name: "Mission 5 · Validate actual source-backed BTC archive"
+        if: ${{ github.event_name == 'push' || inputs.mission == 'inspect_archive' }}
+        run: |
+          python -m pip install -e .
+          python -m scripts.ceo_inspect_archive
+
+      - name: "Mission 4 · Fetch live public BTC/USD market sample"
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mission == 'verify_live_feed' }}
+        run: |
+          set -euo pipefail
+          python -m pip install -e .
+          python scripts/fetch_btc_sample.py > "$RUNNER_TEMP/live_btc_sample.json"
+          echo "Received live public BTC/USD market-data response."
+
+      - name: "Mission 5 · Validate live feed and publish real result"
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mission == 'verify_live_feed' }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime
+          from pathlib import Path
+
+          payload = json.loads((Path(os.environ["RUNNER_TEMP"]) / "live_btc_sample.json").read_text())
+          cutoff = datetime.fromisoformat(payload["source_time"])
+          rows = payload.get("bars", [])
+          if (
+              type(payload.get("bar_count")) is not int
+              or payload["bar_count"] < 1
+              or not rows
+          ):
+              raise SystemExit("No final BTC/USD candles returned by Coinbase")
+          for bar in rows:
+              if (
+                  bar.get("instrument_id") != "market:coinbase:spot:btc-usd"
+                  or bar.get("source_id") != "source:coinbase.advanced-trade.public"
+                  or bar.get("status") != "FINAL"
+                  or datetime.fromisoformat(bar["available_at"]) > cutoff
+              ):
+                  raise SystemExit("Invalid, future or unrelated market bar returned")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(
+                  "## CEO Mission Control · live BTC/USD verification\n\n"
+                  "**Mission completed — actual read-only public data fetch.**\n\n"
+                  f"- Final candles received: {payload['bar_count']}\n"
+                  f"- Coinbase server UTC: {cutoff.isoformat()}\n"
+                  "- No exchange account, trading, or autonomous AI agent involved.\n"
+              )
+          print("CEO LIVE BTC/USD VERIFICATION: PASS")
+          PY
