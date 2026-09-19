@@ -48,7 +48,7 @@ jobs:
         run: python -m pip install -e .
 
       - name: Collect, validate and persist real public BTC/USD candles
-        run: python scripts/ingest_btc_daily.py
+        run: python -m scripts.ingest_btc_daily
 
       - name: Render factual CEO snapshot for this completed ingestion
         run: python scripts/render_ceo_snapshot.py
