@@ -101,8 +101,7 @@ def main() -> None:
     args = parser.parse_args()
     report = download(args.database, start=args.start, end=args.end)
     args.report.parent.mkdir(parents=True, exist_ok=True)
-    args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "
-")
+    args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     print(json.dumps(report, indent=2, sort_keys=True))
 
 
