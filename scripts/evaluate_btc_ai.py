@@ -30,7 +30,10 @@ def main() -> int:
         bars = archive.all_bars()
     if not bars:
         raise ValueError("Archive has no candles")
-    if any(\n        bar.timeframe is not Timeframe.ONE_DAY or bar.status is not BarStatus.FINAL\n        for bar in bars\n    ):
+    if any(
+        bar.timeframe is not Timeframe.ONE_DAY or bar.status is not BarStatus.FINAL
+        for bar in bars
+    ):
         raise ValueError("Archive must contain final daily candles only")
     instruments = {bar.instrument_id for bar in bars}
     sources = {bar.source_id for bar in bars}
@@ -59,7 +62,8 @@ def main() -> int:
         "warning": "Research baseline only; short history is not cycle validation.",
     }
     arguments.report.parent.mkdir(parents=True, exist_ok=True)
-    arguments.report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+    arguments.report.write_text(json.dumps(result, indent=2, sort_keys=True) + "
+")
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 
