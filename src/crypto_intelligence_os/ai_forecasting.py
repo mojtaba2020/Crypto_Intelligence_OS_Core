@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from itertools import pairwise
 from math import exp, isfinite, log, sqrt
 
 
@@ -44,7 +45,7 @@ def _validate(history: tuple[Observation, ...]) -> None:
     for point in history:
         if not isfinite(point.close) or point.close <= 0:
             raise ValueError("Closes must be finite and positive")
-    for previous, current in zip(history, history[1:], strict=False):
+    for previous, current in pairwise(history):
         if (current.day - previous.day).days != 1:
             raise ValueError("Daily observations must be contiguous and strictly ordered")
 
