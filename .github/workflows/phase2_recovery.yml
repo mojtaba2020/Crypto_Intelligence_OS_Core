@@ -87,6 +87,13 @@ jobs:
                   target.write_bytes(content)
                   print("Verified and staged:", rel)
           print("All 17 files match verified Phase 2 v0.1.4 manifest.")
+          coinbase_file = root / "src/crypto_intelligence_os/adapters/market_data/coinbase.py"
+          before = "return min(0.5 * (2**attempt), 8.0)"
+          after = "return float(min(0.5 * (2**attempt), 8.0))"
+          original = coinbase_file.read_text()
+          assert original.count(before) == 1, "Unexpected Coinbase retry-delay implementation"
+          coinbase_file.write_text(original.replace(before, after))
+          print("Applied narrow mypy return-type fix to Phase 2 Coinbase adapter.")
           PY
       - name: Install validation dependencies
         run: |
