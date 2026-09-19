@@ -119,12 +119,13 @@ def train_hybrid(
     if len(examples) < minimum_examples:
         raise ValueError("Insufficient resolved training labels")
 
-    # A strictly earlier calibration block chooses whether to trust the ML signal.
+    # Embargo calibration labels: no provisional-training target crosses the split.
+    # The last calibration labels must also be resolved at the forecast origin.
     calibration = min(365, max(30, len(examples) // 5))
     split = len(examples) - calibration
     blend = 0.0
-    if split >= minimum_examples:
-        provisional = _fit(examples[:split], ridge=ridge)
+    if split - horizon_days >= minimum_examples:
+        provisional = _fit(examples[: split - horizon_days], ridge=ridge)
         errors = []
         for weight in (0.0, 0.25, 0.5, 0.75, 1.0):
             absolute = sum(
