@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Evaluate a historical BTC PriceUSD research baseline without mixing Coinbase candles."""
+
 from __future__ import annotations
 
 import argparse
@@ -82,8 +83,7 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
     return {
         "status": "HISTORICAL_RESEARCH_EVALUATED",
         "metric": (
-            "Research close series with explicit Coin Metrics-to-Coinbase "
-            "source transition"
+            "Research close series with explicit Coin Metrics-to-Coinbase source transition"
         ),
         "sources": sorted(sources),
         "source_transition_day": transition_day,
