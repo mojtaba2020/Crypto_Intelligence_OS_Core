@@ -75,6 +75,24 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: "Mission 8 · Show iPad download and current-status links"
+        if: ${{ github.event_name == 'push' || inputs.mission == 'inspect_archive' }}
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/workflows/ceo_mission_control.yml
+          ARTIFACT_NAME: ceo-private-console-${{ github.run_id }}
+        run: |
+          {
+            echo "## CEO iPad console · private download"
+            echo
+            echo "1. **[Open this run's Artifacts section](${RUN_URL}#artifacts)** and download **${ARTIFACT_NAME}** (ZIP)."
+            echo "2. On iPad, open the ZIP in Files and open **ceo_private_console.html**."
+            echo "3. This is a **historical snapshot**, not a live dashboard; it does not start or cancel jobs."
+            echo "4. **[See current mission status and start an approved read-only mission](${WORKFLOW_URL)** in authenticated GitHub."
+            echo
+            echo "Artifact retention: 7 days. The repository and artifact remain private to authorized GitHub users."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: "Mission 4 · Fetch live public BTC/USD market sample"
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.mission == 'verify_live_feed' }}
         run: |
