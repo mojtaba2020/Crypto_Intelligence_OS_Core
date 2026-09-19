@@ -31,8 +31,7 @@ def main() -> int:
     if not bars:
         raise ValueError("Archive has no candles")
     if any(
-        bar.timeframe is not Timeframe.ONE_DAY or bar.status is not BarStatus.FINAL
-        for bar in bars
+        bar.timeframe is not Timeframe.ONE_DAY or bar.status is not BarStatus.FINAL for bar in bars
     ):
         raise ValueError("Archive must contain final daily candles only")
     instruments = {bar.instrument_id for bar in bars}
