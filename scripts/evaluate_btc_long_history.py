@@ -6,6 +6,7 @@ import argparse
 import json
 import sqlite3
 from datetime import date, timedelta
+from itertools import pairwise
 from math import isfinite
 from pathlib import Path
 
@@ -26,12 +27,14 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
         raise ValueError("Empty archive or mixed price sources")
     if rows[0][2] != "coinmetrics:btc:PriceUSD:1d":
         raise ValueError("Expected Coin Metrics PriceUSD research data only")
-    observations = tuple(Observation(date.fromisoformat(day), float(price)) for day, price, _ in rows)
+    observations = tuple(
+        Observation(date.fromisoformat(day), float(price)) for day, price, _ in rows
+    )
     if any(not isfinite(point.close) or point.close <= 0 for point in observations):
         raise ValueError("Invalid historical price")
     if observations[0].day != date(2011, 1, 1):
         raise ValueError("Historical series does not begin on 2011-01-01")
-    for previous, current in zip(observations, observations[1:]):
+    for previous, current in pairwise(observations):
         if current.day - previous.day != timedelta(days=1):
             raise ValueError(f"Missing daily data between {previous.day} and {current.day}")
     last_origin = len(observations) - horizon - 1
@@ -69,7 +72,10 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
         "persistence_mae_usd": sum(e[1] for e in errors) / n,
         "model_mape_pct": sum(e[2] for e in errors) / n,
         "persistence_mape_pct": sum(e[3] for e in errors) / n,
-        "warning": "Research only. Historical archive may be stale; no live forecast or profitability claim.",
+        "warning": (
+            "Research only. Historical archive may be stale; "
+            "no live forecast or profitability claim."
+        ),
     }
 
 
