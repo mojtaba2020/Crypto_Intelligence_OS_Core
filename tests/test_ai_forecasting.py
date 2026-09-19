@@ -15,8 +15,7 @@ from crypto_intelligence_os.ai_forecasting import (
 def history(count: int = 95) -> tuple[Observation, ...]:
     start = date(2025, 1, 1)
     return tuple(
-        Observation(start + timedelta(days=index), 100 + index * 0.5)
-        for index in range(count)
+        Observation(start + timedelta(days=index), 100 + index * 0.5) for index in range(count)
     )
 
 
