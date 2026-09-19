@@ -52,10 +52,7 @@ def _fetch(start: date, end: date) -> dict[date, str]:
                 raise ValueError(f"Invalid Coinbase close on {day}")
             prices[day] = close
 
-    expected = {
-        start + timedelta(days=index)
-        for index in range((end - start).days + 1)
-    }
+    expected = {start + timedelta(days=index) for index in range((end - start).days + 1)}
     missing = sorted(expected - set(prices))
     if missing:
         raise ValueError(f"Coinbase daily candles missing: {missing[:5]}")
@@ -103,8 +100,7 @@ def extend(
         max_overlap = max(value for _, value in overlap_diffs)
         if max_overlap > 5.0:
             raise ValueError(
-                "Coinbase/Coin Metrics overlap divergence too large: "
-                f"{max_overlap:.3f}%"
+                f"Coinbase/Coin Metrics overlap divergence too large: {max_overlap:.3f}%"
             )
 
         extension_start = historical_last + timedelta(days=1)
@@ -116,10 +112,7 @@ def extend(
         with connection:
             connection.executemany(
                 "INSERT INTO daily_price(day, price_usd, source) VALUES (?, ?, ?)",
-                (
-                    (day.isoformat(), prices[day], SOURCE)
-                    for day in extension_days
-                ),
+                ((day.isoformat(), prices[day], SOURCE) for day in extension_days),
             )
             provenance = {
                 "extension_source_url": API_URL,
@@ -168,9 +161,7 @@ def main() -> int:
         completed_through=arguments.completed_through,
     )
     arguments.report.parent.mkdir(parents=True, exist_ok=True)
-    arguments.report.write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n"
-    )
+    arguments.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0
 
