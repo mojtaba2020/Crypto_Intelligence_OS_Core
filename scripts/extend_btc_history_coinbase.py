@@ -21,7 +21,7 @@ API_URL = "https://api.exchange.coinbase.com/products/BTC-USD/candles"
 SOURCE = "coinbase:exchange:BTC-USD:1d:close"
 
 
-def _fetch(start: date, end: date) -> dict[date, str]:
+def _fetch(\n    start: date, end: date, *, full_candles: bool = False\n) -> dict[date, str] | dict[date, tuple[float, float, float, float, float]]:
     params = urllib.parse.urlencode(
         {
             "granularity": 86400,
@@ -41,7 +41,7 @@ def _fetch(start: date, end: date) -> dict[date, str]:
     if not isinstance(payload, list):
         raise ValueError("Unexpected Coinbase response")
 
-    prices: dict[date, str] = {}
+    prices: dict[date, str] | dict[date, tuple[float, float, float, float, float]] = {}
     for candle in payload:
         if not isinstance(candle, list) or len(candle) < 6:
             raise ValueError("Malformed Coinbase candle")
@@ -50,7 +50,7 @@ def _fetch(start: date, end: date) -> dict[date, str]:
             close = str(candle[4])
             if float(close) <= 0:
                 raise ValueError(f"Invalid Coinbase close on {day}")
-            prices[day] = close
+            if full_candles:\n                prices[day] = (\n                    float(candle[1]), float(candle[2]), float(candle[3]),\n                    float(candle[4]), float(candle[5]),\n                )\n            else:\n                prices[day] = close
 
     expected = {start + timedelta(days=index) for index in range((end - start).days + 1)}
     missing = sorted(expected - set(prices))
