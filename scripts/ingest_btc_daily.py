@@ -23,7 +23,9 @@ def main() -> int:
     source = CoinbasePublicCandleSource()
     source_time = source.fetch_server_time()
     end = source_time.replace(hour=0, minute=0, second=0, microsecond=0)
-    run_id = os.environ.get("GITHUB_RUN_ID", "").strip() or started_at.isoformat()
+    run_number = os.environ.get("GITHUB_RUN_ID", "").strip()
+    attempt = os.environ.get("GITHUB_RUN_ATTEMPT", "1").strip()
+    run_id = f"{run_number}-{attempt}" if run_number else started_at.isoformat()
     with BTCArchive(DB_PATH) as store:
         last_open = store.last_open_time()
         # First run: 90 complete days. Later runs: overlap by 2 days to detect revisions.
