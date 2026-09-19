@@ -1,0 +1,57 @@
+name: Phase 2 archival sample — 90 daily BTC/USD bars
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/phase2_archive_90d.yml"
+      - "scripts/archive_btc_90d.py"
+
+permissions:
+  contents: read
+
+jobs:
+  archive-public-candles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out private repository
+        uses: actions/checkout@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install project
+        run: python -m pip install -e .
+      - name: Fetch, validate, and archive daily public BTC/USD bars
+        run: python scripts/archive_btc_90d.py
+      - name: Preserve JSON archive and SHA-256 checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: coinbase-btc-usd-90d-${{ github.run_id }}
+          path: |
+            btc_usd_90d.json
+            btc_usd_90d.sha256
+          if-no-files-found: error
+          retention-days: 14
+      - name: Report results
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path("btc_usd_90d.json").read_text())
+          checksum = Path("btc_usd_90d.sha256").read_text().split()[0]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write(
+                  "## Validated historical BTC/USD sample\n\n"
+                  f"- Final daily candles: {data['bar_count']}\n"
+                  f"- UTC interval: [{data['start_inclusive']}, {data['end_exclusive']})\n"
+                  f"- Source server time: {data['source_server_time']}\n"
+                  f"- Recorded now (not observed historically): {data['recorded_at']}\n"
+                  f"- JSON SHA-256: `{checksum}`\n"
+                  "- Artifact retention: 14 days; no credentials or trades.\n"
+              )
+          PY
