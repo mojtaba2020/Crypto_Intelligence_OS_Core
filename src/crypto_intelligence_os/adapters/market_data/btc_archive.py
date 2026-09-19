@@ -57,9 +57,7 @@ class BTCArchive:
         return int(row[0])
 
     def all_bars(self) -> tuple[OHLCVBar, ...]:
-        rows = self._connection.execute(
-            "SELECT record FROM candles ORDER BY open_time"
-        ).fetchall()
+        rows = self._connection.execute("SELECT record FROM candles ORDER BY open_time").fetchall()
         return tuple(OHLCVBar.model_validate_json(row[0]) for row in rows)
 
     def integrity_check(self) -> None:
