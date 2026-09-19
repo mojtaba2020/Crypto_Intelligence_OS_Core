@@ -57,13 +57,11 @@ def test_archive_persists_and_preserves_first_ingestion(tmp_path: Path) -> None:
     bar = make_bar(start, ingested=first_seen)
     db = tmp_path / "btc.sqlite"
     with BTCArchive(db) as store:
-        assert record_run(
-            store, (bar,), run_id="one", started=first_seen, completed=first_seen
-        ) == 1
+        assert (
+            record_run(store, (bar,), run_id="one", started=first_seen, completed=first_seen) == 1
+        )
         repeated = bar.model_copy(update={"ingested_at": later})
-        assert record_run(
-            store, (repeated,), run_id="two", started=later, completed=later
-        ) == 0
+        assert record_run(store, (repeated,), run_id="two", started=later, completed=later) == 0
         assert store.count() == 1
         assert store.last_open_time() == start
         assert store.all_bars()[0].ingested_at == first_seen
@@ -78,9 +76,7 @@ def test_archive_rejects_conflicting_history_without_partial_commit(tmp_path: Pa
     seen = start + timedelta(days=3)
     bar = make_bar(start, ingested=seen)
     with BTCArchive(tmp_path / "btc.sqlite") as store:
-        assert record_run(
-            store, (bar,), run_id="one", started=seen, completed=seen
-        ) == 1
+        assert record_run(store, (bar,), run_id="one", started=seen, completed=seen) == 1
         conflicting = bar.model_copy(update={"close": Decimal("106")})
         with pytest.raises(ValueError, match="Historical candle revision"):
             record_run(
@@ -100,7 +96,5 @@ def test_archive_rejects_future_candle(tmp_path: Path) -> None:
     bar = make_bar(start, ingested=ingested)
     with BTCArchive(tmp_path / "btc.sqlite") as store:
         with pytest.raises(ValueError, match="Invalid candle"):
-            record_run(
-                store, (bar,), run_id="one", started=start, completed=ingested
-            )
+            record_run(store, (bar,), run_id="one", started=start, completed=ingested)
         assert store.count() == 0
