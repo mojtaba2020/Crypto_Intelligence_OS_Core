@@ -1,6 +1,6 @@
 {
   "archive_total_count": 90,
-  "completed_at_utc": "2026-09-19T17:40:19.511258+00:00",
+  "completed_at_utc": "2026-09-19T17:41:00.319172+00:00",
   "end_exclusive_utc": "2026-09-19T00:00:00+00:00",
   "fetched_count": 3,
   "first_archived_bar_utc": "2026-06-21T00:00:00+00:00",
@@ -8,12 +8,12 @@
   "instrument": "market:coinbase:spot:btc-usd",
   "last_archived_bar_utc": "2026-09-18T00:00:00+00:00",
   "persistence": "PRIVATE_GITHUB_DATA_BRANCH",
-  "run_id": "35458798650-1",
+  "run_id": "35458834962-1",
   "source": "source:coinbase.advanced-trade.public",
-  "source_time_utc": "2026-09-19T17:40:19.372000+00:00",
-  "sqlite_sha256": "83b0526d741a6e72a8b58bb5472abecfa548ab1d8b2de35fe7e5d1167947ae40",
+  "source_time_utc": "2026-09-19T17:41:00.087000+00:00",
+  "sqlite_sha256": "10b928c0f1307e7487dfde38eda58c9cad5ec8d4d436baeaec6f05db2eeb422c",
   "start_utc": "2026-09-16T00:00:00+00:00",
-  "started_at_utc": "2026-09-19T17:40:19.310225+00:00",
+  "started_at_utc": "2026-09-19T17:40:59.920354+00:00",
   "status": "COMPLETED",
   "worker_type": "DETERMINISTIC_MARKET_DATA_PIPELINE_NOT_AI_AGENT"
 }
