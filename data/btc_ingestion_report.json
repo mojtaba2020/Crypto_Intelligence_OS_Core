@@ -1,0 +1,19 @@
+{
+  "archive_total_count": 90,
+  "completed_at_utc": "2026-09-19T17:27:50.242693+00:00",
+  "end_exclusive_utc": "2026-09-19T00:00:00+00:00",
+  "fetched_count": 90,
+  "first_archived_bar_utc": "2026-06-21T00:00:00+00:00",
+  "inserted_count": 90,
+  "instrument": "market:coinbase:spot:btc-usd",
+  "last_archived_bar_utc": "2026-09-18T00:00:00+00:00",
+  "persistence": "PRIVATE_GITHUB_DATA_BRANCH",
+  "run_id": "35458153869-1",
+  "source": "source:coinbase.advanced-trade.public",
+  "source_time_utc": "2026-09-19T17:27:50.019000+00:00",
+  "sqlite_sha256": "8cbb8b11778b0065a2cd1ed81733f1a5a26dfca7d3294007f68c713c58a4de62",
+  "start_utc": "2026-06-21T00:00:00+00:00",
+  "started_at_utc": "2026-09-19T17:27:49.887547+00:00",
+  "status": "COMPLETED",
+  "worker_type": "DETERMINISTIC_MARKET_DATA_PIPELINE_NOT_AI_AGENT"
+}
