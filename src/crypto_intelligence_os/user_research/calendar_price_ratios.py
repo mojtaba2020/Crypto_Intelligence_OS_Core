@@ -4,8 +4,6 @@ An observation compares the close at two exact UTC timestamps. Missing endpoints
 are never filled. These are Mojtaba's historical ratios, not AI forecasts or forecast odds.
 """
 
-from __future__ import annotations
-
 from calendar import monthrange
 from dataclasses import dataclass
 from datetime import datetime, timedelta
