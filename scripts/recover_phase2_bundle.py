@@ -11,8 +11,14 @@ TARGET = Path("Crypto_Intelligence_OS_Phase2_RealBTC_Data_v0_1_4_verified.zip")
 SOURCE_SHA256 = "815e73a6294ba3ce6ee58d15b1c6ef027ef7cc5f48c13ba3d1a5506c601dc849"
 TARGET_SHA256 = "7cee582bee91f7e523d0097413fb196dd0b2058f8c28a5fab13e1feaeb17d32a"
 FIXES = {
-    "src/crypto_intelligence_os/adapters/market_data/coinbase.py": ("b656377b16b6c691d3b2564c8d0fdfcd07d7d930e771d82b36ea0edacbac6218", 13047),
-    "tests/test_point_in_time_phase2.py": ("78cac3e496b525dbcf34d9123e91a5658e41b2c194c0bd3b0dd05d7806810acf", 2391),
+    "src/crypto_intelligence_os/adapters/market_data/coinbase.py": (
+        "b656377b16b6c691d3b2564c8d0fdfcd07d7d930e771d82b36ea0edacbac6218",
+        13047,
+    ),
+    "tests/test_point_in_time_phase2.py": (
+        "78cac3e496b525dbcf34d9123e91a5658e41b2c194c0bd3b0dd05d7806810acf",
+        2391,
+    ),
 }
 
 
@@ -50,11 +56,15 @@ def main() -> None:
         for name, (digest, size) in FIXES.items():
             listed[name]["sha256"], listed[name]["size"] = digest, size
         manifest["bundle_id"] = "phase2-real-btc-data-v0.1.4"
-        manifest["description"] = "Read-only Coinbase BTC/USD ingestion; manifest integrity corrected and verified"
+        manifest["description"] = (
+            "Read-only Coinbase BTC/USD ingestion; manifest integrity corrected and verified"
+        )
         updated_manifest = (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode()
         with zipfile.ZipFile(TARGET, "w") as rebuilt:
             for info in infos:
-                payload = updated_manifest if info.filename == manifest_path else original.read(info)
+                payload = (
+                    updated_manifest if info.filename == manifest_path else original.read(info)
+                )
                 rebuilt.writestr(info, payload)
     with zipfile.ZipFile(TARGET) as verified:
         if verified.testzip() is not None:
