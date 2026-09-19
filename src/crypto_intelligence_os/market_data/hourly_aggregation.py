@@ -89,9 +89,15 @@ def aggregate_fixed_hours(
         bars = [item for item in ordered if item is not None]
         output.append(
             AggregateCandle(
-                source, start, end, bars[0].open,
-                max(x.high for x in bars), min(x.low for x in bars),
-                bars[-1].close, sum((x.volume for x in bars), Decimal(0)), hours,
+                source,
+                start,
+                end,
+                bars[0].open,
+                max(x.high for x in bars),
+                min(x.low for x in bars),
+                bars[-1].close,
+                sum((x.volume for x in bars), Decimal(0)),
+                hours,
             )
         )
     return tuple(output)
