@@ -4,7 +4,6 @@ import sqlite3
 from datetime import date
 
 import pytest
-
 from scripts.import_btc_history import import_history
 
 
