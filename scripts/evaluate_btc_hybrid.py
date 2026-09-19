@@ -15,7 +15,9 @@ from crypto_intelligence_os.ai_forecasting import Observation, predict, train
 from crypto_intelligence_os.hybrid_forecasting import predict_hybrid, train_hybrid
 
 
-def evaluate(\n    database: Path, *, horizon: int, holdout_days: int, step: int, ablation: bool = False\n) -> dict:
+def evaluate(
+    database: Path, *, horizon: int, holdout_days: int, step: int, ablation: bool = False
+) -> dict:
     if horizon < 1 or step < 1 or holdout_days < horizon + 1:
         raise ValueError("Invalid evaluation window")
     with sqlite3.connect(database) as connection:
@@ -44,14 +46,24 @@ def evaluate(\n    database: Path, *, horizon: int, holdout_days: int, step: int
             raise ValueError("Missing daily observation")
     first = max(365 + horizon + 365 - 1, len(observations) - holdout_days)
     last = len(observations) - horizon - 1
-    errors: list[tuple[float, ...]] = []\n    ablation_errors: dict[str, list[float]] = {\n        group: [] for group in ("no_halving", "no_extrema", "momentum_only")\n    }\n    regime_errors: dict[str, list[tuple[float, ...]]] = {\n        "up_90d": [], "down_90d": [], "flat_90d": []\n    }
+    errors: list[tuple[float, ...]] = []
+    ablation_errors: dict[str, list[float]] = {
+        group: [] for group in ("no_halving", "no_extrema", "momentum_only")
+    }
+    regime_errors: dict[str, list[tuple[float, ...]]] = {
+        "up_90d": [], "down_90d": [], "flat_90d": []
+    }
     for origin in range(first, last + 1, step):
         history = observations[: origin + 1]
         hybrid = train_hybrid(history, horizon_days=horizon)
         baseline = train(history, horizon_days=horizon)
         if hybrid.last_training_target > history[-1].day:
             raise ValueError("Hybrid future-label leakage")
-        actual = observations[origin + horizon].close\n        if ablation:\n            for group, group_errors in ablation_errors.items():\n                variant = train_hybrid(history, horizon_days=horizon, feature_group=group)\n                group_errors.append(abs(predict_hybrid(variant, history) - actual))
+        actual = observations[origin + horizon].close
+        if ablation:
+            for group, group_errors in ablation_errors.items():
+                variant = train_hybrid(history, horizon_days=horizon, feature_group=group)
+                group_errors.append(abs(predict_hybrid(variant, history) - actual))
         predictions = (
             predict_hybrid(hybrid, history),
             predict(baseline, history),
@@ -81,7 +93,13 @@ def evaluate(\n    database: Path, *, horizon: int, holdout_days: int, step: int
         "first_test_origin": observations[first].day.isoformat(),
         "last_test_origin": observations[first + (count - 1) * step].day.isoformat(),
         "source_transition_day": transition,
-        "metrics": metrics,\n        "regimes": regimes,\n        "ablation_mae_usd": (\n            {name: sum(values) / len(values) for name, values in ablation_errors.items()}\n            if ablation else None\n        ),\n        "regime_definition": "90-day trailing return: >10% up, <-10% down, otherwise flat",
+        "metrics": metrics,
+        "regimes": regimes,
+        "ablation_mae_usd": (
+            {name: sum(values) / len(values) for name, values in ablation_errors.items()}
+            if ablation else None
+        ),
+        "regime_definition": "90-day trailing return: >10% up, <-10% down, otherwise flat",
         "research_only": True,
     }
 
@@ -92,16 +110,19 @@ def main() -> None:
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--horizon", type=int, default=7)
     parser.add_argument("--holdout-days", type=int, default=365)
-    parser.add_argument("--step", type=int, default=7)\n    parser.add_argument("--ablation", action="store_true")
+    parser.add_argument("--step", type=int, default=7)
+    parser.add_argument("--ablation", action="store_true")
     args = parser.parse_args()
     report = evaluate(
         args.database,
         horizon=args.horizon,
         holdout_days=args.holdout_days,
-        step=args.step,\n        ablation=args.ablation,
+        step=args.step,
+        ablation=args.ablation,
     )
     args.report.parent.mkdir(parents=True, exist_ok=True)
-    args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "
+")
     print(json.dumps(report, indent=2, sort_keys=True))
 
 
