@@ -62,8 +62,7 @@ def main() -> int:
         "warning": "Research baseline only; short history is not cycle validation.",
     }
     arguments.report.parent.mkdir(parents=True, exist_ok=True)
-    arguments.report.write_text(json.dumps(result, indent=2, sort_keys=True) + "
-")
+    arguments.report.write_text(json.dumps(result, indent=2, sort_keys=True) + chr(10))
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 
