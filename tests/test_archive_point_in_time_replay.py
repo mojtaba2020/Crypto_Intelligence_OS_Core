@@ -24,18 +24,27 @@ def test_replay_excludes_bars_not_yet_ingested_and_keeps_first_observation(tmp_p
             close_time=open_time + timedelta(days=1),
             available_at=open_time + timedelta(days=1, seconds=1),
             ingested_at=ingested_at,
-            open=Decimal("100"), high=Decimal("110"), low=Decimal("90"),
-            close=Decimal("105"), volume=Decimal("2"),
+            open=Decimal("100"),
+            high=Decimal("110"),
+            low=Decimal("90"),
+            close=Decimal("105"),
+            volume=Decimal("2"),
             source_id="source:coinbase.advanced-trade.public",
         )
 
     with BTCArchive(tmp_path / "btc.sqlite") as archive:
-        assert archive.persist(
-            (bar(day, first_ingestion), bar(day + timedelta(days=1), late_ingestion)),
-            run_id="first", started_at=late_ingestion, completed_at=late_ingestion,
-            source_time=late_ingestion, requested_start=day,
-            requested_end=day + timedelta(days=2),
-        ) == 2
+        assert (
+            archive.persist(
+                (bar(day, first_ingestion), bar(day + timedelta(days=1), late_ingestion)),
+                run_id="first",
+                started_at=late_ingestion,
+                completed_at=late_ingestion,
+                source_time=late_ingestion,
+                requested_start=day,
+                requested_end=day + timedelta(days=2),
+            )
+            == 2
+        )
         assert archive.bars_known_as_of(day + timedelta(days=1, hours=12)) == ()
         early = archive.bars_known_as_of(day + timedelta(days=2, hours=1))
         assert len(early) == 1
