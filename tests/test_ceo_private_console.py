@@ -29,7 +29,7 @@ def test_private_console_has_real_links_and_no_fake_controls() -> None:
 
 def test_private_console_escapes_untrusted_metadata() -> None:
     data = facts()
-    data["last_ingestion_run_id"] = '<img src=x onerror=alert(1)>'
+    data["last_ingestion_run_id"] = "<img src=x onerror=alert(1)>"
     output = render_console(data, "98765")
     assert "&lt;img src=x onerror=alert(1)&gt;" in output
     assert "<img src=x" not in output
