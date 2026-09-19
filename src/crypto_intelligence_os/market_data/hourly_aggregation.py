@@ -55,7 +55,13 @@ def aggregate_fixed_hours(
     buckets: dict[tuple[str, datetime], dict[datetime, HourCandle]] = {}
     for bar in candles:
         t = bar.open_time
-        if (\n            t.tzinfo is None\n            or t.utcoffset() != timedelta(0)\n            or t.minute\n            or t.second\n            or t.microsecond\n        ):
+        if (
+            t.tzinfo is None
+            or t.utcoffset() != timedelta(0)
+            or t.minute
+            or t.second
+            or t.microsecond
+        ):
             raise ValueError("Hour candle must open on an exact UTC hour")
         if not bar.source or min(bar.open, bar.high, bar.low, bar.close) <= 0 or bar.volume < 0:
             raise ValueError("Invalid source, price or volume")
