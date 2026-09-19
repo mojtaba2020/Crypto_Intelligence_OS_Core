@@ -56,11 +56,10 @@ def inspect_archive(db_path: Path, report_path: Path) -> dict[str, str | int]:
             raise ValueError("Archive contains an unexpected instrument, source or candle")
         if index > 0 and bar.open_time != bars[index - 1].open_time + timedelta(days=1):
             raise ValueError("Archived BTC/USD daily timeline contains a gap")
-    if (
-        bars[0].open_time.isoformat() != report.get("first_archived_bar_utc")
-        or bars[-1].open_time.isoformat() != report.get("last_archived_bar_utc")
-    ):
-        raise ValueError("Archived first/last candle differs from the reported facts")
+    if bars[0].open_time.isoformat() != report.get("first_archived_bar_utc"):
+        raise ValueError("Archived first candle differs from the reported facts")
+    if bars[-1].open_time.isoformat() != report.get("last_archived_bar_utc"):
+        raise ValueError("Archived last candle differs from the reported facts")
 
     return {
         "archive_total_count": len(bars),
