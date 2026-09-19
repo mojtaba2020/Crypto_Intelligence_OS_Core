@@ -8,6 +8,7 @@ on:
       - "scripts/extend_btc_history_coinbase.py"
       - "scripts/evaluate_btc_long_history.py"
       - "scripts/evaluate_btc_hybrid.py"
+      - "scripts/download_btc_ohlcv.py"
       - "src/crypto_intelligence_os/hybrid_forecasting.py"
       - "tests/test_hybrid_forecasting.py"
       - ".github/workflows/btc_long_history_ai.yml"
@@ -42,6 +43,12 @@ jobs:
           python scripts/extend_btc_history_coinbase.py \
             --database .research/btc_full_history.sqlite \
             --report .research/coinbase_extension_report.json
+
+      - name: Download independent Coinbase OHLCV and volume archive
+        run: |
+          python scripts/download_btc_ohlcv.py \
+            --database .research/coinbase_ohlcv.sqlite \
+            --report .research/coinbase_ohlcv_report.json
 
       - name: Evaluate recent one-year 7-day forecasts
         run: |
@@ -82,6 +89,7 @@ jobs:
         run: |
           cat .research/import_report.json
           cat .research/coinbase_extension_report.json
+          cat .research/coinbase_ohlcv_report.json
           cat .research/evaluation_7d_1y.json
           cat .research/evaluation_7d_full.json
           cat .research/evaluation_30d_4y.json
@@ -96,6 +104,7 @@ jobs:
           path: |
             .research/import_report.json
             .research/coinbase_extension_report.json
+            .research/coinbase_ohlcv_report.json
             .research/evaluation_7d_1y.json
             .research/evaluation_7d_full.json
             .research/evaluation_30d_4y.json
