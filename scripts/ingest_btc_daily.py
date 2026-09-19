@@ -9,10 +9,11 @@ import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from scripts.archive_btc_90d import validate_daily_bars
+
 from crypto_intelligence_os.adapters.market_data import CoinbasePublicCandleSource
 from crypto_intelligence_os.adapters.market_data.btc_archive import BTCArchive
 from crypto_intelligence_os.market_data import Timeframe
-from scripts.archive_btc_90d import validate_daily_bars
 
 DB_PATH = Path("data/btc_usd_daily.sqlite")
 REPORT_PATH = Path("data/btc_ingestion_report.json")
