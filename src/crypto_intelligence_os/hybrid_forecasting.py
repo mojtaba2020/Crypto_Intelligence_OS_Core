@@ -32,10 +32,7 @@ def features(history: tuple[Observation, ...], index: int) -> tuple[float, ...]:
         raise ValueError("At least 366 completed daily closes required")
     current = history[index].close
     result = [log(current / history[index - window].close) for window in WINDOWS]
-    returns = [
-        log(history[j].close / history[j - 1].close)
-        for j in range(index - 29, index + 1)
-    ]
+    returns = [log(history[j].close / history[j - 1].close) for j in range(index - 29, index + 1)]
     average = sum(returns) / len(returns)
     volatility = sqrt(sum((value - average) ** 2 for value in returns) / len(returns))
     result.append(volatility)
@@ -55,10 +52,7 @@ def _fit(
     ridge: float,
 ) -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
     dimensions = len(examples[0][0])
-    means = tuple(
-        sum(row[0][j] for row in examples) / len(examples)
-        for j in range(dimensions)
-    )
+    means = tuple(sum(row[0][j] for row in examples) / len(examples) for j in range(dimensions))
     scales = tuple(
         max(
             sqrt(sum((row[0][j] - means[j]) ** 2 for row in examples) / len(examples)),
@@ -73,8 +67,7 @@ def _fit(
     targets = [target for _, target in examples]
     matrix = [
         [
-            sum(vector[i] * vector[j] for vector in design)
-            + (ridge if i == j and i > 0 else 0.0)
+            sum(vector[i] * vector[j] for vector in design) + (ridge if i == j and i > 0 else 0.0)
             for j in range(dimensions + 1)
         ]
         for i in range(dimensions + 1)
@@ -93,8 +86,7 @@ def _estimate(
     values: tuple[float, ...],
 ) -> float:
     return weights[0] + sum(
-        weights[j + 1] * (values[j] - means[j]) / scales[j]
-        for j in range(len(values))
+        weights[j + 1] * (values[j] - means[j]) / scales[j] for j in range(len(values))
     )
 
 
