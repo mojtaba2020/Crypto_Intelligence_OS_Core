@@ -83,6 +83,7 @@ jobs:
           DATA_BRANCH="data/btc-usd-daily"
           cp data/btc_usd_daily.sqlite "$RUNNER_TEMP/btc_usd_daily.sqlite"
           cp data/btc_ingestion_report.json "$RUNNER_TEMP/btc_ingestion_report.json"
+          cp scripts/render_ceo_mission_board.py "$RUNNER_TEMP/render_ceo_mission_board.py"
           # Moving the generated untracked files avoids a checkout collision with the
           # already-tracked database and report on an existing data branch.
           rm -f data/btc_usd_daily.sqlite data/btc_ingestion_report.json
@@ -112,4 +113,4 @@ jobs:
           retention-days: 14
 
       - name: Publish verified mobile CEO mission board to private GitHub run summary
-        run: python -m scripts.render_ceo_mission_board
+        run: python "$RUNNER_TEMP/render_ceo_mission_board.py"
