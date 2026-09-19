@@ -30,7 +30,7 @@ def main() -> int:
         bars = archive.all_bars()
     if not bars:
         raise ValueError("Archive has no candles")
-    if any(bar.timeframe is not Timeframe.ONE_DAY or bar.status is not BarStatus.FINAL for bar in bars):
+    if any(\n        bar.timeframe is not Timeframe.ONE_DAY or bar.status is not BarStatus.FINAL\n        for bar in bars\n    ):
         raise ValueError("Archive must contain final daily candles only")
     instruments = {bar.instrument_id for bar in bars}
     sources = {bar.source_id for bar in bars}
