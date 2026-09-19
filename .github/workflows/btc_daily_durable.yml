@@ -1,0 +1,132 @@
+name: Durable daily BTC/USD research archive
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "13 1 * * *"
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/btc_daily_durable.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: private-btc-daily-archive-single-writer
+  cancel-in-progress: false
+
+jobs:
+  collect-validate-persist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout private research code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Restore previous private database
+        run: |
+          set -euo pipefail
+          mkdir -p data
+          DATA_BRANCH="data/btc-usd-daily"
+          if git ls-remote --exit-code --heads origin "refs/heads/$DATA_BRANCH" >/dev/null; then
+            git fetch origin "refs/heads/$DATA_BRANCH:refs/remotes/origin/$DATA_BRANCH"
+            git show "origin/$DATA_BRANCH:data/btc_usd_daily.sqlite" > data/btc_usd_daily.sqlite
+            echo "Restored previous private SQLite archive from $DATA_BRANCH"
+          else
+            echo "Initial archive: $DATA_BRANCH does not yet exist"
+          fi
+
+      - name: Install validated Python project
+        run: python -m pip install -e .
+
+      - name: Collect, validate and persist real public BTC/USD candles
+        run: python scripts/ingest_btc_daily.py
+
+      - name: Render factual CEO snapshot for this completed ingestion
+        run: python scripts/render_ceo_snapshot.py
+
+      - name: Verify database and report before committing
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import sqlite3
+          from pathlib import Path
+
+          report = json.loads(Path("data/btc_ingestion_report.json").read_text())
+          file = Path("data/btc_usd_daily.sqlite")
+          if hashlib.sha256(file.read_bytes()).hexdigest() != report["sqlite_sha256"]:
+              raise SystemExit("Database SHA-256 mismatch")
+          with sqlite3.connect(file) as db:
+              if db.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                  raise SystemExit("Database integrity verification failed")
+              count = db.execute("SELECT COUNT(*) FROM candles").fetchone()[0]
+          if count != report["archive_total_count"]:
+              raise SystemExit("Reported count does not match persisted database")
+          print(f"Pre-commit verification PASS: {count} daily candles")
+          PY
+
+      - name: Commit archive to dedicated private data branch
+        run: |
+          set -euo pipefail
+          DATA_BRANCH="data/btc-usd-daily"
+          cp data/btc_usd_daily.sqlite "$RUNNER_TEMP/btc_usd_daily.sqlite"
+          cp data/btc_ingestion_report.json "$RUNNER_TEMP/btc_ingestion_report.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git show-ref --verify --quiet "refs/remotes/origin/$DATA_BRANCH"; then
+            git switch -C "$DATA_BRANCH" "origin/$DATA_BRANCH"
+          else
+            git switch -c "$DATA_BRANCH"
+          fi
+          mkdir -p data
+          cp "$RUNNER_TEMP/btc_usd_daily.sqlite" data/btc_usd_daily.sqlite
+          cp "$RUNNER_TEMP/btc_ingestion_report.json" data/btc_ingestion_report.json
+          git add data/btc_usd_daily.sqlite data/btc_ingestion_report.json
+          git commit -m "Persist validated public BTC/USD daily research archive (run $GITHUB_RUN_ID)"
+          git push origin "HEAD:refs/heads/$DATA_BRANCH"
+          echo "Data saved to private Git branch: $DATA_BRANCH" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Attach CEO run snapshot (temporary convenience copy)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ceo-btc-snapshot-${{ github.run_id }}
+          path: |
+            ceo_ingestion_snapshot.html
+            data/btc_ingestion_report.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish actual results in GitHub Actions summary
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          result = json.loads(Path("data/btc_ingestion_report.json").read_text())
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
+              out.write(
+                  "## CEO Control Tower · completed BTC data mission\n\n"
+                  "> Real deterministic worker run; not an autonomous AI agent.\n\n"
+                  f"- Status: **{result['status']}**\n"
+                  f"- Validated this run: **{result['fetched_count']}** daily candles\n"
+                  f"- Newly stored: **{result['inserted_count']}**\n"
+                  f"- Total persistent candles: **{result['archive_total_count']}**\n"
+                  f"- First / last candle: {result['first_archived_bar_utc']} / "
+                  f"{result['last_archived_bar_utc']}\n"
+                  f"- Source time UTC: {result['source_time_utc']}\n"
+                  f"- Private data branch: `data/btc-usd-daily`\n"
+                  f"- SQLite SHA-256: `{result['sqlite_sha256']}`\n"
+                  "- A static HTML CEO snapshot is attached for 14 days. "
+                  "The **database itself is committed** to the private data branch.\n"
+              )
+          PY
