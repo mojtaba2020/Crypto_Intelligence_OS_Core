@@ -23,10 +23,29 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
             "SELECT day, price_usd, source FROM daily_price ORDER BY day"
         ).fetchall()
         provenance = dict(connection.execute("SELECT key, value FROM provenance"))
-    if not rows or len({row[2] for row in rows}) != 1:
-        raise ValueError("Empty archive or mixed price sources")
-    if rows[0][2] != "coinmetrics:btc:PriceUSD:1d":
-        raise ValueError("Expected Coin Metrics PriceUSD research data only")
+    if not rows:
+        raise ValueError("Empty archive")
+    allowed_sources = {
+        "coinmetrics:btc:PriceUSD:1d",
+        "coinbase:exchange:BTC-USD:1d:close",
+    }
+    sources = {row[2] for row in rows}
+    if not sources.issubset(allowed_sources):
+        raise ValueError(f"Unexpected research price source: {sorted(sources)}")
+    transition_day = provenance.get("source_transition_day")
+    if len(sources) > 1 and not transition_day:
+        raise ValueError("Mixed-source archive lacks an explicit transition day")
+    if transition_day:
+        transition = date.fromisoformat(transition_day)
+        for raw_day, _price, source in rows:
+            day = date.fromisoformat(raw_day)
+            expected = (
+                "coinbase:exchange:BTC-USD:1d:close"
+                if day >= transition
+                else "coinmetrics:btc:PriceUSD:1d"
+            )
+            if source != expected:
+                raise ValueError(f"Unexpected source assignment on {day}: {source}")
     observations = tuple(
         Observation(date.fromisoformat(day), float(price)) for day, price, _ in rows
     )
@@ -49,15 +68,25 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
         estimate = predict(model, history)
         actual = observations[origin + horizon].close
         baseline = history[-1].close
-        errors.append((abs(estimate - actual), abs(baseline - actual),
-                       100 * abs(estimate - actual) / actual,
-                       100 * abs(baseline - actual) / actual))
+        errors.append(
+            (
+                abs(estimate - actual),
+                abs(baseline - actual),
+                100 * abs(estimate - actual) / actual,
+                100 * abs(baseline - actual) / actual,
+            )
+        )
     if not errors:
         raise ValueError("No resolved out-of-sample forecasts")
     n = len(errors)
     return {
         "status": "HISTORICAL_RESEARCH_EVALUATED",
-        "metric": "Coin Metrics BTC PriceUSD daily aggregate; NOT Coinbase OHLCV",
+        "metric": (
+            "Research close series with explicit Coin Metrics-to-Coinbase "
+            "source transition"
+        ),
+        "sources": sorted(sources),
+        "source_transition_day": transition_day,
         "license": provenance.get("license", "UNKNOWN"),
         "source_csv_sha256": provenance.get("source_csv_sha256"),
         "first_day": observations[0].day.isoformat(),
@@ -87,8 +116,12 @@ def main() -> None:
     parser.add_argument("--step", type=int, default=7)
     parser.add_argument("--holdout-days", type=int, default=365)
     args = parser.parse_args()
-    result = evaluate(args.database, horizon=args.horizon, step=args.step,
-                      holdout_days=args.holdout_days)
+    result = evaluate(
+        args.database,
+        horizon=args.horizon,
+        step=args.step,
+        holdout_days=args.holdout_days,
+    )
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     print(json.dumps(result, indent=2, sort_keys=True))
