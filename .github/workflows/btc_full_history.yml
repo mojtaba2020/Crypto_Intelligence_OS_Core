@@ -1,0 +1,35 @@
+name: BTC Full History Research Import
+
+on:
+  pull_request:
+    paths:
+      - "scripts/import_btc_history.py"
+      - "tests/test_import_btc_history.py"
+      - ".github/workflows/btc_full_history.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  import:
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Download and import complete daily research history
+        run: |
+          python scripts/import_btc_history.py \
+            --database .research/btc_full_history.sqlite \
+            --report .research/btc_full_history_report.json
+          cat .research/btc_full_history_report.json
+      - name: Preserve import report and research database
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-full-history-research
+          path: |
+            .research/btc_full_history.sqlite
+            .research/btc_full_history_report.json
+          retention-days: 30
