@@ -55,6 +55,7 @@ def evaluate(
         "down_90d": [],
         "flat_90d": [],
     }
+    era_errors: dict[str, list[tuple[float, ...]]] = {}
     for origin in range(first, last + 1, step):
         history = observations[: origin + 1]
         hybrid = train_hybrid(history, horizon_days=horizon)
@@ -78,6 +79,15 @@ def evaluate(
         change_90d = history[-1].close / history[-91].close - 1
         regime = "up_90d" if change_90d > 0.10 else "down_90d" if change_90d < -0.10 else "flat_90d"
         regime_errors[regime].append(row)
+        origin_day = history[-1].day
+        era = (
+            "2011-2012" if origin_day.year <= 2012
+            else "2013-2016" if origin_day.year <= 2016
+            else "2017-2020" if origin_day.year <= 2020
+            else "2021-2024" if origin_day.year <= 2024
+            else "2025-2026"
+        )
+        era_errors.setdefault(era, []).append(row)
     if not errors:
         raise ValueError("No resolved out-of-sample examples")
     count = len(errors)
@@ -98,6 +108,20 @@ def evaluate(
         for name, group in regime_errors.items()
         if group
     }
+    eras = {
+        name: {
+            "test_examples": len(group),
+            "mae_usd": {
+                model: sum(row[index] for row in group) / len(group)
+                for index, model in enumerate(("hybrid", "linear", "persistence"))
+            },
+            "mape_pct": {
+                model: sum(row[index + 3] for row in group) / len(group)
+                for index, model in enumerate(("hybrid", "linear", "persistence"))
+            },
+        }
+        for name, group in era_errors.items()
+    }
     return {
         "status": "HYBRID_WALK_FORWARD_EVALUATED",
         "first_day": rows[0][0],
@@ -111,6 +135,7 @@ def evaluate(
         "source_transition_day": transition,
         "metrics": metrics,
         "regimes": regimes,
+        "eras": eras,
         "ablation_mae_usd": (
             {name: sum(values) / len(values) for name, values in ablation_errors.items()}
             if ablation
