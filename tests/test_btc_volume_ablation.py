@@ -4,7 +4,6 @@ import sqlite3
 from datetime import date, timedelta
 
 import pytest
-
 from scripts.evaluate_btc_volume_ablation import evaluate
 
 
