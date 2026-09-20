@@ -19,8 +19,8 @@ from pathlib import Path
 from crypto_intelligence_os.ai_forecasting import Observation
 from crypto_intelligence_os.hybrid_forecasting import predict_hybrid, train_hybrid
 
-HORIZONS = (7, 30)
-VERSION = "phase5-hybrid-all-ridge100-v1"
+HORIZONS = (1, 3, 7, 30, 90, 180, 365)
+VERSION = "phase5-hybrid-all-ridge100-v2"
 
 
 def read_prices(database: Path) -> tuple[Observation, ...]:

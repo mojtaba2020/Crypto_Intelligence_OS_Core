@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - .github/workflows/btc_phase5_prospective.yml
+      - scripts/btc_phase5_prospective.py
+      - src/crypto_intelligence_os/hybrid_forecasting.py
+      - tests/test_btc_phase5_prospective.py
   workflow_dispatch:
   schedule:
     - cron: "17 8 * * *"

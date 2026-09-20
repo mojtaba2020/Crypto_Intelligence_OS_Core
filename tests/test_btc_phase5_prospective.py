@@ -28,12 +28,13 @@ def test_issue_is_idempotent_and_targets_are_future(tmp_path):
     ledger = tmp_path / "ledger.jsonl"
     now = datetime(2026, 9, 20, 12, tzinfo=UTC)
     created = issue(database, ledger, now=now)
-    assert len(created) == 2
-    assert all(date.fromisoformat(row["target_day"]) > now.date() for row in created)
+    assert len(created) == 7
+    assert all(date.fromisoformat(row["target_day"]) >= now.date() for row in created)
     assert issue(database, ledger, now=now) == []
     report = score(database, ledger, now=now)
-    assert report["ledger_entries"] == 2
-    assert report["by_horizon"]["7"]["resolved_examples"] == 0
+    assert report["ledger_entries"] == 7
+    assert set(report["by_horizon"]) == {"1", "3", "7", "30", "90", "180", "365"}
+    assert all(row["resolved_examples"] == 0 for row in report["by_horizon"].values())
 
 
 def test_issue_rejects_unfinished_day_and_stale_archive(tmp_path):
