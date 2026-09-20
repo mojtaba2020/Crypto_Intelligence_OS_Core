@@ -35,9 +35,10 @@ def test_phase4_fixed_candidates_share_all_origins(tmp_path):
         "momentum_90d_quarter",
     }
     assert set(result["mean_absolute_error_pct_of_origin_price"]) == set(result["mae_usd"])
-    assert sum(era["test_examples"] for era in result["by_origin_era"].values()) == result[
-        "test_examples"
-    ]
+    assert (
+        sum(era["test_examples"] for era in result["by_origin_era"].values())
+        == result["test_examples"]
+    )
     for row in result["paired_vs_persistence"].values():
         assert row["lower_error_count"] + row["higher_error_count"] <= result["test_examples"]
 
