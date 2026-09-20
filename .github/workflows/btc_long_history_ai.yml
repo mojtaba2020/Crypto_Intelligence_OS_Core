@@ -8,8 +8,15 @@ on:
       - "scripts/extend_btc_history_coinbase.py"
       - "scripts/evaluate_btc_long_history.py"
       - "scripts/evaluate_btc_hybrid.py"
+      - "scripts/evaluate_btc_volume_ablation.py"
+      - "scripts/evaluate_btc_phase4_simple.py"
+      - "scripts/btc_phase5_prospective.py"
+      - "scripts/download_btc_ohlcv.py"
       - "src/crypto_intelligence_os/hybrid_forecasting.py"
       - "tests/test_hybrid_forecasting.py"
+      - "tests/test_btc_volume_ablation.py"
+      - "tests/test_btc_phase4_simple.py"
+      - "tests/test_btc_phase5_prospective.py"
       - ".github/workflows/btc_long_history_ai.yml"
 
 permissions:
@@ -18,7 +25,7 @@ permissions:
 jobs:
   evaluate:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -42,6 +49,13 @@ jobs:
           python scripts/extend_btc_history_coinbase.py \
             --database .research/btc_full_history.sqlite \
             --report .research/coinbase_extension_report.json
+
+      - name: Download independent Coinbase OHLCV and volume archive
+        run: |
+          python scripts/download_btc_ohlcv.py \
+            --database .research/coinbase_ohlcv.sqlite \
+            --report .research/coinbase_ohlcv_report.json \
+            --start 2023-01-01
 
       - name: Evaluate recent one-year 7-day forecasts
         run: |
@@ -78,15 +92,96 @@ jobs:
             --report .research/hybrid_30d_4y.json \
             --horizon 30 --step 30 --holdout-days 1460
 
+      - name: Historical-era hybrid evaluation (7-day, full eligible history)
+        run: |
+          python scripts/evaluate_btc_hybrid.py \
+            --database .research/btc_full_history.sqlite \
+            --report .research/hybrid_7d_full_eras.json \
+            --horizon 7 --step 60 --holdout-days 6000
+
+      - name: Historical-era hybrid evaluation (30-day, full eligible history)
+        run: |
+          python scripts/evaluate_btc_hybrid.py \
+            --database .research/btc_full_history.sqlite \
+            --report .research/hybrid_30d_full_eras.json \
+            --horizon 30 --step 120 --holdout-days 6000
+
+      - name: Feature ablation on identical seven-day origins
+        run: |
+          python scripts/evaluate_btc_hybrid.py \
+            --database .research/btc_full_history.sqlite \
+            --report .research/hybrid_7d_ablation.json \
+            --horizon 7 --step 14 --holdout-days 365 --ablation
+
+      - name: Feature ablation on identical thirty-day origins
+        run: |
+          python scripts/evaluate_btc_hybrid.py \
+            --database .research/btc_full_history.sqlite \
+            --report .research/hybrid_30d_ablation.json \
+            --horizon 30 --step 60 --holdout-days 1460 --ablation
+
+      - name: Full-history seven-day feature ablation
+        run: |
+          python scripts/evaluate_btc_hybrid.py \
+            --database .research/btc_full_history.sqlite \
+            --report .research/hybrid_7d_full_ablation.json \
+            --horizon 7 --step 120 --holdout-days 6000 --ablation
+
+      - name: Full-history thirty-day feature ablation
+        run: |
+          python scripts/evaluate_btc_hybrid.py \
+            --database .research/btc_full_history.sqlite \
+            --report .research/hybrid_30d_full_ablation.json \
+            --horizon 30 --step 180 --holdout-days 6000 --ablation
+
+      - name: Paired Coinbase volume ablation (7-day)
+        run: |
+          python scripts/evaluate_btc_volume_ablation.py \
+            --database .research/coinbase_ohlcv.sqlite \
+            --report .research/volume_7d_ablation.json \
+            --horizon 7 --step 30
+
+      - name: Paired Coinbase volume ablation (30-day)
+        run: |
+          python scripts/evaluate_btc_volume_ablation.py \
+            --database .research/coinbase_ohlcv.sqlite \
+            --report .research/volume_30d_ablation.json \
+            --horizon 30 --step 60
+
+      - name: Phase 4 fixed simple models (7-day full history)
+        run: |
+          python scripts/evaluate_btc_phase4_simple.py \
+            --database .research/btc_full_history.sqlite \
+            --report .research/phase4_simple_7d.json \
+            --horizon 7 --step 30 --holdout-days 6000
+
+      - name: Phase 4 fixed simple models (30-day full history)
+        run: |
+          python scripts/evaluate_btc_phase4_simple.py \
+            --database .research/btc_full_history.sqlite \
+            --report .research/phase4_simple_30d.json \
+            --horizon 30 --step 60 --holdout-days 6000
+
       - name: Show reports
         run: |
           cat .research/import_report.json
           cat .research/coinbase_extension_report.json
+          cat .research/coinbase_ohlcv_report.json
           cat .research/evaluation_7d_1y.json
           cat .research/evaluation_7d_full.json
           cat .research/evaluation_30d_4y.json
           cat .research/hybrid_7d_1y.json
           cat .research/hybrid_30d_4y.json
+          cat .research/hybrid_7d_full_eras.json
+          cat .research/hybrid_30d_full_eras.json
+          cat .research/hybrid_7d_ablation.json
+          cat .research/hybrid_30d_ablation.json
+          cat .research/hybrid_7d_full_ablation.json
+          cat .research/hybrid_30d_full_ablation.json
+          cat .research/volume_7d_ablation.json
+          cat .research/volume_30d_ablation.json
+          cat .research/phase4_simple_7d.json
+          cat .research/phase4_simple_30d.json
 
       - name: Preserve research results
         if: always()
@@ -96,9 +191,20 @@ jobs:
           path: |
             .research/import_report.json
             .research/coinbase_extension_report.json
+            .research/coinbase_ohlcv_report.json
             .research/evaluation_7d_1y.json
             .research/evaluation_7d_full.json
             .research/evaluation_30d_4y.json
             .research/hybrid_7d_1y.json
             .research/hybrid_30d_4y.json
+            .research/hybrid_7d_full_eras.json
+            .research/hybrid_30d_full_eras.json
+            .research/hybrid_7d_ablation.json
+            .research/hybrid_30d_ablation.json
+            .research/hybrid_7d_full_ablation.json
+            .research/hybrid_30d_full_ablation.json
+            .research/volume_7d_ablation.json
+            .research/volume_30d_ablation.json
+            .research/phase4_simple_7d.json
+            .research/phase4_simple_30d.json
           retention-days: 30

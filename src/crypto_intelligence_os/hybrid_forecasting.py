@@ -25,9 +25,12 @@ class HybridModel:
     blend: float
     train_examples: int
     last_training_target: date
+    feature_group: str = "all"
 
 
-def features(history: tuple[Observation, ...], index: int) -> tuple[float, ...]:
+def features(
+    history: tuple[Observation, ...], index: int, *, group: str = "all"
+) -> tuple[float, ...]:
     if index < 365:
         raise ValueError("At least 366 completed daily closes required")
     current = history[index].close
@@ -43,7 +46,15 @@ def features(history: tuple[Observation, ...], index: int) -> tuple[float, ...]:
     known_halvings = [day for day in HALVINGS if day <= history[index].day]
     days_since = (history[index].day - known_halvings[-1]).days if known_halvings else 0
     result.extend((days_since / 1461.0, days_since * days_since / (1461.0**2)))
-    return tuple(result)
+    if group == "all":
+        return tuple(result)
+    if group == "no_halving":
+        return tuple(result[:-2])
+    if group == "no_extrema":
+        return tuple(result[:6] + result[-2:])
+    if group == "momentum_only":
+        return tuple(result[:5])
+    raise ValueError(f"Unknown feature group: {group}")
 
 
 def _fit(
@@ -96,6 +107,7 @@ def train_hybrid(
     horizon_days: int = 7,
     ridge: float = 100.0,
     minimum_examples: int = 365,
+    feature_group: str = "all",
 ) -> HybridModel:
     _validate(history)
     if horizon_days < 1 or ridge <= 0 or minimum_examples < 30:
@@ -103,7 +115,7 @@ def train_hybrid(
     cutoff = len(history) - 1
     examples = [
         (
-            features(history, index),
+            features(history, index, group=feature_group),
             log(history[index + horizon_days].close / history[index].close),
         )
         for index in range(365, cutoff - horizon_days + 1)
@@ -135,6 +147,7 @@ def train_hybrid(
         blend=blend,
         train_examples=len(examples),
         last_training_target=history[cutoff].day,
+        feature_group=feature_group,
     )
 
 
@@ -144,7 +157,7 @@ def predict_hybrid(model: HybridModel, history: tuple[Observation, ...]) -> floa
         model.weights,
         model.means,
         model.scales,
-        features(history, len(history) - 1),
+        features(history, len(history) - 1, group=model.feature_group),
     )
     estimate = history[-1].close * exp(max(-1.0, min(1.0, model.blend * signal)))
     if not isfinite(estimate) or estimate <= 0:
