@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "mode": "dry_run",
+  "max_active_workers": 4,
+  "tasks": [
+    {
+      "id": "audit_data",
+      "agent_id": "A001",
+      "kind": "data_audit"
+    },
+    {
+      "id": "review_ci",
+      "agent_id": "A071",
+      "kind": "ci_review"
+    },
+    {
+      "id": "research_model",
+      "agent_id": "A041",
+      "kind": "model_research",
+      "depends_on": [
+        "audit_data"
+      ]
+    },
+    {
+      "id": "evaluate_independently",
+      "agent_id": "A053",
+      "kind": "independent_evaluation",
+      "depends_on": [
+        "research_model",
+        "review_ci"
+      ]
+    }
+  ]
+}
