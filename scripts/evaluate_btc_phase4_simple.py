@@ -78,7 +78,7 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
         "holdout_days": holdout_days,
         "test_examples": count,
         "mae_usd": {name: sum(values) / count for name, values in errors.items()},
-        "mean_absolute_percentage_error": {
+        "mean_absolute_error_pct_of_origin_price": {
             name: 100 * sum(values) / count for name, values in relative_errors.items()
         },
         "paired_vs_persistence": {
