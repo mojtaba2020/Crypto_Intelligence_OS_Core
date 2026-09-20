@@ -8,9 +8,11 @@ on:
       - "scripts/extend_btc_history_coinbase.py"
       - "scripts/evaluate_btc_long_history.py"
       - "scripts/evaluate_btc_hybrid.py"
+      - "scripts/evaluate_btc_volume_ablation.py"
       - "scripts/download_btc_ohlcv.py"
       - "src/crypto_intelligence_os/hybrid_forecasting.py"
       - "tests/test_hybrid_forecasting.py"
+      - "tests/test_btc_volume_ablation.py"
       - ".github/workflows/btc_long_history_ai.yml"
 
 permissions:
@@ -48,7 +50,8 @@ jobs:
         run: |
           python scripts/download_btc_ohlcv.py \
             --database .research/coinbase_ohlcv.sqlite \
-            --report .research/coinbase_ohlcv_report.json
+            --report .research/coinbase_ohlcv_report.json \
+            --start 2023-01-01
 
       - name: Evaluate recent one-year 7-day forecasts
         run: |
@@ -127,6 +130,20 @@ jobs:
             --report .research/hybrid_30d_full_ablation.json \
             --horizon 30 --step 180 --holdout-days 6000 --ablation
 
+      - name: Paired Coinbase volume ablation (7-day)
+        run: |
+          python scripts/evaluate_btc_volume_ablation.py \
+            --database .research/coinbase_ohlcv.sqlite \
+            --report .research/volume_7d_ablation.json \
+            --horizon 7 --step 30
+
+      - name: Paired Coinbase volume ablation (30-day)
+        run: |
+          python scripts/evaluate_btc_volume_ablation.py \
+            --database .research/coinbase_ohlcv.sqlite \
+            --report .research/volume_30d_ablation.json \
+            --horizon 30 --step 60
+
       - name: Show reports
         run: |
           cat .research/import_report.json
@@ -143,6 +160,8 @@ jobs:
           cat .research/hybrid_30d_ablation.json
           cat .research/hybrid_7d_full_ablation.json
           cat .research/hybrid_30d_full_ablation.json
+          cat .research/volume_7d_ablation.json
+          cat .research/volume_30d_ablation.json
 
       - name: Preserve research results
         if: always()
@@ -164,4 +183,6 @@ jobs:
             .research/hybrid_30d_ablation.json
             .research/hybrid_7d_full_ablation.json
             .research/hybrid_30d_full_ablation.json
+            .research/volume_7d_ablation.json
+            .research/volume_30d_ablation.json
           retention-days: 30
