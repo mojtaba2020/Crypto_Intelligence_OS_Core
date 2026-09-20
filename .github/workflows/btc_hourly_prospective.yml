@@ -1,6 +1,10 @@
 name: BTC Hourly Prospective Forecasts
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/btc_hourly_prospective.yml"
   workflow_dispatch:
   schedule:
     - cron: "9 * * * *"
