@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/btc_hourly_prospective.yml"
+      - "scripts/btc_hourly_prospective.py"
   workflow_dispatch:
   schedule:
     - cron: "9 * * * *"
@@ -31,6 +32,9 @@ jobs:
         run: python -m pip install -e .
       - name: Issue and evaluate hourly forecasts
         run: python scripts/btc_hourly_prospective.py --ledger research/hourly_forecasts.jsonl --scores-ledger research/hourly_scores.jsonl --report .research/hourly_report.json
+      - name: Validate generated ledger
+        run: |
+          python -c 'import json,pathlib; p=pathlib.Path("research/hourly_forecasts.jsonl"); rows=[json.loads(x) for x in p.read_text().splitlines() if x.strip()]; assert len(rows)>=4; assert all(x["forecast_usd"]>0 for x in rows[-4:]); print("Validated hourly ledger",len(rows))'
       - name: Commit hourly ledger
         run: |
           if [ -n "$(git status --porcelain -- research/hourly_forecasts.jsonl research/hourly_scores.jsonl)" ]; then
