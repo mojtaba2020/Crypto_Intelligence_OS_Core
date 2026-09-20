@@ -46,9 +46,7 @@ class ProviderSmokeTests(unittest.TestCase):
                     patch.object(
                         smoke.urllib.request,
                         "urlopen",
-                        return_value=FakeResponse(
-                            {"output": [{"content": [{"text": output}]}]}
-                        ),
+                        return_value=FakeResponse({"output": [{"content": [{"text": output}]}]}),
                     ) as request,
                     patch("sys.stdout", new_callable=io.StringIO),
                 ):
