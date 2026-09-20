@@ -194,7 +194,8 @@ def run(now: datetime, ledger: Path, report: Path, scores_ledger: Path | None = 
             ),
             "persistence_mae_usd": (
                 statistics.mean(row["persistence_absolute_error_usd"] for row in resolved)
-                if resolved else None
+                if resolved
+                else None
             ),
         }
     result = {
