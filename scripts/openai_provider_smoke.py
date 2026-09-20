@@ -12,7 +12,7 @@ import urllib.error
 import urllib.request
 
 API_URL = "https://api.openai.com/v1/responses"
-DEFAULT_MODEL = "gpt-5.6-luna"
+DEFAULT_MODEL = "gpt-4o-mini"
 
 
 def extract_output_text(payload: dict) -> str:
@@ -62,8 +62,7 @@ def main() -> int:
         with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
             payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        print(f"OpenAI API HTTP {exc.code}: {detail[:800]}", file=sys.stderr)
+        print(f"OpenAI API HTTP {exc.code}; response body suppressed.", file=sys.stderr)
         return 1
     except (urllib.error.URLError, TimeoutError) as exc:
         print(f"OpenAI API connection failed: {exc}", file=sys.stderr)
@@ -71,8 +70,9 @@ def main() -> int:
 
     output = extract_output_text(payload)
     print(f"provider=openai model={model}")
-    print(f"response={output}")
-    return 0 if "PROVIDER_CONNECTED" in output else 1
+    connected = output == "PROVIDER_CONNECTED"
+    print(f"provider_connected={str(connected).lower()}")
+    return 0 if connected else 1
 
 
 if __name__ == "__main__":
