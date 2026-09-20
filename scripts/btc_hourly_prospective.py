@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Research-only hourly BTC-USD prospective forecasts; Coinbase Exchange candles."""
+"""Research-only hourly BTC-USD prospective forecasts; Coinbase Exchange closed candles."""
 
 from __future__ import annotations
 
