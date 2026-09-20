@@ -11,9 +11,9 @@ import urllib.parse
 import urllib.request
 from datetime import UTC, datetime, timedelta
 from itertools import pairwise
+from pathlib import Path
 
 from crypto_intelligence_os.hybrid_forecasting import _estimate, _fit
-from pathlib import Path
 
 API = "https://api.exchange.coinbase.com/products/BTC-USD/candles"
 HORIZONS = (1, 4, 12, 24)
@@ -217,7 +217,8 @@ def main() -> None:
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--scores-ledger", type=Path)
     args = parser.parse_args()
-    print(json.dumps(run(datetime.now(UTC), args.ledger, args.report, args.scores_ledger), indent=2))
+    result = run(datetime.now(UTC), args.ledger, args.report, args.scores_ledger)
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":
