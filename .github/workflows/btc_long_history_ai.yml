@@ -9,10 +9,12 @@ on:
       - "scripts/evaluate_btc_long_history.py"
       - "scripts/evaluate_btc_hybrid.py"
       - "scripts/evaluate_btc_volume_ablation.py"
+      - "scripts/evaluate_btc_phase4_simple.py"
       - "scripts/download_btc_ohlcv.py"
       - "src/crypto_intelligence_os/hybrid_forecasting.py"
       - "tests/test_hybrid_forecasting.py"
       - "tests/test_btc_volume_ablation.py"
+      - "tests/test_btc_phase4_simple.py"
       - ".github/workflows/btc_long_history_ai.yml"
 
 permissions:
@@ -144,6 +146,20 @@ jobs:
             --report .research/volume_30d_ablation.json \
             --horizon 30 --step 60
 
+      - name: Phase 4 fixed simple models (7-day full history)
+        run: |
+          python scripts/evaluate_btc_phase4_simple.py \
+            --database .research/btc_full_history.sqlite \
+            --report .research/phase4_simple_7d.json \
+            --horizon 7 --step 30 --holdout-days 6000
+
+      - name: Phase 4 fixed simple models (30-day full history)
+        run: |
+          python scripts/evaluate_btc_phase4_simple.py \
+            --database .research/btc_full_history.sqlite \
+            --report .research/phase4_simple_30d.json \
+            --horizon 30 --step 60 --holdout-days 6000
+
       - name: Show reports
         run: |
           cat .research/import_report.json
@@ -162,6 +178,8 @@ jobs:
           cat .research/hybrid_30d_full_ablation.json
           cat .research/volume_7d_ablation.json
           cat .research/volume_30d_ablation.json
+          cat .research/phase4_simple_7d.json
+          cat .research/phase4_simple_30d.json
 
       - name: Preserve research results
         if: always()
@@ -185,4 +203,6 @@ jobs:
             .research/hybrid_30d_full_ablation.json
             .research/volume_7d_ablation.json
             .research/volume_30d_ablation.json
+            .research/phase4_simple_7d.json
+            .research/phase4_simple_30d.json
           retention-days: 30
