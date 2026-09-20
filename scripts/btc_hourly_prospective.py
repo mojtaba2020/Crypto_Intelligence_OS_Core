@@ -109,7 +109,7 @@ def run(now: datetime, ledger: Path, report: Path) -> dict:
             and row["horizon_hours"] == horizon
             and row["target_hour_utc"] in prices
             and datetime.fromisoformat(row["issued_at_utc"])
-            < datetime.fromisoformat(row["target_hour_utc"])
+            < datetime.fromisoformat(row["target_hour_utc"]) + timedelta(hours=1)
         ]
         scores[str(horizon)] = {
             "resolved": len(resolved),
