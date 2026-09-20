@@ -1,4 +1,5 @@
 """Offline tests for the stage-zero accuracy gate; no network required."""
+
 import json
 import math
 import tempfile
