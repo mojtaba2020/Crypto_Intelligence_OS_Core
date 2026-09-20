@@ -81,10 +81,14 @@ def evaluate(
         regime_errors[regime].append(row)
         origin_day = history[-1].day
         era = (
-            "2011-2012" if origin_day.year <= 2012
-            else "2013-2016" if origin_day.year <= 2016
-            else "2017-2020" if origin_day.year <= 2020
-            else "2021-2024" if origin_day.year <= 2024
+            "2011-2012"
+            if origin_day.year <= 2012
+            else "2013-2016"
+            if origin_day.year <= 2016
+            else "2017-2020"
+            if origin_day.year <= 2020
+            else "2021-2024"
+            if origin_day.year <= 2024
             else "2025-2026"
         )
         era_errors.setdefault(era, []).append(row)
