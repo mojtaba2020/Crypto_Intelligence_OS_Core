@@ -49,7 +49,15 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
             current * exp(max(-1.0, min(1.0, 0.25 * trend90))),
         )
         year = observations[origin].day.year
-        era = "2012-2016" if year <= 2016 else "2017-2020" if year <= 2020 else "2021-2023" if year <= 2023 else "2024-2026"
+        era = (
+            "2012-2016"
+            if year <= 2016
+            else "2017-2020"
+            if year <= 2020
+            else "2021-2023"
+            if year <= 2023
+            else "2024-2026"
+        )
         era_values = era_errors.setdefault(era, {name: [] for name in names})
         for name, forecast in zip(names, forecasts, strict=True):
             error = abs(forecast - actual)
