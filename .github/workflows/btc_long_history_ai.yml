@@ -166,7 +166,7 @@ jobs:
 
       - name: Multi-horizon model benchmark
         run: |
-          python scripts/evaluate_btc_multihorizon.py \
+          python -m scripts.evaluate_btc_multihorizon \
             --database .research/btc_full_history.sqlite \
             --report .research/multihorizon_benchmark.json
 
