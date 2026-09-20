@@ -154,7 +154,8 @@ def evaluate(
                         for variant_error, full_error in zip(
                             values, (row[0] for row in errors), strict=True
                         )
-                    ) / len(values),
+                    )
+                    / len(values),
                     "variant_lower_error_count": sum(
                         variant_error < full_error
                         for variant_error, full_error in zip(
