@@ -42,7 +42,7 @@ def fetch(now: datetime, hours: int = 720) -> list[tuple[datetime, float]]:
                 values[hour] = close
         cursor = start
     ordered = sorted(values.items())
-    if len(ordered) < hours - 1:
+    if len(ordered) < hours:
         raise ValueError("Hourly history incomplete")
     if any(b[0] - a[0] != timedelta(hours=1) for a, b in zip(ordered, ordered[1:])):
         raise ValueError("Missing hourly candle")
@@ -96,7 +96,7 @@ def run(now: datetime, ledger: Path, report: Path) -> dict:
             if row["version"] == VERSION and row["horizon_hours"] == horizon
             and row["target_hour_utc"] in prices
             and datetime.fromisoformat(row["issued_at_utc"])
-            < datetime.fromisoformat(row["target_hour_utc"]) + timedelta(hours=1)
+            < datetime.fromisoformat(row["target_hour_utc"])
         ]
         scores[str(horizon)] = {
             "resolved": len(resolved),
