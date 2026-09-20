@@ -137,7 +137,7 @@ def run(now: datetime, ledger: Path, report: Path, scores_ledger: Path | None = 
         ledger.parent.mkdir(parents=True, exist_ok=True)
         with ledger.open("a", encoding="utf-8") as output:
             for row in new:
-                output.write(json.dumps(row, sort_keys=True) + "\\n")
+                output.write(json.dumps(row, sort_keys=True) + "\n")
     prices = {hour.isoformat(): price for hour, price in candles}
     scores_ledger = scores_ledger or ledger.with_name("hourly_scores.jsonl")
     prior_scores = ledger_rows(scores_ledger)
@@ -178,7 +178,7 @@ def run(now: datetime, ledger: Path, report: Path, scores_ledger: Path | None = 
         scores_ledger.parent.mkdir(parents=True, exist_ok=True)
         with scores_ledger.open("a", encoding="utf-8") as output:
             for row in newly_scored:
-                output.write(json.dumps(row, sort_keys=True) + "\\n")
+                output.write(json.dumps(row, sort_keys=True) + "\n")
     scores = {}
     for horizon in HORIZONS:
         resolved = [
@@ -207,7 +207,7 @@ def run(now: datetime, ledger: Path, report: Path, scores_ledger: Path | None = 
         "limitations": "No trading or profitability claim; evaluate only future issued forecasts.",
     }
     report.parent.mkdir(parents=True, exist_ok=True)
-    report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
+    report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return result
 
 
