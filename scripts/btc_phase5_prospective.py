@@ -98,6 +98,10 @@ def score(database: Path, ledger: Path, *, now: datetime) -> dict:
             if row["version"] == VERSION
             and row["horizon_days"] == horizon
             and date.fromisoformat(row["target_day"]) < today
+            and datetime.fromisoformat(row["issued_at_utc"]).astimezone(UTC).date()
+            <= date.fromisoformat(row["origin_day"]) + timedelta(days=1)
+            and datetime.fromisoformat(row["issued_at_utc"]).astimezone(UTC).date()
+            < date.fromisoformat(row["target_day"])
             and row["target_day"] in closes
         ]
         paired = [
