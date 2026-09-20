@@ -11,7 +11,7 @@ import argparse
 import json
 import math
 import statistics
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from crypto_intelligence_os.hybrid_forecasting import _estimate, _fit
@@ -29,7 +29,10 @@ def load_candles(path: Path):
     rows = sorted((datetime.fromisoformat(t.replace("Z", "+00:00")), float(p)) for t, p in raw)
     if len(rows) < 168 + MIN_TRAIN + VALIDATION + TEST + max(HORIZONS):
         raise ValueError("Not enough candles for a purged train/validation/test split")
-    if any(t.tzinfo is None or t.utcoffset() != timedelta(0) or not math.isfinite(p) or p <= 0 for t, p in rows):
+    if any(
+        t.tzinfo is None or t.utcoffset() != timedelta(0) or not math.isfinite(p) or p <= 0
+        for t, p in rows
+    ):
         raise ValueError("Timestamps must be UTC and close prices finite and positive")
     if any(b[0] - a[0] != timedelta(hours=1) for a, b in zip(rows, rows[1:])):
         raise ValueError("Missing or duplicate hourly candle")
@@ -58,6 +61,7 @@ def evaluate(rows, horizon):
     test_origins = range(first_test, last_origin + 1)
     if len(train_origins) < MIN_TRAIN or len(validation_origins) < 48:
         raise ValueError("Insufficient resolved, purged samples")
+
     def examples(origins):
         return [(features(prices, i), math.log(prices[i + horizon] / prices[i])) for i in origins]
     training = examples(train_origins)
@@ -80,9 +84,15 @@ def evaluate(rows, horizon):
         fitted = _fit(final_training, ridge=ridge)
     origins = list(test_origins)
     actual_returns = [math.log(prices[i + horizon] / prices[i]) for i in origins]
-    predicted_returns = [0.0 if fitted is None else blend * _estimate(*fitted, features(prices, i)) for i in origins]
+    predicted_returns = [
+        0.0 if fitted is None else blend * _estimate(*fitted, features(prices, i))
+        for i in origins
+    ]
     actual_prices = [prices[i + horizon] for i in origins]
-    model_prices = [prices[i] * math.exp(max(-0.2, min(0.2, r))) for i, r in zip(origins, predicted_returns)]
+    model_prices = [
+        prices[i] * math.exp(max(-0.2, min(0.2, r)))
+        for i, r in zip(origins, predicted_returns)
+    ]
     baseline_prices = [prices[i] for i in origins]
     model_mae = mae(model_prices, actual_prices)
     baseline_mae = mae(baseline_prices, actual_prices)
@@ -96,11 +106,16 @@ def evaluate(rows, horizon):
         "test_end_utc": rows[last_origin + horizon][0].isoformat(),
         "test_model_mae_usd": model_mae,
         "test_persistence_mae_usd": baseline_mae,
-        "test_mae_improvement_pct": 100 * (baseline_mae - model_mae) / baseline_mae if baseline_mae else None,
+        "test_mae_improvement_pct": (
+            100 * (baseline_mae - model_mae) / baseline_mae if baseline_mae else None
+        ),
         "test_model_return_mae": mae(predicted_returns, actual_returns),
         "test_persistence_return_mae": mae([0.0] * len(origins), actual_returns),
         "eligible_for_promotion": bool(model_mae < baseline_mae and winner != "persistence"),
-        "warning": "One held-out block is not proof of persistent skill; use multiple forward periods and prospective scoring.",
+        "warning": (
+            "One held-out block is not proof of persistent skill; "
+            "use multiple forward periods and prospective scoring."
+        ),
     }
 
 
@@ -110,7 +125,11 @@ def main():
     parser.add_argument("--report", type=Path)
     args = parser.parse_args()
     rows = load_candles(args.candles)
-    report = {"status": "RESEARCH_ONLY", "source": str(args.candles), "results": [evaluate(rows, h) for h in HORIZONS]}
+    report = {
+        "status": "RESEARCH_ONLY",
+        "source": str(args.candles),
+        "results": [evaluate(rows, h) for h in HORIZONS],
+    }
     output = json.dumps(report, indent=2, sort_keys=True) + "\n"
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
