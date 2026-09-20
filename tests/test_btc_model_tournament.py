@@ -1,9 +1,8 @@
 """Chronological tournament unit tests."""
-from datetime import date, timedelta
 import sqlite3
+from datetime import date, timedelta
 
 import pytest
-
 from scripts.evaluate_btc_model_tournament import MODELS, predict, run
 
 
