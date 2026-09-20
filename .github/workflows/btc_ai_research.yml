@@ -1,0 +1,54 @@
+name: BTC AI Research Evaluation
+
+on:
+  pull_request:
+    paths:
+      - "src/crypto_intelligence_os/ai_forecasting.py"
+      - "scripts/evaluate_btc_ai.py"
+      - ".github/workflows/btc_ai_research.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-slim
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Fetch durable BTC data branch
+        run: |
+          git fetch origin data/btc-usd-daily:data/btc-usd-daily
+          mkdir -p .research
+          git show data/btc-usd-daily:data/btc_usd_daily.sqlite > .research/btc_usd_daily.sqlite
+          git show data/btc-usd-daily:data/btc_ingestion_report.json > .research/ingestion_report.json
+          cat .research/ingestion_report.json
+
+      - name: Evaluate 7-day AI baseline
+        run: |
+          python scripts/evaluate_btc_ai.py \
+            --archive .research/btc_usd_daily.sqlite \
+            --report .research/ai_7d_report.json \
+            --horizon-days 7
+          cat .research/ai_7d_report.json
+          {
+            echo "## BTC AI 7-day research evaluation"
+            echo "\`\`\`json"
+            cat .research/ai_7d_report.json
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
