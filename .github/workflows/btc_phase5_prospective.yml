@@ -1,0 +1,57 @@
+name: BTC Phase 5 Prospective Ledger
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 8 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: btc-phase5-prospective-ledger
+  cancel-in-progress: false
+
+jobs:
+  prospective:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install project
+        run: python -m pip install -e ".[dev]"
+      - name: Validate code
+        run: python scripts/quality_gate.py
+      - name: Download historical completed daily closes
+        run: |
+          python scripts/import_btc_history.py --database .research/btc_full_history.sqlite --report .research/phase5_import.json
+          python scripts/extend_btc_history_coinbase.py --database .research/btc_full_history.sqlite --report .research/phase5_extension.json
+      - name: Issue immutable dated forecasts and score resolved outcomes
+        run: |
+          python scripts/btc_phase5_prospective.py --database .research/btc_full_history.sqlite --ledger research/phase5_forecasts.jsonl --mode issue --report .research/phase5_issued.json
+          python scripts/btc_phase5_prospective.py --database .research/btc_full_history.sqlite --ledger research/phase5_forecasts.jsonl --mode score --report .research/phase5_score.json
+      - name: Persist ledger in repository history
+        run: |
+          if [ -n "$(git status --porcelain -- research/phase5_forecasts.jsonl)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add research/phase5_forecasts.jsonl
+            git commit -m "Record prospective BTC forecasts for completed UTC day"
+            git push
+          fi
+      - name: Upload issued and scored reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-phase5-prospective-reports
+          path: |
+            .research/phase5_import.json
+            .research/phase5_extension.json
+            .research/phase5_issued.json
+            .research/phase5_score.json
+          retention-days: 90
