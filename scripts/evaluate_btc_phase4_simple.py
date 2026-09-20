@@ -35,6 +35,7 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
     names = ("persistence", "momentum_30d_quarter", "momentum_30d_half", "momentum_90d_quarter")
     errors: dict[str, list[float]] = {name: [] for name in names}
     origin_days: list[str] = []
+    era_errors: dict[str, dict[str, list[float]]] = {}
     for origin in range(first, last + 1, step):
         current = observations[origin].close
         actual = observations[origin + horizon].close
@@ -47,8 +48,13 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
             current * exp(max(-1.0, min(1.0, 0.50 * trend30))),
             current * exp(max(-1.0, min(1.0, 0.25 * trend90))),
         )
+        year = observations[origin].day.year
+        era = "2012-2016" if year <= 2016 else "2017-2020" if year <= 2020 else "2021-2023" if year <= 2023 else "2024-2026"
+        era_values = era_errors.setdefault(era, {name: [] for name in names})
         for name, forecast in zip(names, forecasts, strict=True):
-            errors[name].append(abs(forecast - actual))
+            error = abs(forecast - actual)
+            errors[name].append(error)
+            era_values[name].append(error)
         origin_days.append(observations[origin].day.isoformat())
     count = len(origin_days)
     return {
@@ -80,6 +86,27 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
             }
             for name, values in errors.items()
             if name != "persistence"
+        },
+        "by_origin_era": {
+            era: {
+                "test_examples": len(values["persistence"]),
+                "mae_usd": {
+                    name: sum(candidate_errors) / len(candidate_errors)
+                    for name, candidate_errors in values.items()
+                },
+                "mean_error_difference_vs_persistence_usd": {
+                    name: sum(
+                        candidate - baseline
+                        for candidate, baseline in zip(
+                            candidate_errors, values["persistence"], strict=True
+                        )
+                    )
+                    / len(candidate_errors)
+                    for name, candidate_errors in values.items()
+                    if name != "persistence"
+                },
+            }
+            for era, values in era_errors.items()
         },
         "research_only": True,
         "limitations": (
