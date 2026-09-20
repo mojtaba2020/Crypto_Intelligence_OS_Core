@@ -27,8 +27,11 @@ def score(prices: list[float], origins: list[int], horizon: int) -> dict:
     if not origins:
         raise ValueError("No resolved observations in tournament split")
     return {
-        name: sum(abs(predict(name, prices, origin, horizon) - prices[origin + horizon])
-                  for origin in origins) / len(origins)
+        name: sum(
+            abs(predict(name, prices, origin, horizon) - prices[origin + horizon])
+            for origin in origins
+        )
+        / len(origins)
         for name in MODELS
     }
 
@@ -57,36 +60,38 @@ def run(database: Path, *, validation_end: str = "2022-12-31") -> dict:
         first = max(365 + horizon + 365 - 1, 90)
         origins = range(first, len(days) - horizon, stride)
         validation = [
-            i for i in origins
-            if days[i + horizon] <= cutoff and days[i] >= date(2018, 1, 1)
+            i for i in origins if days[i + horizon] <= cutoff and days[i] >= date(2018, 1, 1)
         ]
         test = [i for i in origins if days[i] > cutoff]
         validation_scores = score(prices, validation, horizon)
         selected = min(MODELS, key=lambda name: (validation_scores[name], name))
         test_scores = score(prices, test, horizon)
-        results.append({
-            "horizon_days": horizon,
-            "selected_on_validation": selected,
-            "validation_examples": len(validation),
-            "locked_test_examples": len(test),
-            "validation_mae_usd": validation_scores,
-            "locked_test_mae_usd": test_scores,
-            "selected_test_mae_usd": test_scores[selected],
-            "persistence_test_mae_usd": test_scores["persistence"],
-            "selected_test_improvement_vs_persistence_pct": (
-                100 * (test_scores["persistence"] - test_scores[selected])
-                / test_scores["persistence"]
-                if test_scores["persistence"] else None
-            ),
-        })
+        results.append(
+            {
+                "horizon_days": horizon,
+                "selected_on_validation": selected,
+                "validation_examples": len(validation),
+                "locked_test_examples": len(test),
+                "validation_mae_usd": validation_scores,
+                "locked_test_mae_usd": test_scores,
+                "selected_test_mae_usd": test_scores[selected],
+                "persistence_test_mae_usd": test_scores["persistence"],
+                "selected_test_improvement_vs_persistence_pct": (
+                    100
+                    * (test_scores["persistence"] - test_scores[selected])
+                    / test_scores["persistence"]
+                    if test_scores["persistence"]
+                    else None
+                ),
+            }
+        )
     return {
         "status": "MODEL_TOURNAMENT_RESEARCH_ONLY",
         "validation_end": validation_end,
         "models": list(MODELS),
         "results": results,
         "warning": (
-            "Historical locked test is not prospective evidence; "
-            "no automatic production promotion."
+            "Historical locked test is not prospective evidence; no automatic production promotion."
         ),
     }
 
