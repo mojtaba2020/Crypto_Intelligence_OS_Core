@@ -6,7 +6,9 @@ from scripts.agent_fleet import plan
 class FleetPlannerTests(unittest.TestCase):
     def setUp(self):
         self.manifest = {
-            "schema_version": 1, "mode": "dry_run", "max_active_workers": 2,
+            "schema_version": 1,
+            "mode": "dry_run",
+            "max_active_workers": 2,
             "tasks": [
                 {"id": "data", "agent_id": "A001", "kind": "data_audit"},
                 {
