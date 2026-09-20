@@ -34,6 +34,7 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
         raise ValueError("No resolved test origins")
     names = ("persistence", "momentum_30d_quarter", "momentum_30d_half", "momentum_90d_quarter")
     errors: dict[str, list[float]] = {name: [] for name in names}
+    relative_errors: dict[str, list[float]] = {name: [] for name in names}
     origin_days: list[str] = []
     era_errors: dict[str, dict[str, list[float]]] = {}
     for origin in range(first, last + 1, step):
@@ -62,6 +63,7 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
         for name, forecast in zip(names, forecasts, strict=True):
             error = abs(forecast - actual)
             errors[name].append(error)
+            relative_errors[name].append(error / current)
             era_values[name].append(error)
         origin_days.append(observations[origin].day.isoformat())
     count = len(origin_days)
@@ -76,6 +78,9 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
         "holdout_days": holdout_days,
         "test_examples": count,
         "mae_usd": {name: sum(values) / count for name, values in errors.items()},
+        "mean_absolute_percentage_error": {
+            name: 100 * sum(values) / count for name, values in relative_errors.items()
+        },
         "paired_vs_persistence": {
             name: {
                 "mean_error_difference_usd": sum(
