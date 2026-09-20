@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
-from itertools import pairwise
 from datetime import date, timedelta
+from itertools import pairwise
 from math import isfinite
 from pathlib import Path
 
