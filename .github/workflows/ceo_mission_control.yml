@@ -40,7 +40,7 @@ jobs:
           echo "No autonomous AI agent, exchange account, trading, or financial action is involved."
 
       - name: "Mission 2 · Check out the approved private research code"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: "Mission 3 · Set up audited Python runtime"
         uses: actions/setup-python@v5
