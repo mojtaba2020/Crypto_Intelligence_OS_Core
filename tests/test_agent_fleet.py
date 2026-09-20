@@ -9,8 +9,18 @@ class FleetPlannerTests(unittest.TestCase):
             "schema_version": 1, "mode": "dry_run", "max_active_workers": 2,
             "tasks": [
                 {"id": "data", "agent_id": "A001", "kind": "data_audit"},
-                {"id": "model", "agent_id": "A041", "kind": "model_research", "depends_on": ["data"]},
-                {"id": "eval", "agent_id": "A100", "kind": "independent_evaluation", "depends_on": ["model"]},
+                {
+                    "id": "model",
+                    "agent_id": "A041",
+                    "kind": "model_research",
+                    "depends_on": ["data"],
+                },
+                {
+                    "id": "eval",
+                    "agent_id": "A100",
+                    "kind": "independent_evaluation",
+                    "depends_on": ["model"],
+                },
             ],
         }
 
