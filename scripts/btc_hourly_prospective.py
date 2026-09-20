@@ -24,11 +24,13 @@ def fetch(now: datetime, hours: int = 720) -> list[tuple[datetime, float]]:
     cursor = end
     while cursor > end - timedelta(hours=hours):
         start = max(end - timedelta(hours=hours), cursor - timedelta(hours=299))
-        params = urllib.parse.urlencode({
-            "granularity": 3600,
-            "start": start.isoformat().replace("+00:00", "Z"),
-            "end": cursor.isoformat().replace("+00:00", "Z"),
-        })
+        params = urllib.parse.urlencode(
+            {
+                "granularity": 3600,
+                "start": start.isoformat().replace("+00:00", "Z"),
+                "end": cursor.isoformat().replace("+00:00", "Z"),
+            }
+        )
         request = urllib.request.Request(  # noqa: S310
             f"{API}?{params}", headers={"User-Agent": "Crypto-Intelligence-OS research"}
         )
@@ -72,16 +74,22 @@ def run(now: datetime, ledger: Path, report: Path) -> dict:
         if (VERSION, origin.isoformat(), horizon) in keys:
             continue
         forecast = current * math.exp(max(-0.2, min(0.2, momentum * horizon * 0.25)))
-        new.append({
-            "version": VERSION, "issued_at_utc": now.astimezone(UTC).isoformat(),
-            "origin_hour_utc": origin.isoformat(),
-            "target_hour_utc": (origin + timedelta(hours=horizon)).isoformat(),
-            "horizon_hours": horizon, "origin_close_usd": current,
-            "forecast_usd": forecast, "persistence_usd": current,
-            "observed_volatility_hourly": volatility, "training_hours": len(candles),
-            "source": "coinbase:exchange:BTC-USD:1h:close",
-            "research_only": True,
-        })
+        new.append(
+            {
+                "version": VERSION,
+                "issued_at_utc": now.astimezone(UTC).isoformat(),
+                "origin_hour_utc": origin.isoformat(),
+                "target_hour_utc": (origin + timedelta(hours=horizon)).isoformat(),
+                "horizon_hours": horizon,
+                "origin_close_usd": current,
+                "forecast_usd": forecast,
+                "persistence_usd": current,
+                "observed_volatility_hourly": volatility,
+                "training_hours": len(candles),
+                "source": "coinbase:exchange:BTC-USD:1h:close",
+                "research_only": True,
+            }
+        )
     if new:
         ledger.parent.mkdir(parents=True, exist_ok=True)
         with ledger.open("a", encoding="utf-8") as output:
@@ -91,10 +99,13 @@ def run(now: datetime, ledger: Path, report: Path) -> dict:
     scores = {}
     for horizon in HORIZONS:
         resolved = [
-            (abs(row["forecast_usd"] - prices[row["target_hour_utc"]]),
-             abs(row["persistence_usd"] - prices[row["target_hour_utc"]]))
+            (
+                abs(row["forecast_usd"] - prices[row["target_hour_utc"]]),
+                abs(row["persistence_usd"] - prices[row["target_hour_utc"]]),
+            )
             for row in ledger_rows(ledger)
-            if row["version"] == VERSION and row["horizon_hours"] == horizon
+            if row["version"] == VERSION
+            and row["horizon_hours"] == horizon
             and row["target_hour_utc"] in prices
             and datetime.fromisoformat(row["issued_at_utc"])
             < datetime.fromisoformat(row["target_hour_utc"])
@@ -104,8 +115,13 @@ def run(now: datetime, ledger: Path, report: Path) -> dict:
             "model_mae_usd": statistics.mean(x for x, _ in resolved) if resolved else None,
             "persistence_mae_usd": statistics.mean(y for _, y in resolved) if resolved else None,
         }
-    result = {"status": "HOURLY_PROSPECTIVE", "origin_hour_utc": origin.isoformat(),
-              "issued": new, "scores": scores, "research_only": True}
+    result = {
+        "status": "HOURLY_PROSPECTIVE",
+        "origin_hour_utc": origin.isoformat(),
+        "issued": new,
+        "scores": scores,
+        "research_only": True,
+    }
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return result
