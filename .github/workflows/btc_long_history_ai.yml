@@ -10,11 +10,13 @@ on:
       - "scripts/evaluate_btc_hybrid.py"
       - "scripts/evaluate_btc_volume_ablation.py"
       - "scripts/evaluate_btc_phase4_simple.py"
+      - "scripts/btc_phase5_prospective.py"
       - "scripts/download_btc_ohlcv.py"
       - "src/crypto_intelligence_os/hybrid_forecasting.py"
       - "tests/test_hybrid_forecasting.py"
       - "tests/test_btc_volume_ablation.py"
       - "tests/test_btc_phase4_simple.py"
+      - "tests/test_btc_phase5_prospective.py"
       - ".github/workflows/btc_long_history_ai.yml"
 
 permissions:
