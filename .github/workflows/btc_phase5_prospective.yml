@@ -29,8 +29,14 @@ jobs:
         run: python scripts/quality_gate.py
       - name: Download historical completed daily closes
         run: |
-          python scripts/import_btc_history.py --database .research/btc_full_history.sqlite --report .research/phase5_import.json
-          python scripts/extend_btc_history_coinbase.py --database .research/btc_full_history.sqlite --report .research/phase5_extension.json
+          YESTERDAY="$(date -u -d yesterday +%F)"
+          python scripts/import_btc_history.py --database .research/btc_full_history.sqlite --report .research/phase5_import.json --end "$YESTERDAY"
+          LAST_DAY="$(python -c 'import sqlite3; c=sqlite3.connect(".research/btc_full_history.sqlite"); print(c.execute("SELECT MAX(day) FROM daily_price").fetchone()[0])')"
+          if [[ "$LAST_DAY" < "$YESTERDAY" ]]; then
+            python scripts/extend_btc_history_coinbase.py --database .research/btc_full_history.sqlite --report .research/phase5_extension.json --completed-through "$YESTERDAY"
+          else
+            echo '{"status":"NO_EXTENSION_NEEDED"}' > .research/phase5_extension.json
+          fi
       - name: Issue immutable dated forecasts and score resolved outcomes
         run: |
           python scripts/btc_phase5_prospective.py --database .research/btc_full_history.sqlite --ledger research/phase5_forecasts.jsonl --mode issue --report .research/phase5_issued.json
