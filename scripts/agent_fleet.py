@@ -33,7 +33,11 @@ def validate_manifest(manifest: dict) -> list[dict]:
         if not isinstance(tid, str) or not SAFE_ID.fullmatch(tid) or tid in seen:
             raise ValueError("task IDs must be unique and safe")
         seen.add(tid)
-        if not isinstance(role, str) or not re.fullmatch(r"A[0-9]{3}", role) or not 1 <= int(role[1:]) <= 100:
+        if (
+            not isinstance(role, str)
+            or not re.fullmatch(r"A[0-9]{3}", role)
+            or not 1 <= int(role[1:]) <= 100
+        ):
             raise ValueError("agent_id must be A001..A100")
         if kind not in ALLOWED_KINDS:
             raise ValueError("unknown task kind")
@@ -54,7 +58,10 @@ def plan(manifest: dict) -> dict:
     done = set()
     waves = []
     while pending:
-        ready = sorted((t for t in pending.values() if set(t.get("depends_on", [])) <= done), key=lambda t: t["id"])
+        ready = sorted(
+            (t for t in pending.values() if set(t.get("depends_on", [])) <= done),
+            key=lambda t: t["id"],
+        )
         if not ready:
             raise ValueError("dependency cycle detected")
         wave = ready[: manifest["max_active_workers"]]
@@ -62,8 +69,15 @@ def plan(manifest: dict) -> dict:
         for task in wave:
             done.add(task["id"])
             del pending[task["id"]]
-    return {"mode": "dry_run", "role_capacity": ROLE_COUNT, "active_workers": 0, "planned_waves": waves,
-            "dispatched_tasks": 0, "external_calls": 0, "cost_usd": 0}
+    return {
+        "mode": "dry_run",
+        "role_capacity": ROLE_COUNT,
+        "active_workers": 0,
+        "planned_waves": waves,
+        "dispatched_tasks": 0,
+        "external_calls": 0,
+        "cost_usd": 0,
+    }
 
 
 def main() -> None:
