@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Research-only BTC model tournament with chronological selection and locked test."""
+
 from __future__ import annotations
 
 import argparse
