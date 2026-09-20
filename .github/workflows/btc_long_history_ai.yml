@@ -113,6 +113,20 @@ jobs:
             --report .research/hybrid_30d_ablation.json \
             --horizon 30 --step 60 --holdout-days 1460 --ablation
 
+      - name: Full-history seven-day feature ablation
+        run: |
+          python scripts/evaluate_btc_hybrid.py \
+            --database .research/btc_full_history.sqlite \
+            --report .research/hybrid_7d_full_ablation.json \
+            --horizon 7 --step 120 --holdout-days 6000 --ablation
+
+      - name: Full-history thirty-day feature ablation
+        run: |
+          python scripts/evaluate_btc_hybrid.py \
+            --database .research/btc_full_history.sqlite \
+            --report .research/hybrid_30d_full_ablation.json \
+            --horizon 30 --step 180 --holdout-days 6000 --ablation
+
       - name: Show reports
         run: |
           cat .research/import_report.json
@@ -127,6 +141,8 @@ jobs:
           cat .research/hybrid_30d_full_eras.json
           cat .research/hybrid_7d_ablation.json
           cat .research/hybrid_30d_ablation.json
+          cat .research/hybrid_7d_full_ablation.json
+          cat .research/hybrid_30d_full_ablation.json
 
       - name: Preserve research results
         if: always()
@@ -146,4 +162,6 @@ jobs:
             .research/hybrid_30d_full_eras.json
             .research/hybrid_7d_ablation.json
             .research/hybrid_30d_ablation.json
+            .research/hybrid_7d_full_ablation.json
+            .research/hybrid_30d_full_ablation.json
           retention-days: 30
