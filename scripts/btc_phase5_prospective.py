@@ -12,6 +12,7 @@ import argparse
 import json
 import sqlite3
 from datetime import UTC, date, datetime, timedelta
+from itertools import pairwise
 from math import isfinite
 from pathlib import Path
 
@@ -28,7 +29,7 @@ def read_prices(database: Path) -> tuple[Observation, ...]:
     history = tuple(Observation(date.fromisoformat(day), float(price)) for day, price in rows)
     if not history or any(not isfinite(p.close) or p.close <= 0 for p in history):
         raise ValueError("Invalid price archive")
-    if any((b.day - a.day).days != 1 for a, b in zip(history, history[1:], strict=False)):
+    if any((b.day - a.day).days != 1 for a, b in pairwise(history)):
         raise ValueError("Missing daily price")
     return history
 
@@ -119,7 +120,10 @@ def score(database: Path, ledger: Path, *, now: datetime) -> dict:
         "ledger_entries": len(rows),
         "by_horizon": results,
         "research_only": True,
-        "limitations": "Only forecasts issued before their target close count; no profitability claim.",
+        "limitations": (
+            "Only forecasts issued before their target close count; "
+            "no profitability claim."
+        ),
     }
 
 
