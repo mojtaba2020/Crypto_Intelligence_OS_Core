@@ -118,7 +118,9 @@ def evaluate(rows, horizon):
         ),
         "test_model_return_mae": mae(predicted_returns, actual_returns),
         "test_persistence_return_mae": mae([0.0] * len(origins), actual_returns),
-        "eligible_for_promotion": bool(model_mae < baseline_mae and winner != "persistence"),
+        "beats_persistence_on_this_holdout": bool(
+            model_mae < baseline_mae and winner != "persistence"
+        ),
         "warning": (
             "One held-out block is not proof of persistent skill; "
             "use multiple forward periods and prospective scoring."
