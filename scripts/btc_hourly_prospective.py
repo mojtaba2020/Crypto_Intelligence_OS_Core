@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Research-only hourly BTC-USD prospective forecasts; Coinbase Exchange candles."""
+
 from __future__ import annotations
 
 import argparse
