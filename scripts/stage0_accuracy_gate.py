@@ -12,6 +12,7 @@ import json
 import math
 import statistics
 from datetime import datetime, timedelta
+from itertools import pairwise
 from pathlib import Path
 
 from crypto_intelligence_os.hybrid_forecasting import _estimate, _fit
@@ -34,7 +35,7 @@ def load_candles(path: Path):
         for t, p in rows
     ):
         raise ValueError("Timestamps must be UTC and close prices finite and positive")
-    if any(b[0] - a[0] != timedelta(hours=1) for a, b in zip(rows, rows[1:])):
+    if any(b[0] - a[0] != timedelta(hours=1) for a, b in pairwise(rows)):
         raise ValueError("Missing or duplicate hourly candle")
     return rows
 
@@ -42,11 +43,11 @@ def load_candles(path: Path):
 def features(prices, i):
     values = [math.log(prices[i] / prices[i - w]) for w in WINDOWS]
     one_hour = [math.log(prices[j] / prices[j - 1]) for j in range(i - 23, i + 1)]
-    return tuple(values + [statistics.pstdev(one_hour)])
+    return (*values, statistics.pstdev(one_hour))
 
 
 def mae(predictions, actuals):
-    return statistics.mean(abs(p - y) for p, y in zip(predictions, actuals))
+    return statistics.mean(abs(p - y) for p, y in zip(predictions, actuals, strict=True))
 
 
 def evaluate(rows, horizon):
@@ -73,9 +74,15 @@ def evaluate(rows, horizon):
             candidates[f"ridge_{ridge:g}_blend_{blend:g}"] = (blend, fitted)
     validation_scores = {}
     for name, (blend, fitted) in candidates.items():
-        predictions = [0.0 if fitted is None else blend * _estimate(*fitted, x) for x, _ in validation]
+        predictions = [
+            0.0 if fitted is None else blend * _estimate(*fitted, x)
+            for x, _ in validation
+        ]
         validation_scores[name] = mae(predictions, [y for _, y in validation])
-    winner = min(validation_scores, key=lambda name: (validation_scores[name], name != "persistence"))
+    winner = min(
+        validation_scores,
+        key=lambda name: (validation_scores[name], name != "persistence"),
+    )
     # Refit only on labels resolved before first test origin; no test labels used.
     final_training = examples(range(168, first_test - horizon))
     blend, fitted = candidates[winner]
@@ -91,7 +98,7 @@ def evaluate(rows, horizon):
     actual_prices = [prices[i + horizon] for i in origins]
     model_prices = [
         prices[i] * math.exp(max(-0.2, min(0.2, r)))
-        for i, r in zip(origins, predicted_returns)
+        for i, r in zip(origins, predicted_returns, strict=True)
     ]
     baseline_prices = [prices[i] for i in origins]
     model_mae = mae(model_prices, actual_prices)
