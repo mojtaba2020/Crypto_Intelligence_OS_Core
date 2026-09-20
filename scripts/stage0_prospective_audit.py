@@ -85,7 +85,13 @@ def main() -> None:
         parser.error("--min-resolved must be positive")
 
     def read(path: Path) -> list[dict]:
-        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()] if path.exists() else []
+        if not path.exists():
+            return []
+        return [
+            json.loads(line)
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
 
     result = audit(read(args.forecasts), read(args.scores), args.min_resolved)
     args.report.parent.mkdir(parents=True, exist_ok=True)
