@@ -57,7 +57,7 @@ jobs:
           fi
       - name: Upload issued and scored reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: btc-phase5-prospective-reports
           path: |

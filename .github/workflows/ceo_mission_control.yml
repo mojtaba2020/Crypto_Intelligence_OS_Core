@@ -68,7 +68,7 @@ jobs:
 
       - name: "Mission 7 · Attach private CEO console to this run"
         if: ${{ github.event_name == 'push' || inputs.mission == 'inspect_archive' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ceo-private-console-${{ github.run_id }}
           path: ceo_private_console.html
