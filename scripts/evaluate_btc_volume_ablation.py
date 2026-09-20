@@ -54,8 +54,10 @@ def evaluate(database: Path, *, horizon: int, step: int) -> dict:
         # Every training target resolves no later than this forecast origin.
         train_indices = range(365, origin - horizon + 1)
         plain = [
-            (features(observations, index, group="momentum_only"),
-             log(observations[index + horizon].close / observations[index].close))
+            (
+                features(observations, index, group="momentum_only"),
+                log(observations[index + horizon].close / observations[index].close),
+            )
             for index in train_indices
         ]
         augmented = [
@@ -71,11 +73,13 @@ def evaluate(database: Path, *, horizon: int, step: int) -> dict:
         )
         current = observations[origin].close
         actual = observations[origin + horizon].close
-        errors.append((
-            abs(current * exp(max(-1.0, min(1.0, signal_plain))) - actual),
-            abs(current * exp(max(-1.0, min(1.0, signal_volume))) - actual),
-            abs(current - actual),
-        ))
+        errors.append(
+            (
+                abs(current * exp(max(-1.0, min(1.0, signal_plain))) - actual),
+                abs(current * exp(max(-1.0, min(1.0, signal_volume))) - actual),
+                abs(current - actual),
+            )
+        )
         origins.append(observations[origin].day.isoformat())
     if not errors:
         raise ValueError("No resolved out-of-sample origins")
