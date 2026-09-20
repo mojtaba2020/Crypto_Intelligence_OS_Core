@@ -43,8 +43,7 @@ def main() -> int:
     body = {
         "model": model,
         "input": (
-            "You are agent A001 in Crypto Intelligence OS. "
-            "Reply with exactly: PROVIDER_CONNECTED"
+            "You are agent A001 in Crypto Intelligence OS. Reply with exactly: PROVIDER_CONNECTED"
         ),
         "max_output_tokens": 32,
         "store": False,
