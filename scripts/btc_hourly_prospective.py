@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from itertools import pairwise
 import math
 import statistics
 import urllib.parse
@@ -44,7 +45,7 @@ def fetch(now: datetime, hours: int = 720) -> list[tuple[datetime, float]]:
     ordered = sorted(values.items())
     if len(ordered) < hours:
         raise ValueError("Hourly history incomplete")
-    if any(b[0] - a[0] != timedelta(hours=1) for a, b in zip(ordered, ordered[1:])):
+    if any(b[0] - a[0] != timedelta(hours=1) for a, b in pairwise(ordered)):
         raise ValueError("Missing hourly candle")
     if ordered[-1][0] != end - timedelta(hours=1):
         raise ValueError("Latest completed hourly candle unavailable")
@@ -64,7 +65,7 @@ def run(now: datetime, ledger: Path, report: Path) -> dict:
     keys = {(r["version"], r["origin_hour_utc"], r["horizon_hours"]) for r in existing}
     new = []
     # Past-only hourly log returns, with a shrinkage-to-persistence momentum forecast.
-    returns = [math.log(b[1] / a[1]) for a, b in zip(candles, candles[1:])]
+    returns = [math.log(b[1] / a[1]) for a, b in pairwise(candles)]
     momentum = statistics.mean(returns[-24:])
     volatility = statistics.pstdev(returns[-168:])
     for horizon in HORIZONS:
