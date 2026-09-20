@@ -33,7 +33,7 @@ def validate_manifest(manifest: dict) -> list[dict]:
         if not isinstance(tid, str) or not SAFE_ID.fullmatch(tid) or tid in seen:
             raise ValueError("task IDs must be unique and safe")
         seen.add(tid)
-        if not isinstance(role, str) or not re.fullmatch(r"A(?:0[0-9][1-9]|0[1-9]0|[1-9][0-9][0-9]|100)", role) or int(role[1:]) > 100:
+        if not isinstance(role, str) or not re.fullmatch(r"A[0-9]{3}", role) or not 1 <= int(role[1:]) <= 100:
             raise ValueError("agent_id must be A001..A100")
         if kind not in ALLOWED_KINDS:
             raise ValueError("unknown task kind")
