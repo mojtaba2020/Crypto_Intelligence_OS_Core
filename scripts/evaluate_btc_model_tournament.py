@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+from itertools import pairwise
 from datetime import date, timedelta
 from math import isfinite
 from pathlib import Path
@@ -43,7 +44,7 @@ def run(database: Path, *, validation_end: str = "2022-12-31") -> dict:
     prices = [float(price) for _, price in rows]
     if any(not isfinite(price) or price <= 0 for price in prices):
         raise ValueError("Invalid price")
-    if any(b - a != timedelta(days=1) for a, b in zip(days, days[1:])):
+    if any(b - a != timedelta(days=1) for a, b in pairwise(days)):
         raise ValueError("Missing daily observation")
     cutoff = date.fromisoformat(validation_end)
     if cutoff >= days[-1]:
@@ -55,7 +56,10 @@ def run(database: Path, *, validation_end: str = "2022-12-31") -> dict:
         stride = max(step, horizon)
         first = max(365 + horizon + 365 - 1, 90)
         origins = range(first, len(days) - horizon, stride)
-        validation = [i for i in origins if days[i + horizon] <= cutoff and days[i] >= date(2018, 1, 1)]
+        validation = [
+            i for i in origins
+            if days[i + horizon] <= cutoff and days[i] >= date(2018, 1, 1)
+        ]
         test = [i for i in origins if days[i] > cutoff]
         validation_scores = score(prices, validation, horizon)
         selected = min(MODELS, key=lambda name: (validation_scores[name], name))
@@ -80,7 +84,10 @@ def run(database: Path, *, validation_end: str = "2022-12-31") -> dict:
         "validation_end": validation_end,
         "models": list(MODELS),
         "results": results,
-        "warning": "Historical locked test is not prospective evidence; no automatic production promotion.",
+        "warning": (
+            "Historical locked test is not prospective evidence; "
+            "no automatic production promotion."
+        ),
     }
 
 
