@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import argparse
 import json
-from itertools import pairwise
 import math
 import statistics
 import urllib.parse
 import urllib.request
 from datetime import UTC, datetime, timedelta
+from itertools import pairwise
 from pathlib import Path
 
 API = "https://api.exchange.coinbase.com/products/BTC-USD/candles"
@@ -29,7 +29,7 @@ def fetch(now: datetime, hours: int = 720) -> list[tuple[datetime, float]]:
             "start": start.isoformat().replace("+00:00", "Z"),
             "end": cursor.isoformat().replace("+00:00", "Z"),
         })
-        request = urllib.request.Request(
+        request = urllib.request.Request(  # noqa: S310
             f"{API}?{params}", headers={"User-Agent": "Crypto-Intelligence-OS research"}
         )
         with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310
