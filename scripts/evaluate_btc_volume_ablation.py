@@ -25,10 +25,17 @@ def evaluate(database: Path, *, horizon: int, step: int) -> dict:
         ).fetchall()
     if not rows:
         raise ValueError("No OHLCV observations")
-    observations = tuple(Observation(date.fromisoformat(day), float(close)) for day, close, _ in rows)
+    observations = tuple(
+        Observation(date.fromisoformat(day), float(close)) for day, close, _ in rows
+    )
     volumes = tuple(float(volume) for _, _, volume in rows)
     for index, point in enumerate(observations):
-        if not isfinite(point.close) or point.close <= 0 or not isfinite(volumes[index]) or volumes[index] < 0:
+        if (
+            not isfinite(point.close)
+            or point.close <= 0
+            or not isfinite(volumes[index])
+            or volumes[index] < 0
+        ):
             raise ValueError("Invalid OHLCV value")
         if index and point.day - observations[index - 1].day != timedelta(days=1):
             raise ValueError("OHLCV history must be contiguous")
@@ -93,7 +100,11 @@ def evaluate(database: Path, *, horizon: int, step: int) -> dict:
         "volume_equal_error_count": sum(row[1] == row[0] for row in errors),
         "mean_paired_volume_minus_price_error_usd": sum(row[1] - row[0] for row in errors) / n,
         "research_only": True,
-        "limitations": "Coinbase-only era; no volume is imputed before archive start. Same origins, same resolved labels and same ridge regularization; no claim of profitable forecasting.",
+        "limitations": (
+            "Coinbase-only era; no volume is imputed before archive start. "
+            "Same origins, same resolved labels and same ridge regularization; "
+            "no claim of profitable forecasting."
+        ),
     }
 
 
