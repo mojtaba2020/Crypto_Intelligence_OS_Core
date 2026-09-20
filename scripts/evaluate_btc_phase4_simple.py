@@ -20,12 +20,8 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
     with sqlite3.connect(database) as connection:
         if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise ValueError("Corrupt price archive")
-        rows = connection.execute(
-            "SELECT day, price_usd FROM daily_price ORDER BY day"
-        ).fetchall()
-    observations = tuple(
-        Observation(date.fromisoformat(day), float(price)) for day, price in rows
-    )
+        rows = connection.execute("SELECT day, price_usd FROM daily_price ORDER BY day").fetchall()
+    observations = tuple(Observation(date.fromisoformat(day), float(price)) for day, price in rows)
     if not observations or observations[0].day != date(2011, 1, 1):
         raise ValueError("Incomplete price archive")
     if any(not isfinite(point.close) or point.close <= 0 for point in observations):
@@ -71,7 +67,8 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
                 "mean_error_difference_usd": sum(
                     candidate - baseline
                     for candidate, baseline in zip(values, errors["persistence"], strict=True)
-                ) / count,
+                )
+                / count,
                 "lower_error_count": sum(
                     candidate < baseline
                     for candidate, baseline in zip(values, errors["persistence"], strict=True)
