@@ -4,7 +4,6 @@ import sqlite3
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
-
 from scripts.btc_phase5_prospective import issue, score
 
 
