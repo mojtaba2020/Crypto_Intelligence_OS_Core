@@ -145,6 +145,34 @@ def evaluate(
             if ablation
             else None
         ),
+        "ablation_paired_vs_full": (
+            {
+                name: {
+                    "examples": len(values),
+                    "mean_absolute_error_difference_usd": sum(
+                        variant_error - full_error
+                        for variant_error, full_error in zip(
+                            values, (row[0] for row in errors), strict=True
+                        )
+                    ) / len(values),
+                    "variant_lower_error_count": sum(
+                        variant_error < full_error
+                        for variant_error, full_error in zip(
+                            values, (row[0] for row in errors), strict=True
+                        )
+                    ),
+                    "variant_higher_error_count": sum(
+                        variant_error > full_error
+                        for variant_error, full_error in zip(
+                            values, (row[0] for row in errors), strict=True
+                        )
+                    ),
+                }
+                for name, values in ablation_errors.items()
+            }
+            if ablation
+            else None
+        ),
         "regime_definition": "90-day trailing return: >10% up, <-10% down, otherwise flat",
         "research_only": True,
     }
