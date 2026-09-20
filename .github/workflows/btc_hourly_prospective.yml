@@ -1,0 +1,43 @@
+name: BTC Hourly Prospective Forecasts
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "9 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: btc-hourly-prospective
+  cancel-in-progress: false
+
+jobs:
+  hourly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Issue and evaluate hourly forecasts
+        run: python scripts/btc_hourly_prospective.py --ledger research/hourly_forecasts.jsonl --report .research/hourly_report.json
+      - name: Commit hourly ledger
+        run: |
+          if [ -n "$(git status --porcelain -- research/hourly_forecasts.jsonl)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add research/hourly_forecasts.jsonl
+            git commit -m "Record hourly BTC forecasts"
+            git pull --rebase
+            git push
+          fi
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hourly-report
+          path: .research/hourly_report.json
