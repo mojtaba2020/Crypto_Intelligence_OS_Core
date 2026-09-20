@@ -3,7 +3,7 @@ import json
 import math
 import tempfile
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from scripts.stage0_accuracy_gate import HORIZONS, evaluate, load_candles
@@ -11,8 +11,11 @@ from scripts.stage0_accuracy_gate import HORIZONS, evaluate, load_candles
 
 class AccuracyGateTests(unittest.TestCase):
     def setUp(self):
-        start = datetime(2025, 1, 1, tzinfo=timezone.utc)
-        self.rows = [(start + timedelta(hours=i), 50000.0 * math.exp(0.0001 * i + 0.003 * math.sin(i / 13))) for i in range(1000)]
+        start = datetime(2025, 1, 1, tzinfo=UTC)
+        self.rows = [
+            (start + timedelta(hours=i), 50000.0 * math.exp(0.0001 * i + 0.003 * math.sin(i / 13)))
+            for i in range(1000)
+        ]
 
     def test_all_horizons_return_finite_metrics(self):
         for h in HORIZONS:
@@ -25,14 +28,16 @@ class AccuracyGateTests(unittest.TestCase):
     def test_reject_missing_candles(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "candles.json"
-            path.write_text(json.dumps([[t.isoformat(), p] for t, p in self.rows if t != self.rows[100][0]]))
+            payload = [[t.isoformat(), p] for t, p in self.rows if t != self.rows[100][0]]
+            path.write_text(json.dumps(payload))
             with self.assertRaisesRegex(ValueError, "Missing or duplicate"):
                 load_candles(path)
 
     def test_reject_non_utc(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "candles.json"
-            path.write_text(json.dumps([[t.replace(tzinfo=None).isoformat(), p] for t, p in self.rows]))
+            payload = [[t.replace(tzinfo=None).isoformat(), p] for t, p in self.rows]
+            path.write_text(json.dumps(payload))
             with self.assertRaisesRegex(ValueError, "UTC"):
                 load_candles(path)
 
