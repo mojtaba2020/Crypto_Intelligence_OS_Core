@@ -5,6 +5,7 @@ Run with: python scripts/stage0_accuracy_gate.py --candles path/to/hourly.json
 Input: JSON list of [ISO-8601 UTC timestamp, close] pairs, ordered or unordered.
 Research only: no automatic model promotion or trading decisions.
 """
+
 from __future__ import annotations
 
 import argparse
