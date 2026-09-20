@@ -51,7 +51,9 @@ def evaluate(
         group: [] for group in ("no_halving", "no_extrema", "momentum_only")
     }
     regime_errors: dict[str, list[tuple[float, ...]]] = {
-        "up_90d": [], "down_90d": [], "flat_90d": []
+        "up_90d": [],
+        "down_90d": [],
+        "flat_90d": [],
     }
     for origin in range(first, last + 1, step):
         history = observations[: origin + 1]
@@ -69,17 +71,12 @@ def evaluate(
             predict(baseline, history),
             history[-1].close,
         )
-        row = (
-            tuple(abs(estimate - actual) for estimate in predictions)
-            + tuple(100 * abs(estimate - actual) / actual for estimate in predictions)
+        row = tuple(abs(estimate - actual) for estimate in predictions) + tuple(
+            100 * abs(estimate - actual) / actual for estimate in predictions
         )
         errors.append(row)
         change_90d = history[-1].close / history[-91].close - 1
-        regime = (
-            "up_90d" if change_90d > 0.10
-            else "down_90d" if change_90d < -0.10
-            else "flat_90d"
-        )
+        regime = "up_90d" if change_90d > 0.10 else "down_90d" if change_90d < -0.10 else "flat_90d"
         regime_errors[regime].append(row)
     if not errors:
         raise ValueError("No resolved out-of-sample examples")
@@ -98,7 +95,8 @@ def evaluate(
                 for index, model in enumerate(("hybrid", "linear", "persistence"))
             },
         }
-        for name, group in regime_errors.items() if group
+        for name, group in regime_errors.items()
+        if group
     }
     return {
         "status": "HYBRID_WALK_FORWARD_EVALUATED",
@@ -115,7 +113,8 @@ def evaluate(
         "regimes": regimes,
         "ablation_mae_usd": (
             {name: sum(values) / len(values) for name, values in ablation_errors.items()}
-            if ablation else None
+            if ablation
+            else None
         ),
         "regime_definition": "90-day trailing return: >10% up, <-10% down, otherwise flat",
         "research_only": True,
