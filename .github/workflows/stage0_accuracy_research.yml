@@ -1,0 +1,72 @@
+name: Stage 0 BTC Accuracy Research
+
+on:
+  push:
+    branches: ["research/stage0-accuracy-gate"]
+    paths:
+      - "scripts/stage0_accuracy_gate.py"
+      - "scripts/btc_hourly_prospective.py"
+      - "tests/test_stage0_accuracy_gate.py"
+      - ".github/workflows/stage0_accuracy_research.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install project
+        run: python -m pip install -e .
+      - name: Run offline benchmark tests
+        run: python -m unittest discover -s tests -p test_stage0_accuracy_gate.py -v
+      - name: Fetch completed Coinbase candles
+        run: |
+          mkdir -p .research
+          python - <<'PY'
+          import json
+          from datetime import UTC, datetime
+          from pathlib import Path
+          from scripts.btc_hourly_prospective import fetch
+
+          candles = fetch(datetime.now(UTC), hours=1200)
+          Path(".research/hourly_candles.json").write_text(
+              json.dumps([[t.isoformat(), p] for t, p in candles]) + "\n",
+              encoding="utf-8",
+          )
+          print(f"Fetched {len(candles)} completed hourly candles")
+          PY
+      - name: Benchmark against persistence
+        run: |
+          python scripts/stage0_accuracy_gate.py --candles .research/hourly_candles.json --report .research/stage0_accuracy_report.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path(".research/stage0_accuracy_report.json").read_text())
+          with Path(".research/stage0_accuracy_summary.md").open("w") as out:
+              out.write("# Stage 0 research benchmark (not a live accuracy claim)\n\n")
+              out.write("| Horizon | Selected | Model MAE USD | Persistence MAE USD | Improvement % |\n")
+              out.write("|---|---|---:|---:|---:|\n")
+              for row in report["results"]:
+                  out.write(
+                      f'| {row["horizon_hours"]}h | {row["candidate_selected_on_validation"]} | '
+                      f'{row["test_model_mae_usd"]:.2f} | {row["test_persistence_mae_usd"]:.2f} | '
+                      f'{row["test_mae_improvement_pct"]:.2f} |\n'
+                  )
+          PY
+          cat .research/stage0_accuracy_summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload research report and data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage0-accuracy-research
+          path: .research/
+          include-hidden-files: true
+          if-no-files-found: error
