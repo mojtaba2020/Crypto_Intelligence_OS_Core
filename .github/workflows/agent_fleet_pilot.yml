@@ -1,0 +1,24 @@
+name: Agent Fleet Pilot (dry run)
+on:
+  pull_request:
+    paths:
+      - 'scripts/agent_fleet.py'
+      - 'tests/test_agent_fleet.py'
+      - '.agent_fleet/**'
+      - '.github/workflows/agent_fleet_pilot.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test task planner
+        run: python -m unittest tests.test_agent_fleet
+      - name: Show dry-run task plan
+        run: python -m scripts.agent_fleet --manifest .agent_fleet/pilot.json --dry-run
