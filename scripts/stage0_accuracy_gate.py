@@ -65,6 +65,7 @@ def evaluate(rows, horizon):
 
     def examples(origins):
         return [(features(prices, i), math.log(prices[i + horizon] / prices[i])) for i in origins]
+
     training = examples(train_origins)
     validation = examples(validation_origins)
     candidates = {"persistence": (0.0, None)}
@@ -75,8 +76,7 @@ def evaluate(rows, horizon):
     validation_scores = {}
     for name, (blend, fitted) in candidates.items():
         predictions = [
-            0.0 if fitted is None else blend * _estimate(*fitted, x)
-            for x, _ in validation
+            0.0 if fitted is None else blend * _estimate(*fitted, x) for x, _ in validation
         ]
         validation_scores[name] = mae(predictions, [y for _, y in validation])
     winner = min(
@@ -92,8 +92,7 @@ def evaluate(rows, horizon):
     origins = list(test_origins)
     actual_returns = [math.log(prices[i + horizon] / prices[i]) for i in origins]
     predicted_returns = [
-        0.0 if fitted is None else blend * _estimate(*fitted, features(prices, i))
-        for i in origins
+        0.0 if fitted is None else blend * _estimate(*fitted, features(prices, i)) for i in origins
     ]
     actual_prices = [prices[i + horizon] for i in origins]
     model_prices = [
