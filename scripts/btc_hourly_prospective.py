@@ -68,10 +68,7 @@ def feature_vector(candles: list[tuple[datetime, float]], index: int) -> tuple[f
     """Past-only log returns and realized volatility at the forecast origin."""
     current = candles[index][1]
     values = [math.log(current / candles[index - window][1]) for window in FEATURE_WINDOWS]
-    returns = [
-        math.log(candles[j][1] / candles[j - 1][1])
-        for j in range(index - 23, index + 1)
-    ]
+    returns = [math.log(candles[j][1] / candles[j - 1][1]) for j in range(index - 23, index + 1)]
     values.append(statistics.pstdev(returns))
     return tuple(values)
 
@@ -90,8 +87,13 @@ def train(candles: list[tuple[datetime, float]], horizon: int) -> tuple[float, f
     provisional = _fit(examples[: split - horizon], ridge=100.0)
     holdout = examples[split:]
     blend = min(
-        (sum(abs(weight * _estimate(*provisional, features) - target)
-             for features, target in holdout), weight)
+        (
+            sum(
+                abs(weight * _estimate(*provisional, features) - target)
+                for features, target in holdout
+            ),
+            weight,
+        )
         for weight in (0.0, 0.25, 0.5, 0.75, 1.0)
     )[1]
     fitted = _fit(examples, ridge=100.0)
@@ -141,16 +143,13 @@ def run(now: datetime, ledger: Path, report: Path, scores_ledger: Path | None = 
     prices = {hour.isoformat(): price for hour, price in candles}
     scores_ledger = scores_ledger or ledger.with_name("hourly_scores.jsonl")
     prior_scores = ledger_rows(scores_ledger)
-    scored_keys = {
-        (r["version"], r["origin_hour_utc"], r["horizon_hours"]) for r in prior_scores
-    }
+    scored_keys = {(r["version"], r["origin_hour_utc"], r["horizon_hours"]) for r in prior_scores}
     newly_scored = []
     for row in [*existing, *new]:
         key = (row["version"], row["origin_hour_utc"], row["horizon_hours"])
         target_close = datetime.fromisoformat(
-            row.get("target_close_utc") or (
-                datetime.fromisoformat(row["target_hour_utc"]) + timedelta(hours=1)
-            ).isoformat()
+            row.get("target_close_utc")
+            or (datetime.fromisoformat(row["target_hour_utc"]) + timedelta(hours=1)).isoformat()
         )
         if (
             key in scored_keys
@@ -182,14 +181,16 @@ def run(now: datetime, ledger: Path, report: Path, scores_ledger: Path | None = 
     scores = {}
     for horizon in HORIZONS:
         resolved = [
-            row for row in [*prior_scores, *newly_scored]
+            row
+            for row in [*prior_scores, *newly_scored]
             if row["version"] == VERSION and row["horizon_hours"] == horizon
         ]
         scores[str(horizon)] = {
             "resolved": len(resolved),
             "model_mae_usd": (
                 statistics.mean(row["model_absolute_error_usd"] for row in resolved)
-                if resolved else None
+                if resolved
+                else None
             ),
             "persistence_mae_usd": (
                 statistics.mean(row["persistence_absolute_error_usd"] for row in resolved)
