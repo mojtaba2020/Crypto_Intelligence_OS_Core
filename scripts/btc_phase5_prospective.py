@@ -94,7 +94,8 @@ def score(database: Path, ledger: Path, *, now: datetime) -> dict:
     results = {}
     for horizon in HORIZONS:
         eligible = [
-            row for row in rows
+            row
+            for row in rows
             if row["version"] == VERSION
             and row["horizon_days"] == horizon
             and date.fromisoformat(row["target_day"]) < today
@@ -125,8 +126,7 @@ def score(database: Path, ledger: Path, *, now: datetime) -> dict:
         "by_horizon": results,
         "research_only": True,
         "limitations": (
-            "Only forecasts issued before their target close count; "
-            "no profitability claim."
+            "Only forecasts issued before their target close count; no profitability claim."
         ),
     }
 
@@ -139,8 +139,10 @@ def main() -> None:
     parser.add_argument("--report", type=Path, required=True)
     args = parser.parse_args()
     now = datetime.now(UTC)
-    result = issue(args.database, args.ledger, now=now) if args.mode == "issue" else score(
-        args.database, args.ledger, now=now
+    result = (
+        issue(args.database, args.ledger, now=now)
+        if args.mode == "issue"
+        else score(args.database, args.ledger, now=now)
     )
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
