@@ -61,6 +61,7 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
     first_origin = max(14 + horizon + 30 - 1, len(observations) - holdout_days)
     origins = range(first_origin, last_origin + 1, step)
     errors = []
+    yearly_errors: dict[int, list[tuple[float, float, float, float]]] = {}
     for origin in origins:
         history = observations[: origin + 1]
         model = train(history, horizon_days=horizon)
@@ -69,14 +70,14 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
         estimate = predict(model, history)
         actual = observations[origin + horizon].close
         baseline = history[-1].close
-        errors.append(
-            (
-                abs(estimate - actual),
-                abs(baseline - actual),
-                100 * abs(estimate - actual) / actual,
-                100 * abs(baseline - actual) / actual,
-            )
+        error = (
+            abs(estimate - actual),
+            abs(baseline - actual),
+            100 * abs(estimate - actual) / actual,
+            100 * abs(baseline - actual) / actual,
         )
+        errors.append(error)
+        yearly_errors.setdefault(history[-1].day.year, []).append(error)
     if not errors:
         raise ValueError("No resolved out-of-sample forecasts")
     n = len(errors)
@@ -95,6 +96,15 @@ def evaluate(database: Path, *, horizon: int, step: int, holdout_days: int) -> d
         "holdout_days": holdout_days,
         "evaluation_step_days": step,
         "test_examples": n,
+        "test_origins_overlap": step < horizon,
+        "yearly_out_of_sample": {
+            str(year): {
+                "test_examples": len(values),
+                "model_mae_usd": sum(value[0] for value in values) / len(values),
+                "persistence_mae_usd": sum(value[1] for value in values) / len(values),
+            }
+            for year, values in sorted(yearly_errors.items())
+        },
         "first_test_origin": observations[first_origin].day.isoformat(),
         "last_test_origin": observations[first_origin + (n - 1) * step].day.isoformat(),
         "model_mae_usd": sum(e[0] for e in errors) / n,
