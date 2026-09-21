@@ -33,6 +33,16 @@ class ProspectiveAuditTests(unittest.TestCase):
         result = audit([self.forecast], [self.score], min_resolved=2)
         self.assertEqual(result["results"][0]["improvement_pct"], 50.0)
         self.assertFalse(result["results"][0]["sample_threshold_met"])
+        self.assertEqual(result["results"][0]["forecasts_different_from_persistence"], 1)
+        self.assertTrue(result["results"][0]["model_differentiation_observed"])
+
+    def test_identical_model_and_persistence_is_disclosed(self):
+        forecast = dict(self.forecast, forecast_usd=100.0)
+        score = dict(self.score, model_absolute_error_usd=2.0)
+        result = audit([forecast], [score])
+        self.assertEqual(result["results"][0]["forecasts_different_from_persistence"], 0)
+        self.assertFalse(result["results"][0]["model_differentiation_observed"])
+        self.assertEqual(result["results"][0]["improvement_pct"], 0.0)
 
     def test_rejects_early_score(self):
         row = dict(self.score, scored_at_utc=self.forecast["issued_at_utc"])
