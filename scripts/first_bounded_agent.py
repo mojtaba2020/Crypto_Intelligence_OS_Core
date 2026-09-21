@@ -83,7 +83,10 @@ def run(report_path: Path) -> int:
     print(output[:2400])
     usage = payload.get("usage", {})
     if isinstance(usage, dict):
-        print(f"usage_input_tokens={usage.get('input_tokens', 'unknown')} usage_output_tokens={usage.get('output_tokens', 'unknown')}")
+        print(
+            f"usage_input_tokens={usage.get('input_tokens', 'unknown')} "
+            f"usage_output_tokens={usage.get('output_tokens', 'unknown')}"
+        )
     return 0
 
 
