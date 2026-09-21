@@ -32,7 +32,7 @@ def test_issue_is_idempotent_and_targets_are_future(tmp_path):
     assert all(date.fromisoformat(row["target_day"]) >= now.date() for row in created)
     assert issue(database, ledger, now=now) == []
     report = score(database, ledger, now=now)
-    assert report["ledger_entries"] == 7
+    assert report["ledger_entries"] == 9
     assert set(report["by_horizon"]) == {"1", "3", "7", "14", "21", "30", "90", "180", "365"}
     assert all(row["resolved_examples"] == 0 for row in report["by_horizon"].values())
 
