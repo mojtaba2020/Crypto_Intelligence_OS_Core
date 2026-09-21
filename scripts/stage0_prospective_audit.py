@@ -44,7 +44,14 @@ def audit(forecasts: list[dict], scores: list[dict], min_resolved: int = 100) ->
             raise ValueError(f"Incorrect model score: {key}")
         if abs(baseline_error - float(row["persistence_absolute_error_usd"])) > 0.01:
             raise ValueError(f"Incorrect baseline score: {key}")
-        groups[(key[0], key[2])].append((forecast["target_hour_utc"], model_error, baseline_error))
+        groups[(key[0], key[2])].append(
+            (
+                forecast["target_hour_utc"],
+                model_error,
+                baseline_error,
+                abs(float(forecast["forecast_usd"]) - float(forecast["persistence_usd"])) > 0.01,
+            )
+        )
 
     results = []
     for (version, horizon), rows in sorted(groups.items()):
@@ -52,12 +59,15 @@ def audit(forecasts: list[dict], scores: list[dict], min_resolved: int = 100) ->
         model = statistics.mean(r[1] for r in rows)
         baseline = statistics.mean(r[2] for r in rows)
         distinct_targets = len({r[0] for r in rows})
+        distinct_model_forecasts = sum(row[3] for row in rows)
         results.append(
             {
                 "version": version,
                 "horizon_hours": horizon,
                 "resolved": len(rows),
                 "distinct_target_hours": distinct_targets,
+                "forecasts_different_from_persistence": distinct_model_forecasts,
+                "model_differentiation_observed": distinct_model_forecasts > 0,
                 "model_mae_usd": model,
                 "persistence_mae_usd": baseline,
                 "improvement_pct": 100 * (baseline - model) / baseline if baseline else None,
