@@ -4,7 +4,7 @@ from scripts.evaluate_btc_multihorizon import HORIZONS, plan
 
 
 def test_supported_horizons_are_ordered_and_complete():
-    assert HORIZONS == (1, 3, 7, 30, 90, 180, 365)
+    assert HORIZONS == (1, 3, 7, 14, 21, 30, 90, 180, 365)
 
 
 def test_plan_uses_longer_windows_for_longer_horizons():
