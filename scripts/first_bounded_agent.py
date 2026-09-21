@@ -25,6 +25,12 @@ REQUIRED_FIELDS = (
     "test_examples",
     "model_mae_usd",
     "persistence_mae_usd",
+    "evaluation_method",
+    "training_labels_resolved_by_forecast_origin",
+    "test_origins_overlap",
+    "holdout_first_origin_day",
+    "holdout_last_origin_day",
+    "data_covers_full_btc_cycle_history",
 )
 
 
@@ -41,6 +47,18 @@ def load_evidence(path: Path) -> dict:
         value = report[field]
         if not isinstance(value, (int, float)) or isinstance(value, bool) or not 0 <= value < 1e15:
             raise ValueError("Evidence report has invalid MAE")
+    if report["evaluation_method"] != "expanding_window_walk_forward":
+        raise ValueError("Unexpected evaluation protocol")
+    for field in (
+        "training_labels_resolved_by_forecast_origin",
+        "test_origins_overlap",
+        "data_covers_full_btc_cycle_history",
+    ):
+        if not isinstance(report[field], bool):
+            raise ValueError("Invalid evaluation metadata")
+    for field in ("holdout_first_origin_day", "holdout_last_origin_day"):
+        if not isinstance(report[field], str) or len(report[field]) != 10:
+            raise ValueError("Invalid holdout date")
     return {field: report[field] for field in REQUIRED_FIELDS}
 
 
