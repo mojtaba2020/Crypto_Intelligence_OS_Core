@@ -32,7 +32,7 @@ def run() -> int:
         "max_output_tokens": MAX_OUTPUT_TOKENS,
         "store": False,
     }
-    request = urllib.request.Request(
+    request = urllib.request.Request(  # noqa: S310
         API_URL,
         data=json.dumps(body).encode("utf-8"),
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
