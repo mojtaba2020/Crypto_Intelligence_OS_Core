@@ -54,6 +54,16 @@ def main() -> int:
         "horizon_days": arguments.horizon_days,
         "train_examples": evaluation.train_examples,
         "test_examples": evaluation.test_examples,
+        "evaluation_method": "expanding_window_walk_forward",
+        "training_labels_resolved_by_forecast_origin": True,
+        "test_origins_overlap": arguments.horizon_days > 1,
+        "holdout_first_origin_day": observations[
+            14 + arguments.horizon_days + 30 - 1
+        ].day.isoformat(),
+        "holdout_last_origin_day": observations[
+            len(observations) - arguments.horizon_days - 1
+        ].day.isoformat(),
+        "data_covers_full_btc_cycle_history": False,
         "model_mae_usd": evaluation.model_mae,
         "persistence_mae_usd": evaluation.persistence_mae,
         "model_mape_pct": evaluation.model_mape_pct,
