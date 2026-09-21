@@ -29,9 +29,9 @@ jobs:
           test -s .research/btc_usd_daily.sqlite
       - name: Produce genuine local seven-day evaluation
         run: |
-          python scripts/evaluate_btc_ai.py \\
-            --archive .research/btc_usd_daily.sqlite \\
-            --report .research/ai_7d_report.json \\
+          python scripts/evaluate_btc_ai.py \
+            --archive .research/btc_usd_daily.sqlite \
+            --report .research/ai_7d_report.json \
             --horizon-days 7
       - name: One bounded evidence-grounded agent call
         run: python -m scripts.first_bounded_agent --report .research/ai_7d_report.json
