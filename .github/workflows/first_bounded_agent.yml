@@ -17,5 +17,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: One bounded agent call
-        run: python -m scripts.first_bounded_agent
+      - name: Check for local evaluation evidence (no paid call if absent)
+        run: test -f data/reports/btc_ai_evaluation.json
+      - name: One bounded evidence-grounded agent call
+        run: python -m scripts.first_bounded_agent --report data/reports/btc_ai_evaluation.json
