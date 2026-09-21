@@ -9,15 +9,29 @@ concurrency:
 jobs:
   first-agent:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 8
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Check for local evaluation evidence (no paid call if absent)
-        run: test -f data/reports/btc_ai_evaluation.json
+      - name: Install local research dependencies
+        run: python -m pip install -e .
+      - name: Load existing durable BTC archive
+        run: |
+          git fetch origin data/btc-usd-daily:data/btc-usd-daily
+          mkdir -p .research
+          git show data/btc-usd-daily:data/btc_usd_daily.sqlite > .research/btc_usd_daily.sqlite
+          test -s .research/btc_usd_daily.sqlite
+      - name: Produce genuine local seven-day evaluation
+        run: |
+          python scripts/evaluate_btc_ai.py \\
+            --archive .research/btc_usd_daily.sqlite \\
+            --report .research/ai_7d_report.json \\
+            --horizon-days 7
       - name: One bounded evidence-grounded agent call
-        run: python -m scripts.first_bounded_agent --report data/reports/btc_ai_evaluation.json
+        run: python -m scripts.first_bounded_agent --report .research/ai_7d_report.json
