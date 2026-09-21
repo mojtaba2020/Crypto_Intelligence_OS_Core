@@ -16,9 +16,15 @@ MODEL = "gpt-4o-mini"
 MAX_OUTPUT_TOKENS = 350
 MAX_REPORT_BYTES = 12_000
 REQUIRED_FIELDS = (
-    "source", "instrument", "first_day", "last_completed_day",
-    "horizon_days", "train_examples", "test_examples",
-    "model_mae_usd", "persistence_mae_usd",
+    "source",
+    "instrument",
+    "first_day",
+    "last_completed_day",
+    "horizon_days",
+    "train_examples",
+    "test_examples",
+    "model_mae_usd",
+    "persistence_mae_usd",
 )
 
 
