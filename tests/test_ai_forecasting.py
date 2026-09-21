@@ -64,7 +64,7 @@ def test_walk_forward_is_invariant_to_unseen_future() -> None:
     rows = history(105)
     # Change only the last completed close. Earlier forecasts and targets
     # must be identical; only the final origin/target pair may change.
-    amended = rows[:-1] + (Observation(rows[-1].day, rows[-1].close * 10),)
+    amended = (*rows[:-1], Observation(rows[-1].day, rows[-1].close * 10))
     horizon = 7
     earlier = walk_forward(rows[:-horizon], horizon_days=horizon)
     amended_earlier = walk_forward(amended[:-horizon], horizon_days=horizon)
