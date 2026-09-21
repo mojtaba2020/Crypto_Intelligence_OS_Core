@@ -1,0 +1,21 @@
+name: First Bounded Agent (manual)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: first-bounded-agent
+  cancel-in-progress: false
+jobs:
+  first-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: One bounded agent call
+        run: python scripts/first_bounded_agent.py
