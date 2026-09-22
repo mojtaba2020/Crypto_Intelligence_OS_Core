@@ -9,7 +9,7 @@ from pathlib import Path
 
 from scripts.evaluate_btc_hybrid import evaluate
 
-HORIZONS = (1, 3, 7, 30, 90, 180, 365)
+HORIZONS = (1, 3, 7, 14, 21, 30, 90, 180, 365)
 
 
 def plan(horizon: int) -> tuple[int, int]:
