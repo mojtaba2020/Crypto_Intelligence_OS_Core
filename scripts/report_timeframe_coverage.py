@@ -63,7 +63,7 @@ def build(root: Path) -> dict:
                     else "implemented_unverified"
                 )
                 rows.append(
-                        {
+                    {
                         "input_candle": candle,
                         "forecast_horizon": f"{horizon}h",
                         "code_path": str(hourly_code.relative_to(root)),
@@ -87,7 +87,7 @@ def build(root: Path) -> dict:
                     if r.get("horizon_days") == horizon
                 }
                 rows.append(
-                        {
+                    {
                         "input_candle": candle,
                         "forecast_horizon": f"{horizon}d",
                         "code_path": str(daily_code.relative_to(root)),
@@ -105,7 +105,7 @@ def build(root: Path) -> dict:
                 )
         else:
             rows.append(
-                    {
+                {
                     "input_candle": candle,
                     "forecast_horizon": None,
                     "code_path": None,
