@@ -31,7 +31,7 @@ jobs:
           import json
           from pathlib import Path
           data=json.loads(Path(".research/timeframe_coverage.json").read_text())
-          assert len(data["coverage"]) == 22
+          assert len(data["coverage"]) == 24
           assert len({r["input_candle"] for r in data["coverage"]}) == 13
           assert all(r["research_only"] for r in data["coverage"])
           print("Validated", len(data["coverage"]), "coverage rows")
