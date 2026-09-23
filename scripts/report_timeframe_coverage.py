@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Generate an evidence-based BTC timeframe coverage manifest; no inferred model skill."""
+
 from __future__ import annotations
 
 import argparse
@@ -7,8 +8,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-REQUESTED_INPUTS = ("1h", "2h", "3h", "4h", "12h", "1d", "2d", "3d",
-                    "1w", "2w", "3w", "1mo", "3mo")
+REQUESTED_INPUTS = ("1h", "2h", "3h", "4h", "12h", "1d", "2d", "3d", "1w", "2w", "3w", "1mo", "3mo")
 HOURLY_HORIZONS = (1, 4, 12, 24)
 DAILY_HORIZONS = (1, 3, 7, 14, 21, 30, 90, 180, 365)
 
@@ -35,6 +35,7 @@ def build(root: Path) -> dict:
     for candle in REQUESTED_INPUTS:
         if candle == "1h" and hourly_code.is_file():
             for horizon in HOURLY_HORIZONS:
+
                 def key(record: dict) -> tuple:
                     return (
                         record.get("version"),
@@ -43,11 +44,11 @@ def build(root: Path) -> dict:
                     )
 
                 issued = {
-                    key(record) for record in hourly
-                    if record.get("horizon_hours") == horizon
+                    key(record) for record in hourly if record.get("horizon_hours") == horizon
                 }
                 resolved = {
-                    key(record) for record in hourly_scores
+                    key(record)
+                    for record in hourly_scores
                     if record.get("horizon_hours") == horizon
                     and key(record) in issued
                     and record.get("actual_close_usd", 0) > 0
@@ -55,45 +56,56 @@ def build(root: Path) -> dict:
                     and record.get("persistence_absolute_error_usd", -1) >= 0
                 }
                 status = (
-                    "resolved_and_scored" if resolved else
-                    "issuing" if issued else "implemented_unverified"
+                    "resolved_and_scored"
+                    if resolved
+                    else "issuing"
+                    if issued
+                    else "implemented_unverified"
                 )
-                rows.append({
+                rows.append(
+                    {
                     "input_candle": candle,
                     "forecast_horizon": f"{horizon}h",
                     "code_path": str(hourly_code.relative_to(root)),
                     "workflow": (
                         str(hourly_workflow.relative_to(root))
-                        if hourly_workflow.is_file() else None
+                        if hourly_workflow.is_file()
+                        else None
                     ),
                     "ledger": hourly_path,
                     "issued_count": len(issued),
                     "resolved_count": len(resolved),
                     "status": status,
                     "research_only": True,
-                })
+                    }
+                )
         elif candle == "1d" and daily_code.is_file():
             for horizon in DAILY_HORIZONS:
                 issued = {
                     (r.get("version"), r.get("origin_day"), r.get("horizon_days"))
-                    for r in daily if r.get("horizon_days") == horizon
+                    for r in daily
+                    if r.get("horizon_days") == horizon
                 }
-                rows.append({
+                rows.append(
+                    {
                     "input_candle": candle,
                     "forecast_horizon": f"{horizon}d",
                     "code_path": str(daily_code.relative_to(root)),
                     "workflow": (
                         str(daily_workflow.relative_to(root))
-                        if daily_workflow.is_file() else None
+                        if daily_workflow.is_file()
+                        else None
                     ),
                     "ledger": daily_path,
                     "issued_count": len(issued),
                     "resolved_count": None,
                     "status": "issuing" if issued else "implemented_unverified",
                     "research_only": True,
-                })
+                    }
+                )
         else:
-            rows.append({
+            rows.append(
+                {
                 "input_candle": candle,
                 "forecast_horizon": None,
                 "code_path": None,
@@ -103,7 +115,8 @@ def build(root: Path) -> dict:
                 "resolved_count": None,
                 "status": "not_verified",
                 "research_only": True,
-            })
+                }
+            )
     return {
         "schema_version": 1,
         "generated_at_utc": datetime.now(UTC).isoformat(),
