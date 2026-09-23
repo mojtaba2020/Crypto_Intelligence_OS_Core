@@ -1,4 +1,5 @@
 """Coverage manifest tests: unknown is not zero and horizons are not candle inputs."""
+
 import json
 from pathlib import Path
 
@@ -17,17 +18,27 @@ def test_counts_and_input_horizon_separation(tmp_path: Path) -> None:
     (tmp_path / "scripts/btc_phase5_prospective.py").write_text("")
     (tmp_path / "research").mkdir()
     (tmp_path / "research/hourly_forecasts.jsonl").write_text(
-        json.dumps({
-            "version": "v", "origin_hour_utc": "2026-09-21T00:00:00+00:00",
-            "horizon_hours": 4,
-        }) + "\n"
+        json.dumps(
+            {
+                "version": "v",
+                "origin_hour_utc": "2026-09-21T00:00:00+00:00",
+                "horizon_hours": 4,
+            }
+        )
+        + "\n"
     )
     (tmp_path / "research/hourly_scores.jsonl").write_text(
-        json.dumps({
-            "version": "v", "origin_hour_utc": "2026-09-21T00:00:00+00:00",
-            "horizon_hours": 4, "actual_close_usd": 100,
-            "model_absolute_error_usd": 1, "persistence_absolute_error_usd": 2,
-        }) + "\n"
+        json.dumps(
+            {
+                "version": "v",
+                "origin_hour_utc": "2026-09-21T00:00:00+00:00",
+                "horizon_hours": 4,
+                "actual_close_usd": 100,
+                "model_absolute_error_usd": 1,
+                "persistence_absolute_error_usd": 2,
+            }
+        )
+        + "\n"
     )
     (tmp_path / "research/phase5_forecasts.jsonl").write_text(
         json.dumps({"version": "v", "origin_day": "2026-09-21", "horizon_days": 3}) + "\n"
@@ -50,7 +61,8 @@ def test_score_without_observed_outcome_is_not_resolved(tmp_path: Path) -> None:
     (tmp_path / "research/hourly_forecasts.jsonl").write_text(json.dumps(key) + "\n")
     (tmp_path / "research/hourly_scores.jsonl").write_text(json.dumps(key) + "\n")
     row = next(
-        r for r in build(tmp_path)["coverage"]
+        r
+        for r in build(tmp_path)["coverage"]
         if r["input_candle"] == "1h" and r["forecast_horizon"] == "4h"
     )
     assert row["issued_count"] == 1
