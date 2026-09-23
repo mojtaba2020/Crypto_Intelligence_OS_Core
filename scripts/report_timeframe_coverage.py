@@ -30,7 +30,7 @@ def build(root: Path) -> dict:
         if candle == "1h" and hourly_code.is_file():
             for horizon in HOURLY_HORIZONS:
                 issued = {(r.get("version"), r.get("origin_hour_utc"), r.get("horizon_hours")) for r in hourly if r.get("horizon_hours") == horizon}
-                resolved = {(r.get("version"), r.get("origin_hour_utc"), r.get("horizon_hours")) for r in hourly_scores if r.get("horizon_hours") == horizon and (r.get("version"), r.get("origin_hour_utc"), r.get("horizon_hours")) in issued}
+                resolved = {(r.get("version"), r.get("origin_hour_utc"), r.get("horizon_hours")) for r in hourly_scores if r.get("horizon_hours") == horizon and (r.get("version"), r.get("origin_hour_utc"), r.get("horizon_hours")) in issued and r.get("actual_close_usd", 0) > 0 and r.get("model_absolute_error_usd", -1) >= 0 and r.get("persistence_absolute_error_usd", -1) >= 0}
                 rows.append(dict(input_candle=candle, forecast_horizon=f"{horizon}h", code_path=str(hourly_code.relative_to(root)), workflow=str(hourly_workflow.relative_to(root)) if hourly_workflow.is_file() else None, ledger="research/hourly_forecasts.jsonl", issued_count=len(issued), resolved_count=len(resolved), status="resolved_and_scored" if resolved else "issuing" if issued else "implemented_unverified", research_only=True))
         elif candle == "1d" and daily_code.is_file():
             for horizon in DAILY_HORIZONS:
