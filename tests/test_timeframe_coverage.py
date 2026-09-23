@@ -17,10 +17,17 @@ def test_counts_and_input_horizon_separation(tmp_path: Path) -> None:
     (tmp_path / "scripts/btc_phase5_prospective.py").write_text("")
     (tmp_path / "research").mkdir()
     (tmp_path / "research/hourly_forecasts.jsonl").write_text(
-        json.dumps({"version": "v", "origin_hour_utc": "2026-09-21T00:00:00+00:00", "horizon_hours": 4}) + "\n"
+        json.dumps({
+            "version": "v", "origin_hour_utc": "2026-09-21T00:00:00+00:00",
+            "horizon_hours": 4,
+        }) + "\n"
     )
     (tmp_path / "research/hourly_scores.jsonl").write_text(
-        json.dumps({"version": "v", "origin_hour_utc": "2026-09-21T00:00:00+00:00", "horizon_hours": 4, "actual_close_usd": 100, "model_absolute_error_usd": 1, "persistence_absolute_error_usd": 2}) + "\n"
+        json.dumps({
+            "version": "v", "origin_hour_utc": "2026-09-21T00:00:00+00:00",
+            "horizon_hours": 4, "actual_close_usd": 100,
+            "model_absolute_error_usd": 1, "persistence_absolute_error_usd": 2,
+        }) + "\n"
     )
     (tmp_path / "research/phase5_forecasts.jsonl").write_text(
         json.dumps({"version": "v", "origin_day": "2026-09-21", "horizon_days": 3}) + "\n"
@@ -28,7 +35,9 @@ def test_counts_and_input_horizon_separation(tmp_path: Path) -> None:
     rows = build(tmp_path)["coverage"]
     hourly = next(r for r in rows if r["input_candle"] == "1h" and r["forecast_horizon"] == "4h")
     daily = next(r for r in rows if r["input_candle"] == "1d" and r["forecast_horizon"] == "3d")
-    assert (hourly["issued_count"], hourly["resolved_count"], hourly["status"]) == (1, 1, "resolved_and_scored")
+    assert hourly["issued_count"] == 1
+    assert hourly["resolved_count"] == 1
+    assert hourly["status"] == "resolved_and_scored"
     assert (daily["issued_count"], daily["resolved_count"]) == (1, None)
     assert next(r for r in rows if r["input_candle"] == "4h")["status"] == "not_verified"
 
@@ -40,7 +49,10 @@ def test_score_without_observed_outcome_is_not_resolved(tmp_path: Path) -> None:
     key = {"version": "v", "origin_hour_utc": "2026-09-21T00:00:00+00:00", "horizon_hours": 4}
     (tmp_path / "research/hourly_forecasts.jsonl").write_text(json.dumps(key) + "\n")
     (tmp_path / "research/hourly_scores.jsonl").write_text(json.dumps(key) + "\n")
-    row = next(r for r in build(tmp_path)["coverage"] if r["input_candle"] == "1h" and r["forecast_horizon"] == "4h")
+    row = next(
+        r for r in build(tmp_path)["coverage"]
+        if r["input_candle"] == "1h" and r["forecast_horizon"] == "4h"
+    )
     assert row["issued_count"] == 1
     assert row["resolved_count"] == 0
     assert row["status"] == "issuing"
