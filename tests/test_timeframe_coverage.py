@@ -31,3 +31,16 @@ def test_counts_and_input_horizon_separation(tmp_path: Path) -> None:
     assert (hourly["issued_count"], hourly["resolved_count"], hourly["status"]) == (1, 1, "resolved_and_scored")
     assert (daily["issued_count"], daily["resolved_count"]) == (1, None)
     assert next(r for r in rows if r["input_candle"] == "4h")["status"] == "not_verified"
+
+
+def test_score_without_observed_outcome_is_not_resolved(tmp_path: Path) -> None:
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts/btc_hourly_prospective.py").write_text("")
+    (tmp_path / "research").mkdir()
+    key = {"version": "v", "origin_hour_utc": "2026-09-21T00:00:00+00:00", "horizon_hours": 4}
+    (tmp_path / "research/hourly_forecasts.jsonl").write_text(json.dumps(key) + "\n")
+    (tmp_path / "research/hourly_scores.jsonl").write_text(json.dumps(key) + "\n")
+    row = next(r for r in build(tmp_path)["coverage"] if r["input_candle"] == "1h" and r["forecast_horizon"] == "4h")
+    assert row["issued_count"] == 1
+    assert row["resolved_count"] == 0
+    assert row["status"] == "issuing"
