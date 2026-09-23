@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -26,7 +25,6 @@ def build(root: Path) -> dict:
     hourly = read_jsonl(root / "research/hourly_forecasts.jsonl")
     hourly_scores = read_jsonl(root / "research/hourly_scores.jsonl")
     daily = read_jsonl(root / "research/phase5_forecasts.jsonl")
-    # The daily ledger path can differ by workflow: no count is asserted unless verified.
     rows = []
     for candle in REQUESTED_INPUTS:
         if candle == "1h" and hourly_code.is_file():
@@ -37,10 +35,10 @@ def build(root: Path) -> dict:
         elif candle == "1d" and daily_code.is_file():
             for horizon in DAILY_HORIZONS:
                 issued = {(r.get("version"), r.get("origin_day"), r.get("horizon_days")) for r in daily if r.get("horizon_days") == horizon}
-                rows.append(dict(input_candle=candle, forecast_horizon=f"{horizon}d", code_path=str(daily_code.relative_to(root)), workflow=None, ledger="research/phase5_forecasts.jsonl" if daily else None, issued_count=len(issued) if daily else None, resolved_count=None, status="issuing" if issued else "implemented_unverified", research_only=True))
+                rows.append(dict(input_candle=candle, forecast_horizon=f"{horizon}d", code_path=str(daily_code.relative_to(root)), workflow=".github/workflows/btc_phase5_prospective.yml" if (root / ".github/workflows/btc_phase5_prospective.yml").is_file() else None, ledger="research/phase5_forecasts.jsonl", issued_count=len(issued), resolved_count=None, status="issuing" if issued else "implemented_unverified", research_only=True))
         else:
             rows.append(dict(input_candle=candle, forecast_horizon=None, code_path=None, workflow=None, ledger=None, issued_count=None, resolved_count=None, status="not_verified", research_only=True))
-    return {"schema_version": 1, "generated_at_utc": datetime.now(timezone.utc).isoformat(), "coverage": rows, "long_range_2_to_8_years": "exploratory_not_verified", "warning": "Code presence and ledger counts do not establish forecast accuracy. Unknown counts are null, not zero. Daily ledger path must be confirmed against actual workflow."}
+    return {"schema_version": 1, "generated_at_utc": datetime.now(timezone.utc).isoformat(), "coverage": rows, "long_range_2_to_8_years": "exploratory_not_verified", "warning": "Code presence and ledger counts do not establish forecast accuracy. Unknown counts are null, not zero. Daily resolved counts are unavailable until the scoring report is persisted; null is not zero."}
 
 
 def main() -> None:
