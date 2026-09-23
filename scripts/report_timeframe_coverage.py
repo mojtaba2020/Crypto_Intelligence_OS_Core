@@ -63,20 +63,20 @@ def build(root: Path) -> dict:
                     else "implemented_unverified"
                 )
                 rows.append(
-                    {
-                    "input_candle": candle,
-                    "forecast_horizon": f"{horizon}h",
-                    "code_path": str(hourly_code.relative_to(root)),
-                    "workflow": (
-                        str(hourly_workflow.relative_to(root))
-                        if hourly_workflow.is_file()
-                        else None
-                    ),
-                    "ledger": hourly_path,
-                    "issued_count": len(issued),
-                    "resolved_count": len(resolved),
-                    "status": status,
-                    "research_only": True,
+                        {
+                        "input_candle": candle,
+                        "forecast_horizon": f"{horizon}h",
+                        "code_path": str(hourly_code.relative_to(root)),
+                        "workflow": (
+                            str(hourly_workflow.relative_to(root))
+                            if hourly_workflow.is_file()
+                            else None
+                        ),
+                        "ledger": hourly_path,
+                        "issued_count": len(issued),
+                        "resolved_count": len(resolved),
+                        "status": status,
+                        "research_only": True,
                     }
                 )
         elif candle == "1d" and daily_code.is_file():
@@ -87,34 +87,34 @@ def build(root: Path) -> dict:
                     if r.get("horizon_days") == horizon
                 }
                 rows.append(
-                    {
-                    "input_candle": candle,
-                    "forecast_horizon": f"{horizon}d",
-                    "code_path": str(daily_code.relative_to(root)),
-                    "workflow": (
-                        str(daily_workflow.relative_to(root))
-                        if daily_workflow.is_file()
-                        else None
-                    ),
-                    "ledger": daily_path,
-                    "issued_count": len(issued),
-                    "resolved_count": None,
-                    "status": "issuing" if issued else "implemented_unverified",
-                    "research_only": True,
+                        {
+                        "input_candle": candle,
+                        "forecast_horizon": f"{horizon}d",
+                        "code_path": str(daily_code.relative_to(root)),
+                        "workflow": (
+                            str(daily_workflow.relative_to(root))
+                            if daily_workflow.is_file()
+                            else None
+                        ),
+                        "ledger": daily_path,
+                        "issued_count": len(issued),
+                        "resolved_count": None,
+                        "status": "issuing" if issued else "implemented_unverified",
+                        "research_only": True,
                     }
                 )
         else:
             rows.append(
-                {
-                "input_candle": candle,
-                "forecast_horizon": None,
-                "code_path": None,
-                "workflow": None,
-                "ledger": None,
-                "issued_count": None,
-                "resolved_count": None,
-                "status": "not_verified",
-                "research_only": True,
+                    {
+                    "input_candle": candle,
+                    "forecast_horizon": None,
+                    "code_path": None,
+                    "workflow": None,
+                    "ledger": None,
+                    "issued_count": None,
+                    "resolved_count": None,
+                    "status": "not_verified",
+                    "research_only": True,
                 }
             )
     return {
@@ -137,7 +137,9 @@ def main() -> None:
     args = parser.parse_args()
     report = build(args.root)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    args.output.write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     print(json.dumps({"coverage_rows": len(report["coverage"]), "output": str(args.output)}))
 
 
