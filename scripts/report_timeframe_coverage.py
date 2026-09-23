@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 REQUESTED_INPUTS = ("1h", "2h", "3h", "4h", "12h", "1d", "2d", "3d",
@@ -106,7 +106,7 @@ def build(root: Path) -> dict:
             })
     return {
         "schema_version": 1,
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "generated_at_utc": datetime.now(UTC).isoformat(),
         "coverage": rows,
         "long_range_2_to_8_years": "exploratory_not_verified",
         "warning": (
