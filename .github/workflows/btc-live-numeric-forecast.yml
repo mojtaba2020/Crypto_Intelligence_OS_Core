@@ -37,11 +37,11 @@ jobs:
           from pathlib import Path
           result = json.loads(Path(".research/live_btc_forecast.json").read_text())
           assert result["status"] == "LIVE_NUMERIC_RESEARCH_FORECAST_NOT_TRADING_ADVICE"
-          assert len(result["forecasts"]) == 14
-          assert len({r["timeframe"] for r in result["forecasts"]}) == 14
+          assert len(result["forecasts"]) == 15
+          assert len({r["timeframe"] for r in result["forecasts"]}) == 15
           assert all(r["predicted_price_usd"] > 0 and r["target_utc"] for r in result["forecasts"])
           assert all(r["evidence"] for r in result["forecasts"])
-          print("Validated 14 timestamped numerical forecasts")
+          print("Validated 15 timestamped numerical forecasts")
           PY
       - uses: actions/upload-artifact@v4
         if: always()
