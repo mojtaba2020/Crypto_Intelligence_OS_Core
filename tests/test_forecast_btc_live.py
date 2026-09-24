@@ -12,9 +12,9 @@ from scripts import forecast_btc_live as live
 
 def test_forecast_models() -> None:
     origin = 100 * 86400
-    prices = {origin - i * 86400: 100.0 - i for i in range(90)}
+    prices = {origin - i * 86400: 100.0 - i for i in range(91)}
     assert live.forecast("persistence", 110.0, prices, origin, 7, 86400) == 110.0
-    assert live.forecast("momentum_30d_quarter", 110.0, prices, origin, 30, 86400) == 119.75
+    assert live.forecast("momentum_30d_quarter", 110.0, prices, origin, 30, 86400) == 117.5
     with pytest.raises(ValueError, match="Daily momentum"):
         live.forecast("momentum_30d_quarter", 110.0, prices, origin, 1, 3600)
     with pytest.raises(ValueError, match="Unknown model"):
@@ -48,7 +48,7 @@ def test_run_offline_with_mock_market(tmp_path: Path) -> None:
     with patch.object(live, "fetch_json", side_effect=market):
         output = live.run(report, now)
     assert output["spot_price_usd"] == 100000
-    assert len(output["forecasts"]) == 14
+    assert len(output["forecasts"]) == 15
     assert output["forecasts"][0]["evidence"] == "UNVALIDATED_HOURLY_BASELINE"
     daily_three = next(row for row in output["forecasts"] if row["timeframe"] == "3d")
     assert daily_three["predicted_price_usd"] > 100000
