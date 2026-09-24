@@ -2,6 +2,11 @@ name: BTC Live Numeric Forecast Prototype
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/forecast_btc_live.py
+      - research/live_forecast_selection_v1.json
+      - .github/workflows/btc-live-numeric-forecast.yml
   push:
     branches:
       - feature/live-numeric-btc-forecast-v1
