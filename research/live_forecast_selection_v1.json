@@ -2,61 +2,61 @@
   "status": "MODEL_TOURNAMENT_RESEARCH_ONLY",
   "source_pr": 55,
   "source_run": 35942861573,
-  "warning": "Frozen historical selections, not proof of future accuracy",
+  "warning": "Historical model names are pinned; numerical test metrics are deliberately omitted pending verification against the original report. No evidence of prospective accuracy.",
   "results": [
     {
       "horizon_days": 1,
       "selected_on_validation": "persistence",
-      "locked_test_examples": 1361,
-      "selected_test_improvement_vs_persistence_pct": 0
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
     },
     {
       "horizon_days": 3,
       "selected_on_validation": "momentum_90d_quarter",
-      "locked_test_examples": 453,
-      "selected_test_improvement_vs_persistence_pct": -0.645316665
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
     },
     {
       "horizon_days": 7,
       "selected_on_validation": "persistence",
-      "locked_test_examples": 194,
-      "selected_test_improvement_vs_persistence_pct": 0
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
     },
     {
       "horizon_days": 14,
       "selected_on_validation": "persistence",
-      "locked_test_examples": 97,
-      "selected_test_improvement_vs_persistence_pct": 0
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
     },
     {
       "horizon_days": 21,
       "selected_on_validation": "momentum_30d_quarter",
-      "locked_test_examples": 64,
-      "selected_test_improvement_vs_persistence_pct": -2.460719168
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
     },
     {
       "horizon_days": 30,
       "selected_on_validation": "momentum_90d_quarter",
-      "locked_test_examples": 45,
-      "selected_test_improvement_vs_persistence_pct": -5.170931585
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
     },
     {
       "horizon_days": 90,
       "selected_on_validation": "persistence",
-      "locked_test_examples": 14,
-      "selected_test_improvement_vs_persistence_pct": 0
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
     },
     {
       "horizon_days": 180,
       "selected_on_validation": "persistence",
-      "locked_test_examples": 6,
-      "selected_test_improvement_vs_persistence_pct": 0
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
     },
     {
       "horizon_days": 365,
       "selected_on_validation": "momentum_30d_quarter",
-      "locked_test_examples": 2,
-      "selected_test_improvement_vs_persistence_pct": 34.627291806
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
     }
   ]
 }
