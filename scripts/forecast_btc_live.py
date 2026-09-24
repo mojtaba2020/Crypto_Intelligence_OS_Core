@@ -14,7 +14,7 @@ import urllib.request
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-DAILY_HORIZONS = (1, 3, 7, 14, 21, 30, 90, 180, 365)
+DAILY_HORIZONS = (1, 2, 3, 7, 14, 21, 30, 90, 180, 365)
 HOURLY_HORIZONS = (1, 2, 3, 4, 12)
 API = "https://api.exchange.coinbase.com"
 HEADERS = {"User-Agent": "Crypto-Intelligence-OS/1.0", "Accept": "application/json"}
@@ -47,7 +47,7 @@ def candles(granularity: int, now: datetime) -> dict[int, float]:
         timestamp, close = int(row[0]), float(row[4])
         if timestamp < end and math.isfinite(close) and close > 0:
             values[timestamp] = close
-    for offset in range(1, 91 if granularity == 86400 else 25):
+    for offset in range(1, 92 if granularity == 86400 else 25):
         if end - offset * granularity not in values:
             raise ValueError("Missing required closed candle")
     return values
@@ -62,8 +62,9 @@ def forecast(model: str, current: float, prices: dict[int, float],
     if unit != 86400:
         raise ValueError("Daily momentum model cannot be used for hourly predictions")
     lookback = 30 if model == "momentum_30d_quarter" else 90
-    previous = prices[origin - (lookback - 1) * unit]
-    return max(0.01, current + 0.25 * horizon * (current - previous) / lookback)
+    previous = prices[origin - lookback * unit]
+    origin_close = prices[origin]
+    return max(0.01, current + 0.25 * horizon * (origin_close - previous) / lookback)
 
 
 def run(selection_report: Path, now: datetime | None = None) -> dict:
@@ -76,7 +77,7 @@ def run(selection_report: Path, now: datetime | None = None) -> dict:
         raise ValueError("Expected a historical model tournament report")
     by_horizon = {r["horizon_days"]: r for r in selection["results"]}
     if set(by_horizon) != set(DAILY_HORIZONS):
-        raise ValueError("Selection report must cover all nine daily horizons")
+        raise ValueError("Selection report must cover all ten daily horizons")
     ticker = fetch_json("/products/BTC-USD/ticker")
     if not isinstance(ticker, dict):
         raise ValueError("Unexpected ticker API response")
