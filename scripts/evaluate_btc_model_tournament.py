@@ -98,7 +98,10 @@ def run(database: Path, *, validation_end: str = "2022-12-31") -> dict:
         "models": list(MODELS),
         "horizons_days": list(HORIZONS),
         "results": results,
-        "warning": "Historical locked test is not prospective evidence; no automatic production promotion.",
+        "warning": (
+            "Historical locked test is not prospective evidence; "
+            "no automatic production promotion."
+        ),
     }
 
 
