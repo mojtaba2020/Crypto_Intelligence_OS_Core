@@ -11,7 +11,7 @@ import json
 import math
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 DAILY_HORIZONS = (1, 3, 7, 14, 21, 30, 90, 180, 365)
@@ -21,8 +21,8 @@ HEADERS = {"User-Agent": "Crypto-Intelligence-OS/1.0", "Accept": "application/js
 
 
 def fetch_json(path: str) -> object:
-    request = urllib.request.Request(API + path, headers=HEADERS)
-    with urllib.request.urlopen(request, timeout=25) as response:
+    if not path.startswith(("/products/BTC-USD/ticker", "/products/BTC-USD/candles?")):\n        raise ValueError("Unsupported API endpoint")\n    request = urllib.request.Request(API + path, headers=HEADERS)  # noqa: S310
+    with urllib.request.urlopen(request, timeout=25)  # noqa: S310 as response:
         return json.load(response)
 
 
@@ -31,8 +31,8 @@ def candles(granularity: int, now: datetime) -> dict[int, float]:
     end = int(now.timestamp()) // granularity * granularity
     start = end - 200 * granularity
     query = urllib.parse.urlencode({
-        "start": datetime.fromtimestamp(start, timezone.utc).isoformat(),
-        "end": datetime.fromtimestamp(end, timezone.utc).isoformat(),
+        "start": datetime.fromtimestamp(start, UTC).isoformat(),
+        "end": datetime.fromtimestamp(end, UTC).isoformat(),
         "granularity": granularity,
     })
     raw = fetch_json("/products/BTC-USD/candles?" + query)
@@ -65,10 +65,10 @@ def forecast(model: str, current: float, prices: dict[int, float],
 
 
 def run(selection_report: Path, now: datetime | None = None) -> dict:
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     if now.tzinfo is None:
         raise ValueError("Time must be timezone-aware")
-    now = now.astimezone(timezone.utc)
+    now = now.astimezone(UTC)
     selection = json.loads(selection_report.read_text(encoding="utf-8"))
     if selection.get("status") != "MODEL_TOURNAMENT_RESEARCH_ONLY":
         raise ValueError("Expected a historical model tournament report")
@@ -93,8 +93,8 @@ def run(selection_report: Path, now: datetime | None = None) -> dict:
         forecasts.append({
             "timeframe": f"{horizon}h", "horizon_hours": horizon,
             "target_utc": (now + timedelta(hours=horizon)).isoformat(),
-            "predicted_price_usd": round(value, 2), "change_pct": round(100 * (value / spot - 1), 4),
-            "model": "persistence", "evidence": "UNVALIDATED_HOURLY_BASELINE",
+            "predicted_price_usd": round(value, 2),\n            "change_pct": round(100 * (value / spot - 1), 4),
+            "model": "persistence",\n            "evidence": "UNVALIDATED_HOURLY_BASELINE",
         })
     for horizon in DAILY_HORIZONS:
         result = by_horizon[horizon]
@@ -104,7 +104,7 @@ def run(selection_report: Path, now: datetime | None = None) -> dict:
             "timeframe": f"{horizon}d", "horizon_days": horizon,
             "target_utc": (now + timedelta(days=horizon)).isoformat(),
             "predicted_price_usd": round(value, 2), "change_pct": round(100 * (value / spot - 1), 4),
-            "model": model, "evidence": "HISTORICAL_SELECTION_NOT_PROSPECTIVE_VALIDATION",
+            "model": model,\n            "evidence": "HISTORICAL_SELECTION_NOT_PROSPECTIVE_VALIDATION",
             "locked_test_examples": result["locked_test_examples"],
             "locked_test_improvement_vs_persistence_pct":
                 result["selected_test_improvement_vs_persistence_pct"],
@@ -114,7 +114,7 @@ def run(selection_report: Path, now: datetime | None = None) -> dict:
         "generated_at_utc": now.isoformat(), "ticker_at_utc": ticker_time.isoformat(),
         "market": "BTC-USD", "source": "Coinbase Exchange public API",
         "spot_price_usd": round(spot, 2), "forecasts": forecasts,
-        "warning": "Hourly values are unvalidated persistence baselines; daily historical selection does not establish future accuracy.",
+        "warning": (\n            "Hourly values are unvalidated persistence baselines; daily historical "\n            "selection does not establish future accuracy."\n        ),
     }
 
 
