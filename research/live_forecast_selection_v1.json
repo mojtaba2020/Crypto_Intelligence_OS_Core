@@ -2,10 +2,16 @@
   "status": "MODEL_TOURNAMENT_RESEARCH_ONLY",
   "source_pr": 55,
   "source_run": 35942861573,
-  "warning": "Historical model names are pinned; numerical test metrics are deliberately omitted pending verification against the original report. No evidence of prospective accuracy.",
+  "warning": "Two-day horizon is an explicitly unvalidated persistence baseline, not a tournament winner. Other historical model names are pinned; benchmark metrics omitted pending verification. No prospective accuracy established.",
   "results": [
     {
       "horizon_days": 1,
+      "selected_on_validation": "persistence",
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
+    },
+    {
+      "horizon_days": 2,
       "selected_on_validation": "persistence",
       "locked_test_examples": null,
       "selected_test_improvement_vs_persistence_pct": null
