@@ -35,9 +35,9 @@ def candles(granularity: int, now: datetime) -> dict[int, float]:
     start = end - 200 * granularity
     query = urllib.parse.urlencode(
         {
-        "start": datetime.fromtimestamp(start, UTC).isoformat(),
-        "end": datetime.fromtimestamp(end, UTC).isoformat(),
-        "granularity": granularity,
+            "start": datetime.fromtimestamp(start, UTC).isoformat(),
+            "end": datetime.fromtimestamp(end, UTC).isoformat(),
+            "granularity": granularity,
         }
     )
     raw = fetch_json("/products/BTC-USD/candles?" + query)
