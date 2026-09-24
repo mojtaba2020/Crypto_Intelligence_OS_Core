@@ -4,6 +4,7 @@
 Research prototype: daily models are selected by an explicit historical tournament
 report. Hourly models are exploratory and NOT historically validated. No trades.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -32,11 +33,13 @@ def candles(granularity: int, now: datetime) -> dict[int, float]:
     # Coinbase returns at most 300 candles. Request 200 closed intervals.
     end = int(now.timestamp()) // granularity * granularity
     start = end - 200 * granularity
-    query = urllib.parse.urlencode({
+    query = urllib.parse.urlencode(
+        {
         "start": datetime.fromtimestamp(start, UTC).isoformat(),
         "end": datetime.fromtimestamp(end, UTC).isoformat(),
         "granularity": granularity,
-    })
+        }
+    )
     raw = fetch_json("/products/BTC-USD/candles?" + query)
     if not isinstance(raw, list):
         raise ValueError("Unexpected candle API response")
@@ -53,8 +56,9 @@ def candles(granularity: int, now: datetime) -> dict[int, float]:
     return values
 
 
-def forecast(model: str, current: float, prices: dict[int, float],
-             origin: int, horizon: int, unit: int) -> float:
+def forecast(
+    model: str, current: float, prices: dict[int, float], origin: int, horizon: int, unit: int
+) -> float:
     if model == "persistence":
         return current
     if model not in ("momentum_30d_quarter", "momentum_90d_quarter"):
@@ -93,34 +97,44 @@ def run(selection_report: Path, now: datetime | None = None) -> dict:
     for horizon in HOURLY_HORIZONS:
         # Explicit provisional baseline: never describe as an AI-trained hourly model.
         value = forecast("persistence", spot, hourly, hourly_origin, horizon, 3600)
-        forecasts.append({
-            "timeframe": f"{horizon}h", "horizon_hours": horizon,
-            "target_utc": (now + timedelta(hours=horizon)).isoformat(),
-            "predicted_price_usd": round(value, 2),
-            "change_pct": round(100 * (value / spot - 1), 4),
-            "model": "persistence",
-            "evidence": "UNVALIDATED_HOURLY_BASELINE",
-        })
+        forecasts.append(
+            {
+                "timeframe": f"{horizon}h",
+                "horizon_hours": horizon,
+                "target_utc": (now + timedelta(hours=horizon)).isoformat(),
+                "predicted_price_usd": round(value, 2),
+                "change_pct": round(100 * (value / spot - 1), 4),
+                "model": "persistence",
+                "evidence": "UNVALIDATED_HOURLY_BASELINE",
+            }
+        )
     for horizon in DAILY_HORIZONS:
         result = by_horizon[horizon]
         model = result["selected_on_validation"]
         value = forecast(model, spot, daily, daily_origin, horizon, 86400)
-        forecasts.append({
-            "timeframe": f"{horizon}d", "horizon_days": horizon,
-            "target_utc": (now + timedelta(days=horizon)).isoformat(),
-            "predicted_price_usd": round(value, 2),
-            "change_pct": round(100 * (value / spot - 1), 4),
-            "model": model,
-            "evidence": "HISTORICAL_SELECTION_NOT_PROSPECTIVE_VALIDATION",
-            "locked_test_examples": result["locked_test_examples"],
-            "locked_test_improvement_vs_persistence_pct":
-                result["selected_test_improvement_vs_persistence_pct"],
-        })
+        forecasts.append(
+            {
+                "timeframe": f"{horizon}d",
+                "horizon_days": horizon,
+                "target_utc": (now + timedelta(days=horizon)).isoformat(),
+                "predicted_price_usd": round(value, 2),
+                "change_pct": round(100 * (value / spot - 1), 4),
+                "model": model,
+                "evidence": "HISTORICAL_SELECTION_NOT_PROSPECTIVE_VALIDATION",
+                "locked_test_examples": result["locked_test_examples"],
+                "locked_test_improvement_vs_persistence_pct": result[
+                    "selected_test_improvement_vs_persistence_pct"
+                ],
+            }
+        )
     return {
         "status": "LIVE_NUMERIC_RESEARCH_FORECAST_NOT_TRADING_ADVICE",
-        "generated_at_utc": now.isoformat(), "ticker_at_utc": ticker_time.isoformat(),
-        "market": "BTC-USD", "source": "Coinbase Exchange public API",
-        "spot_price_usd": round(spot, 2), "forecasts": forecasts,
+        "generated_at_utc": now.isoformat(),
+        "ticker_at_utc": ticker_time.isoformat(),
+        "market": "BTC-USD",
+        "source": "Coinbase Exchange public API",
+        "spot_price_usd": round(spot, 2),
+        "forecasts": forecasts,
         "warning": (
             "Hourly values are unvalidated persistence baselines; daily historical "
             "selection does not establish future accuracy."
