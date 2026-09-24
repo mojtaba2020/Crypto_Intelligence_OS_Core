@@ -95,8 +95,10 @@ def run(selection_report: Path, now: datetime | None = None) -> dict:
     hourly_origin = int(now.timestamp()) // 3600 * 3600 - 3600
     forecasts = []
     for horizon in HOURLY_HORIZONS:
-        # Explicit provisional baseline: never describe as an AI-trained hourly model.
-        value = forecast("persistence", spot, hourly, hourly_origin, horizon, 3600)
+        # A simple horizon-dependent hourly momentum candidate; NOT a trained or validated AI model.
+        # Use the last 24 fully closed hourly candles; never peek into the forming candle.
+        hourly_change = hourly[hourly_origin] - hourly[hourly_origin - 23 * 3600]
+        value = max(0.01, spot + 0.25 * horizon * hourly_change / 24)
         forecasts.append(
             {
                 "timeframe": f"{horizon}h",
@@ -104,8 +106,8 @@ def run(selection_report: Path, now: datetime | None = None) -> dict:
                 "target_utc": (now + timedelta(hours=horizon)).isoformat(),
                 "predicted_price_usd": round(value, 2),
                 "change_pct": round(100 * (value / spot - 1), 4),
-                "model": "persistence",
-                "evidence": "UNVALIDATED_HOURLY_BASELINE",
+                "model": "hourly_momentum_24h_quarter_UNVALIDATED",
+                "evidence": "UNVALIDATED_HOURLY_MOMENTUM_CANDIDATE",
             }
         )
     for horizon in DAILY_HORIZONS:
@@ -136,8 +138,8 @@ def run(selection_report: Path, now: datetime | None = None) -> dict:
         "spot_price_usd": round(spot, 2),
         "forecasts": forecasts,
         "warning": (
-            "Hourly values are unvalidated persistence baselines; daily historical "
-            "selection does not establish future accuracy."
+            "Hourly values use an unvalidated 24-hour momentum candidate, not trained AI; "
+            "daily historical selection does not establish future accuracy."
         ),
     }
 
