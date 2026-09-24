@@ -50,7 +50,8 @@ def test_run_offline_with_mock_market(tmp_path: Path) -> None:
         output = live.run(report, now)
     assert output["spot_price_usd"] == 100000
     assert len(output["forecasts"]) == 15
-    assert output["forecasts"][0]["evidence"] == "UNVALIDATED_HOURLY_BASELINE"
+    assert output["forecasts"][0]["evidence"] == "UNVALIDATED_HOURLY_MOMENTUM_CANDIDATE"
+    assert len({row["predicted_price_usd"] for row in output["forecasts"][:5]}) == 5
     daily_three = next(row for row in output["forecasts"] if row["timeframe"] == "3d")
     assert daily_three["predicted_price_usd"] > 100000
     assert daily_three["model"] == "momentum_30d_quarter"
