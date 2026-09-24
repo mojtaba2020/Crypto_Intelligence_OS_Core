@@ -21,8 +21,10 @@ HEADERS = {"User-Agent": "Crypto-Intelligence-OS/1.0", "Accept": "application/js
 
 
 def fetch_json(path: str) -> object:
-    if not path.startswith(("/products/BTC-USD/ticker", "/products/BTC-USD/candles?")):\n        raise ValueError("Unsupported API endpoint")\n    request = urllib.request.Request(API + path, headers=HEADERS)  # noqa: S310
-    with urllib.request.urlopen(request, timeout=25)  # noqa: S310 as response:
+    if not path.startswith(("/products/BTC-USD/ticker", "/products/BTC-USD/candles?")):
+        raise ValueError("Unsupported API endpoint")
+    request = urllib.request.Request(API + path, headers=HEADERS)  # noqa: S310
+    with urllib.request.urlopen(request, timeout=25) as response:  # noqa: S310
         return json.load(response)
 
 
@@ -93,8 +95,10 @@ def run(selection_report: Path, now: datetime | None = None) -> dict:
         forecasts.append({
             "timeframe": f"{horizon}h", "horizon_hours": horizon,
             "target_utc": (now + timedelta(hours=horizon)).isoformat(),
-            "predicted_price_usd": round(value, 2),\n            "change_pct": round(100 * (value / spot - 1), 4),
-            "model": "persistence",\n            "evidence": "UNVALIDATED_HOURLY_BASELINE",
+            "predicted_price_usd": round(value, 2),
+            "change_pct": round(100 * (value / spot - 1), 4),
+            "model": "persistence",
+            "evidence": "UNVALIDATED_HOURLY_BASELINE",
         })
     for horizon in DAILY_HORIZONS:
         result = by_horizon[horizon]
@@ -103,8 +107,10 @@ def run(selection_report: Path, now: datetime | None = None) -> dict:
         forecasts.append({
             "timeframe": f"{horizon}d", "horizon_days": horizon,
             "target_utc": (now + timedelta(days=horizon)).isoformat(),
-            "predicted_price_usd": round(value, 2), "change_pct": round(100 * (value / spot - 1), 4),
-            "model": model,\n            "evidence": "HISTORICAL_SELECTION_NOT_PROSPECTIVE_VALIDATION",
+            "predicted_price_usd": round(value, 2),
+            "change_pct": round(100 * (value / spot - 1), 4),
+            "model": model,
+            "evidence": "HISTORICAL_SELECTION_NOT_PROSPECTIVE_VALIDATION",
             "locked_test_examples": result["locked_test_examples"],
             "locked_test_improvement_vs_persistence_pct":
                 result["selected_test_improvement_vs_persistence_pct"],
@@ -114,7 +120,10 @@ def run(selection_report: Path, now: datetime | None = None) -> dict:
         "generated_at_utc": now.isoformat(), "ticker_at_utc": ticker_time.isoformat(),
         "market": "BTC-USD", "source": "Coinbase Exchange public API",
         "spot_price_usd": round(spot, 2), "forecasts": forecasts,
-        "warning": (\n            "Hourly values are unvalidated persistence baselines; daily historical "\n            "selection does not establish future accuracy."\n        ),
+        "warning": (
+            "Hourly values are unvalidated persistence baselines; daily historical "
+            "selection does not establish future accuracy."
+        ),
     }
 
 
@@ -125,7 +134,8 @@ def main() -> None:
     args = parser.parse_args()
     result = run(args.selection_report)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "
+", encoding="utf-8")
     print(json.dumps(result, indent=2, sort_keys=True))
 
 
