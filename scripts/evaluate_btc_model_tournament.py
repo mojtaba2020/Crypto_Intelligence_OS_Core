@@ -14,6 +14,7 @@ from pathlib import Path
 from scripts.evaluate_btc_multihorizon import HORIZONS, plan
 
 MODELS = ("persistence", "momentum_30d_quarter", "momentum_90d_quarter")
+WARNING = "Historical locked test is not prospective evidence; no automatic production promotion."
 
 
 def predict(name: str, prices: list[float], origin: int, horizon: int) -> float:
@@ -44,9 +45,7 @@ def run(database: Path, *, validation_end: str = "2022-12-31") -> dict:
     with sqlite3.connect(database) as connection:
         if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise ValueError("SQLite integrity check failed")
-        rows = connection.execute(
-            "SELECT day, price_usd FROM daily_price ORDER BY day"
-        ).fetchall()
+        rows = connection.execute("SELECT day, price_usd FROM daily_price ORDER BY day").fetchall()
     if not rows or rows[0][0] != "2011-01-01":
         raise ValueError("Incomplete historical archive")
     days = [date.fromisoformat(day) for day, _ in rows]
@@ -65,9 +64,7 @@ def run(database: Path, *, validation_end: str = "2022-12-31") -> dict:
         first = max(365 + horizon + 365 - 1, 90)
         origins = range(first, len(days) - horizon, stride)
         validation = [
-            i
-            for i in origins
-            if days[i + horizon] <= cutoff and days[i] >= date(2018, 1, 1)
+            i for i in origins if days[i + horizon] <= cutoff and days[i] >= date(2018, 1, 1)
         ]
         test = [i for i in origins if days[i] > cutoff]
         validation_scores = score(prices, validation, horizon)
@@ -98,10 +95,7 @@ def run(database: Path, *, validation_end: str = "2022-12-31") -> dict:
         "models": list(MODELS),
         "horizons_days": list(HORIZONS),
         "results": results,
-        "warning": (
-            "Historical locked test is not prospective evidence; "
-            "no automatic production promotion."
-        ),
+        "warning": WARNING,
     }
 
 
@@ -113,9 +107,7 @@ def main() -> None:
     args = parser.parse_args()
     result = run(args.database, validation_end=args.validation_end)
     args.report.parent.mkdir(parents=True, exist_ok=True)
-    args.report.write_text(
-        json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    args.report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2, sort_keys=True))
 
 
