@@ -1,4 +1,5 @@
 """Offline checks for the timestamped numerical forecast prototype."""
+
 from __future__ import annotations
 
 import json
@@ -57,11 +58,17 @@ def test_run_offline_with_mock_market(tmp_path: Path) -> None:
 
 def test_stale_ticker_rejected(tmp_path: Path) -> None:
     report = tmp_path / "selection.json"
-    report.write_text(json.dumps({"status": "MODEL_TOURNAMENT_RESEARCH_ONLY", "results": [
-        {"horizon_days": h} for h in live.DAILY_HORIZONS
-    ]}), encoding="utf-8")
-    with patch.object(live, "fetch_json", return_value={
-        "price": "100000", "time": "2026-09-23T00:00:00Z"
-    }):
+    report.write_text(
+        json.dumps(
+            {
+                "status": "MODEL_TOURNAMENT_RESEARCH_ONLY",
+                "results": [{"horizon_days": h} for h in live.DAILY_HORIZONS],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with patch.object(
+        live, "fetch_json", return_value={"price": "100000", "time": "2026-09-23T00:00:00Z"}
+    ):
         with pytest.raises(ValueError, match="stale"):
             live.run(report, datetime(2026, 9, 24, 12, 30, tzinfo=UTC))
