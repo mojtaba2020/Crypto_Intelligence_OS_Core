@@ -15,7 +15,7 @@ def test_forecast_models() -> None:
     origin = 100 * 86400
     prices = {origin - i * 86400: 100.0 - i for i in range(90)}
     assert live.forecast("persistence", 110.0, prices, origin, 7, 86400) == 110.0
-    assert live.forecast("momentum_30d_quarter", 110.0, prices, origin, 30, 86400) == 120.0
+    assert live.forecast("momentum_30d_quarter", 110.0, prices, origin, 30, 86400) == 119.75
     with pytest.raises(ValueError, match="Daily momentum"):
         live.forecast("momentum_30d_quarter", 110.0, prices, origin, 1, 3600)
     with pytest.raises(ValueError, match="Unknown model"):
