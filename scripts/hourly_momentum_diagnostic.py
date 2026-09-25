@@ -5,9 +5,33 @@ from __future__ import annotations
 
 import argparse
 import json
+import urllib.parse
+import urllib.request
+from datetime import UTC, datetime
 from pathlib import Path
 
+API = "https://api.exchange.coinbase.com"
 HORIZONS = (1, 2, 3, 4, 12)
+HEADERS = {"User-Agent": "Crypto-Intelligence-OS/1.0", "Accept": "application/json"}
+
+
+def fetch_closes() -> list[float]:
+    now = datetime.now(UTC)
+    end = int(now.timestamp()) // 3600 * 3600
+    start = end - 200 * 3600
+    query = urllib.parse.urlencode(
+        {
+            "start": datetime.fromtimestamp(start, UTC).isoformat(),
+            "end": datetime.fromtimestamp(end, UTC).isoformat(),
+            "granularity": 3600,
+        }
+    )
+    request = urllib.request.Request(
+        API + "/products/BTC-USD/candles?" + query, headers=HEADERS
+    )
+    with urllib.request.urlopen(request, timeout=25) as response:  # noqa: S310
+        rows = json.load(response)
+    return [float(row[4]) for row in sorted(rows) if int(row[0]) < end]
 
 
 def evaluate(closes: list[float]) -> dict:
@@ -44,10 +68,10 @@ def evaluate(closes: list[float]) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=Path, required=True)
+    parser.add_argument("--input", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    closes = json.loads(args.input.read_text(encoding="utf-8"))
+    closes = json.loads(args.input.read_text(encoding="utf-8")) if args.input else fetch_closes()
     report = evaluate(closes)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
