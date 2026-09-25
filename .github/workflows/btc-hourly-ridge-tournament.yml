@@ -1,12 +1,12 @@
-name: BTC Hourly Ridge Tournament
+name: BTC Hourly Model Tournament
 
 on:
   workflow_dispatch:
   pull_request:
     paths:
       - "scripts/train_hourly_ridge_tournament.py"
-      - "scripts/hourly_momentum_diagnostic.py"
       - "scripts/train_hourly_extra_trees_tournament.py"
+      - "scripts/hourly_momentum_diagnostic.py"
       - ".github/workflows/btc-hourly-ridge-tournament.yml"
 
 jobs:
@@ -55,10 +55,17 @@ jobs:
           PY
       - name: Train and walk-forward test Ridge
         run: |
-          python scripts/train_hourly_ridge_tournament.py             --input research/hourly_closes_training.json             --output research/hourly_ridge_tournament.json
+          python scripts/train_hourly_ridge_tournament.py --input research/hourly_closes_training.json --output research/hourly_ridge_tournament.json
+      - name: Train and walk-forward test Extra Trees
+        run: |
+          python scripts/train_hourly_extra_trees_tournament.py --input research/hourly_closes_training.json --output research/hourly_extra_trees_tournament.json
+      - name: Print tournament reports
+        run: |
+          cat research/hourly_ridge_tournament.json
+          cat research/hourly_extra_trees_tournament.json
       - uses: actions/upload-artifact@v4
         with:
-          name: btc-hourly-ridge-tournament
+          name: btc-hourly-model-tournament
           path: |
             research/hourly_ridge_tournament.json
             research/hourly_extra_trees_tournament.json
