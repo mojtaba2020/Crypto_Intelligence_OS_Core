@@ -84,14 +84,16 @@ def tournament(closes: list[float], train_min: int = 240, step: int = 24) -> dic
             samples += 1
         ridge_mape = 100 * sum(ridge_err) / samples
         base_mape = 100 * sum(base_err) / samples
-        rows.append({
-            "horizon_hours": horizon,
-            "walk_forward_samples": samples,
-            "ridge_mape_pct": round(ridge_mape, 5),
-            "persistence_mape_pct": round(base_mape, 5),
-            "ridge_direction_accuracy_pct": round(100 * direction_hits / samples, 2),
-            "beats_persistence": ridge_mape < base_mape,
-        })
+        rows.append(
+            {
+                "horizon_hours": horizon,
+                "walk_forward_samples": samples,
+                "ridge_mape_pct": round(ridge_mape, 5),
+                "persistence_mape_pct": round(base_mape, 5),
+                "ridge_direction_accuracy_pct": round(100 * direction_hits / samples, 2),
+                "beats_persistence": ridge_mape < base_mape,
+            }
+        )
     return {
         "status": "TRAINED_RIDGE_WALK_FORWARD_RESEARCH_V1",
         "target": "future_log_return",
