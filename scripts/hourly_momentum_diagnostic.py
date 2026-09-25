@@ -26,7 +26,7 @@ def fetch_closes() -> list[float]:
             "granularity": 3600,
         }
     )
-    request = urllib.request.Request(
+    request = urllib.request.Request(  # noqa: S310
         API + "/products/BTC-USD/candles?" + query, headers=HEADERS
     )
     with urllib.request.urlopen(request, timeout=25) as response:  # noqa: S310
