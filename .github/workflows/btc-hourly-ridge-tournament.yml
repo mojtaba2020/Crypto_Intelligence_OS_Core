@@ -6,6 +6,7 @@ on:
     paths:
       - "scripts/train_hourly_ridge_tournament.py"
       - "scripts/hourly_momentum_diagnostic.py"
+      - "scripts/train_hourly_extra_trees_tournament.py"
       - ".github/workflows/btc-hourly-ridge-tournament.yml"
 
 jobs:
@@ -60,4 +61,5 @@ jobs:
           name: btc-hourly-ridge-tournament
           path: |
             research/hourly_ridge_tournament.json
+            research/hourly_extra_trees_tournament.json
             research/hourly_diagnostic.json
