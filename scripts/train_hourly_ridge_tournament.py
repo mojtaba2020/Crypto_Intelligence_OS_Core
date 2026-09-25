@@ -26,7 +26,7 @@ def _features(closes: list[float], origin: int) -> list[float]:
 
 def _solve(a: list[list[float]], b: list[float]) -> list[float]:
     n = len(b)
-    aug = [row[:] + [b[i]] for i, row in enumerate(a)]
+    aug = [[*row[:], b[i]] for i, row in enumerate(a)]
     for col in range(n):
         pivot = max(range(col, n), key=lambda r: abs(aug[r][col]))
         aug[col], aug[pivot] = aug[pivot], aug[col]
