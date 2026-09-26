@@ -96,8 +96,45 @@ def test_fetch_hourly_range_pages_without_duplicates(monkeypatch) -> None:
     end = datetime(2020, 1, 1, 4, tzinfo=UTC)
     bars = bitstamp.fetch_hourly_range(start=start, end=end, page_hours=2)
     assert len(calls) == 2
-    assert calls[0][1] == datetime(2020, 1, 1, 1, tzinfo=UTC)
+    assert calls[0][1] == datetime(2020, 1, 1, 2, tzinfo=UTC)
     assert calls[1][0] == datetime(2020, 1, 1, 2, tzinfo=UTC)
-    assert calls[1][1] == datetime(2020, 1, 1, 3, tzinfo=UTC)
+    assert calls[1][1] == datetime(2020, 1, 1, 4, tzinfo=UTC)
     assert len(bars) == 4
     assert len({bar.open_time for bar in bars}) == 4
+
+
+def test_fetch_hourly_range_ignores_out_of_window_boundary_rows(monkeypatch) -> None:
+    base = datetime(2020, 1, 1, tzinfo=UTC)
+
+    def fake_fetch(*, start=None, end=None, limit=1000):
+        rows = []
+        for hour in range(5):
+            opened = base.replace(hour=hour)
+            if start - bitstamp.timedelta(hours=1) <= opened <= end:
+                rows.append(
+                    {
+                        "timestamp": str(int(opened.timestamp())),
+                        "open": str(100 + hour),
+                        "high": str(102 + hour),
+                        "low": str(99 + hour),
+                        "close": str(101 + hour),
+                        "volume": "1",
+                    }
+                )
+        return parse_hourly_ohlc(
+            {"data": {"ohlc": rows}},
+            ingested_at=datetime(2026, 1, 1, tzinfo=UTC),
+        )
+
+    monkeypatch.setattr(bitstamp, "fetch_hourly", fake_fetch)
+    bars = bitstamp.fetch_hourly_range(
+        start=base,
+        end=base.replace(hour=4),
+        page_hours=2,
+    )
+    assert [bar.open_time for bar in bars] == [
+        base.replace(hour=0),
+        base.replace(hour=1),
+        base.replace(hour=2),
+        base.replace(hour=3),
+    ]
