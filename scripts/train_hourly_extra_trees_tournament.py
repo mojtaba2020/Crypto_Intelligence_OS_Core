@@ -73,18 +73,22 @@ def tournament(closes: list[float], train_min: int = 240, step: int = 24) -> dic
             samples += 1
         model_mape = 100 * sum(model_err) / samples
         base_mape = 100 * sum(base_err) / samples
-        rows.append({
-            "horizon_hours": horizon,
-            "walk_forward_samples": samples,
-            "extra_trees_mape_pct": round(model_mape, 5),
-            "persistence_mape_pct": round(base_mape, 5),
-            "extra_trees_direction_accuracy_pct": round(100 * direction_hits / samples, 2),
-            "beats_persistence": model_mape < base_mape,
-        })
-    return {"status": "TRAINED_EXTRA_TREES_WALK_FORWARD_RESEARCH_V1",
-            "target": "future_log_return",
-            "features": "lagged_log_returns_plus_24h_mean_volatility",
-            "rows": rows}
+        rows.append(
+            {
+                "horizon_hours": horizon,
+                "walk_forward_samples": samples,
+                "extra_trees_mape_pct": round(model_mape, 5),
+                "persistence_mape_pct": round(base_mape, 5),
+                "extra_trees_direction_accuracy_pct": round(100 * direction_hits / samples, 2),
+                "beats_persistence": model_mape < base_mape,
+            }
+        )
+    return {
+        "status": "TRAINED_EXTRA_TREES_WALK_FORWARD_RESEARCH_V1",
+        "target": "future_log_return",
+        "features": "lagged_log_returns_plus_24h_mean_volatility",
+        "rows": rows,
+    }
 
 
 def main() -> None:
