@@ -64,9 +64,8 @@ class HistoricalOHLCVArchive:
                 ).fetchone()
                 if existing:
                     old = OHLCVBar.model_validate_json(existing[0])
-                    if old.model_dump(exclude={"bar_id", "ingested_at", "quality"}) != bar.model_dump(
-                        exclude={"ingested_at", "quality"}
-                    ):
+                    ignored = {"bar_id", "ingested_at", "quality"}
+                    if old.model_dump(exclude=ignored) != bar.model_dump(exclude=ignored):
                         raise ValueError(
                             "Historical provider revision requires explicit review: "
                             f"{bar.source_id} {bar.open_time.isoformat()}"
