@@ -77,17 +77,18 @@ def evaluate(
             100 * abs(estimate - actual) / actual for estimate in predictions
         )
         errors.append(row)
+        change_90d = history[-1].close / history[-91].close - 1
+        regime = "up_90d" if change_90d > 0.10 else "down_90d" if change_90d < -0.10 else "flat_90d"
         paired_losses.append(
             {
                 "origin": history[-1].day.isoformat(),
                 "actual": actual,
+                "regime": regime,
                 "hybrid_abs_error": row[0],
                 "linear_abs_error": row[1],
                 "persistence_abs_error": row[2],
             }
         )
-        change_90d = history[-1].close / history[-91].close - 1
-        regime = "up_90d" if change_90d > 0.10 else "down_90d" if change_90d < -0.10 else "flat_90d"
         regime_errors[regime].append(row)
         origin_day = history[-1].day
         era = (
