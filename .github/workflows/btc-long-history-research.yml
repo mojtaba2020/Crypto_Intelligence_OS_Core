@@ -1,0 +1,49 @@
+name: BTC Long-History Research
+
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "UTC ISO start"
+        required: true
+        default: "2012-01-01T00:00:00+00:00"
+      end:
+        description: "UTC ISO end"
+        required: true
+        default: "2013-01-01T00:00:00+00:00"
+
+permissions:
+  contents: read
+
+jobs:
+  bitstamp-hourly-backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install project
+        run: python -m pip install -e .
+
+      - name: Backfill and validate Bitstamp hourly history
+        run: |
+          mkdir -p artifacts/long-history
+          python scripts/backfill_bitstamp_hourly.py \
+            --start "${{ inputs.start }}" \
+            --end "${{ inputs.end }}" \
+            --database artifacts/long-history/bitstamp-btcusd-1h.sqlite \
+            --report artifacts/long-history/bitstamp-btcusd-1h-report.json
+
+      - name: Upload validated research artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-long-history-bitstamp
+          path: artifacts/long-history/
+          if-no-files-found: error
+          retention-days: 14
