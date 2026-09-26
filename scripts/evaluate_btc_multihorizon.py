@@ -13,6 +13,18 @@ from scripts.evaluate_btc_hybrid import evaluate
 HORIZONS = (1, 3, 7, 14, 21, 30, 90, 180, 365)
 
 
+def holm_adjust(p_values: list[float]) -> list[float]:
+    """Holm-Bonferroni adjusted p-values controlling family-wise error."""
+    total = len(p_values)
+    adjusted = [1.0] * total
+    running = 0.0
+    for rank, index in enumerate(sorted(range(total), key=p_values.__getitem__)):
+        candidate = min(1.0, (total - rank) * p_values[index])
+        running = max(running, candidate)
+        adjusted[index] = running
+    return adjusted
+
+
 def plan(horizon: int) -> tuple[int, int]:
     """Choose a long holdout and a stride that limits overlap at longer horizons."""
     # Keep every horizon, but avoid thousands of nearly identical refits.
@@ -121,7 +133,33 @@ def run(database: Path) -> dict:
                 "research_only": True,
             }
         )
+    tests = []
+    for row in rows:
+        for scope, gates in [("overall", row["significance_vs_persistence"])]:
+            for model, gate in gates.items():
+                if "one_sided_p_value" in gate:
+                    tests.append((row, scope, None, model, gate))
+        for regime, gates in row["regime_significance_vs_persistence"].items():
+            for model, gate in gates.items():
+                if "one_sided_p_value" in gate:
+                    tests.append((row, "regime", regime, model, gate))
+    adjusted = holm_adjust([float(item[4]["one_sided_p_value"]) for item in tests])
+    for (_row, _scope, _regime, _model, gate), adjusted_p in zip(tests, adjusted, strict=True):
+        gate["holm_adjusted_p_value"] = adjusted_p
+        gate["holm_status"] = (
+            "PASS"
+            if gate["examples"] >= gate["minimum_examples"]
+            and gate["mean_absolute_error_difference_usd"] < 0
+            and adjusted_p < gate["alpha"]
+            else "FAIL"
+        )
+
     return {
+        "multiple_comparison_control": {
+            "method": "Holm-Bonferroni",
+            "family_tests": len(tests),
+            "family_wise_alpha": 0.05,
+        },
         "status": "MULTIHORIZON_WALK_FORWARD_RESEARCH",
         "horizons_days": list(HORIZONS),
         "results": rows,
