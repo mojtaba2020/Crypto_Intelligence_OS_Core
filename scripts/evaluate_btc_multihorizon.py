@@ -14,15 +14,18 @@ HORIZONS = (1, 3, 7, 14, 21, 30, 90, 180, 365)
 
 def plan(horizon: int) -> tuple[int, int]:
     """Choose a long holdout and a stride that limits overlap at longer horizons."""
+    # Keep every horizon, but avoid thousands of nearly identical refits.
+    # The stride remains much shorter than the multi-year holdout so each
+    # horizon still gets broad out-of-sample coverage across market regimes.
     if horizon <= 7:
-        return 1460, max(1, horizon)
+        return 1460, 7
     if horizon <= 30:
-        return 1825, 7
+        return 1825, 14
     if horizon <= 90:
-        return 2190, 14
+        return 2190, 30
     if horizon <= 180:
-        return 2555, 30
-    return 2920, 60
+        return 2555, 60
+    return 2920, 90
 
 
 def run(database: Path) -> dict:
