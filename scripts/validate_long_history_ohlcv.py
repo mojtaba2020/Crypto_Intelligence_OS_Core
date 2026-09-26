@@ -7,6 +7,7 @@ import argparse
 import csv
 import json
 import math
+from itertools import pairwise
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -48,7 +49,7 @@ def validate(
     duplicates = len(timestamps) - len(set(timestamps))
     gaps = [
         {"after": left, "before": right, "seconds": right - left}
-        for left, right in zip(timestamps, timestamps[1:], strict=False)
+        for left, right in pairwise(timestamps)
         if right - left != HOUR_SECONDS
     ]
 
