@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from crypto_intelligence_os.adapters.market_data import bitstamp
 from crypto_intelligence_os.adapters.market_data.bitstamp import (
     INSTRUMENT_ID,
     SOURCE_ID,
@@ -64,3 +65,36 @@ def test_parse_hourly_ohlc_sorts_oldest_first() -> None:
     }
     bars = parse_hourly_ohlc(payload, ingested_at=datetime(2026, 1, 1, tzinfo=UTC))
     assert bars[0].open_time < bars[1].open_time
+
+
+def test_fetch_hourly_range_pages_without_duplicates(monkeypatch) -> None:
+    calls = []
+
+    def fake_fetch(*, start=None, end=None, limit=1000):
+        calls.append((start, end, limit))
+        base = datetime(2020, 1, 1, tzinfo=UTC)
+        payload = {
+            "data": {
+                "ohlc": [
+                    {
+                        "timestamp": str(int((base.replace(hour=hour)).timestamp())),
+                        "open": "100",
+                        "high": "102",
+                        "low": "99",
+                        "close": "101",
+                        "volume": "1",
+                    }
+                    for hour in range(4)
+                    if start <= base.replace(hour=hour) < end
+                ]
+            }
+        }
+        return parse_hourly_ohlc(payload, ingested_at=datetime(2026, 1, 1, tzinfo=UTC))
+
+    monkeypatch.setattr(bitstamp, "fetch_hourly", fake_fetch)
+    start = datetime(2020, 1, 1, tzinfo=UTC)
+    end = datetime(2020, 1, 1, 4, tzinfo=UTC)
+    bars = bitstamp.fetch_hourly_range(start=start, end=end, page_hours=2)
+    assert len(calls) == 2
+    assert len(bars) == 4
+    assert len({bar.open_time for bar in bars}) == 4
