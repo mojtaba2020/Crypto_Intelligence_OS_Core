@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
+import time
 import urllib.parse
 import urllib.request
-import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -95,7 +95,8 @@ def fetch_hourly_range(
     collected: dict[datetime, OHLCVBar] = {}
     while cursor < end:
         page_end = min(end, cursor + timedelta(hours=page_hours))
-        page = fetch_hourly(start=cursor, end=page_end, limit=page_hours)
+        request_end = page_end - timedelta(hours=1)
+        page = fetch_hourly(start=cursor, end=request_end, limit=page_hours)
         for bar in page:
             if start <= bar.open_time < end:
                 existing = collected.get(bar.open_time)
