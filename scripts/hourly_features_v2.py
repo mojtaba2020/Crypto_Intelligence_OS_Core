@@ -43,10 +43,7 @@ def feature_vector(candles: list[dict[str, float]], origin: int) -> list[float]:
     """Build features using only candles at or before origin."""
     _validate(candles, origin)
     current = float(candles[origin]["close"])
-    values = [
-        math.log(current / float(candles[origin - lag]["close"]))
-        for lag in LAGS
-    ]
+    values = [math.log(current / float(candles[origin - lag]["close"])) for lag in LAGS]
 
     hourly_returns = [
         math.log(float(candles[i]["close"]) / float(candles[i - 1]["close"]))
@@ -68,8 +65,7 @@ def feature_vector(candles: list[dict[str, float]], origin: int) -> list[float]:
     )
 
     ranges = [
-        (float(candles[i]["high"]) - float(candles[i]["low"]))
-        / float(candles[i]["close"])
+        (float(candles[i]["high"]) - float(candles[i]["low"])) / float(candles[i]["close"])
         for i in range(origin - 23, origin + 1)
     ]
     values.extend([statistics.mean(ranges[-6:]), statistics.mean(ranges)])
@@ -82,14 +78,12 @@ def feature_vector(candles: list[dict[str, float]], origin: int) -> list[float]:
 
     returns_24 = hourly_returns[-24:]
     volumes_24 = [
-        math.log(float(candles[i]["volume"]) + 1e-12)
-        for i in range(origin - 23, origin + 1)
+        math.log(float(candles[i]["volume"]) + 1e-12) for i in range(origin - 23, origin + 1)
     ]
     mean_r = statistics.mean(returns_24)
     mean_v = statistics.mean(volumes_24)
     covariance = statistics.mean(
-        (r - mean_r) * (v - mean_v)
-        for r, v in zip(returns_24, volumes_24, strict=True)
+        (r - mean_r) * (v - mean_v) for r, v in zip(returns_24, volumes_24, strict=True)
     )
     std_r = statistics.pstdev(returns_24)
     std_v = statistics.pstdev(volumes_24)
