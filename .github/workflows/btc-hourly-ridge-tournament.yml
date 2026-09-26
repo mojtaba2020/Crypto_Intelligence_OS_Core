@@ -8,6 +8,8 @@ on:
       - "scripts/train_hourly_extra_trees_tournament.py"
       - "scripts/train_hourly_boosting_tournament.py"
       - "scripts/hourly_momentum_diagnostic.py"
+      - "scripts/hourly_features_v2.py"
+      - "scripts/validate_hourly_features_v2.py"
       - ".github/workflows/btc-hourly-ridge-tournament.yml"
 
 jobs:
@@ -31,6 +33,7 @@ jobs:
           headers = {"User-Agent": "Crypto-Intelligence-OS/1.0", "Accept": "application/json"}
           now = int(datetime.now(UTC).timestamp()) // 3600 * 3600
           closes = {}
+          candles = {}
           end = now
           for _ in range(5):
               start = end - 290 * 3600
@@ -46,14 +49,21 @@ jobs:
                   ts = int(row[0])
                   if ts < now:
                       closes[ts] = float(row[4])
+                      candles[ts] = {"low": float(row[1]), "high": float(row[2]), "open": float(row[3]), "close": float(row[4]), "volume": float(row[5])}
               end = start
           ordered = [closes[k] for k in sorted(closes)]
           if len(ordered) < 1000:
               raise SystemExit(f"Only {len(ordered)} hourly closes fetched")
+          ordered_candles = [candles[k] for k in sorted(candles)]
           with open("research/hourly_closes_training.json", "w", encoding="utf-8") as f:
               json.dump(ordered, f)
-          print(f"Fetched {len(ordered)} closed hourly BTC candles")
+          with open("research/hourly_ohlcv_training.json", "w", encoding="utf-8") as f:
+              json.dump(ordered_candles, f)
+          print(f"Fetched {len(ordered)} closed hourly BTC OHLCV candles")
           PY
+      - name: Validate Feature Engineering V2
+        run: |
+          python scripts/validate_hourly_features_v2.py --input research/hourly_ohlcv_training.json --output research/hourly_features_v2_validation.json
       - name: Train and walk-forward test Ridge
         run: |
           python scripts/train_hourly_ridge_tournament.py --input research/hourly_closes_training.json --output research/hourly_ridge_tournament.json
@@ -76,3 +86,4 @@ jobs:
             research/hourly_extra_trees_tournament.json
             research/hourly_boosting_tournament.json
             research/hourly_diagnostic.json
+            research/hourly_features_v2_validation.json
