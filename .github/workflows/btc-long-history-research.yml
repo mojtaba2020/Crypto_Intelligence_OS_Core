@@ -40,7 +40,7 @@ jobs:
       - name: Backfill and validate Bitstamp hourly history
         env:
           START: ${{ github.event_name == 'workflow_dispatch' && inputs.start || '2024-01-01T00:00:00+00:00' }}
-          END: ${{ github.event_name == 'workflow_dispatch' && inputs.end || '2024-01-03T00:00:00+00:00' }}
+          END: ${{ github.event_name == 'workflow_dispatch' && inputs.end || '2025-01-01T00:00:00+00:00' }}
         run: |
           mkdir -p artifacts/long-history
           python scripts/backfill_bitstamp_hourly.py \
