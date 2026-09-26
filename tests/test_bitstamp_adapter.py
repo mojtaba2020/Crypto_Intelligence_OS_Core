@@ -96,5 +96,8 @@ def test_fetch_hourly_range_pages_without_duplicates(monkeypatch) -> None:
     end = datetime(2020, 1, 1, 4, tzinfo=UTC)
     bars = bitstamp.fetch_hourly_range(start=start, end=end, page_hours=2)
     assert len(calls) == 2
+    assert calls[0][1] == datetime(2020, 1, 1, 1, tzinfo=UTC)
+    assert calls[1][0] == datetime(2020, 1, 1, 2, tzinfo=UTC)
+    assert calls[1][1] == datetime(2020, 1, 1, 3, tzinfo=UTC)
     assert len(bars) == 4
     assert len({bar.open_time for bar in bars}) == 4
