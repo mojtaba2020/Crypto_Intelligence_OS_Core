@@ -44,17 +44,19 @@ def tournament(candles: list[dict[str, float]], train_min: int = 360, step: int 
         m1 = 100 * sum(v1_err) / samples
         m2 = 100 * sum(v2_err) / samples
         mb = 100 * sum(base_err) / samples
-        rows.append({
-            "horizon_hours": horizon,
-            "walk_forward_samples": samples,
-            "v1_mape_pct": round(m1, 5),
-            "v2_mape_pct": round(m2, 5),
-            "persistence_mape_pct": round(mb, 5),
-            "v1_direction_accuracy_pct": round(100 * v1_hits / samples, 2),
-            "v2_direction_accuracy_pct": round(100 * v2_hits / samples, 2),
-            "v2_beats_v1": m2 < m1,
-            "v2_beats_persistence": m2 < mb,
-        })
+        rows.append(
+            {
+                "horizon_hours": horizon,
+                "walk_forward_samples": samples,
+                "v1_mape_pct": round(m1, 5),
+                "v2_mape_pct": round(m2, 5),
+                "persistence_mape_pct": round(mb, 5),
+                "v1_direction_accuracy_pct": round(100 * v1_hits / samples, 2),
+                "v2_direction_accuracy_pct": round(100 * v2_hits / samples, 2),
+                "v2_beats_v1": m2 < m1,
+                "v2_beats_persistence": m2 < mb,
+            }
+        )
     return {
         "status": "FEATURE_V2_AB_WALK_FORWARD_RESEARCH_V1",
         "model": "ridge_same_alpha",
