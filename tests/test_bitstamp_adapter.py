@@ -138,3 +138,65 @@ def test_fetch_hourly_range_ignores_out_of_window_boundary_rows(monkeypatch) -> 
         base.replace(hour=2),
         base.replace(hour=3),
     ]
+
+
+def test_fetch_hourly_range_recovers_a_missing_hour(monkeypatch) -> None:
+    base = datetime(2020, 1, 1, tzinfo=UTC)
+    missing = base.replace(hour=2)
+    calls = []
+
+    def fake_fetch(*, start=None, end=None, limit=1000):
+        calls.append((start, end, limit))
+        rows = []
+        for hour in range(4):
+            opened = base.replace(hour=hour)
+            is_recovery = start == missing
+            if start <= opened < end and (opened != missing or is_recovery):
+                rows.append(
+                    {
+                        "timestamp": str(int(opened.timestamp())),
+                        "open": str(100 + hour),
+                        "high": str(102 + hour),
+                        "low": str(99 + hour),
+                        "close": str(101 + hour),
+                        "volume": "1",
+                    }
+                )
+        return parse_hourly_ohlc(
+            {"data": {"ohlc": rows}},
+            ingested_at=datetime(2026, 1, 1, tzinfo=UTC),
+        )
+
+    monkeypatch.setattr(bitstamp, "fetch_hourly", fake_fetch)
+    bars = bitstamp.fetch_hourly_range(start=base, end=base.replace(hour=4), page_hours=4)
+    assert [bar.open_time for bar in bars] == [base.replace(hour=h) for h in range(4)]
+    assert (missing, missing + bitstamp.timedelta(hours=1), 2) in calls
+
+
+def test_fetch_hourly_range_does_not_invent_unavailable_hours(monkeypatch) -> None:
+    base = datetime(2020, 1, 1, tzinfo=UTC)
+    missing = base.replace(hour=2)
+
+    def fake_fetch(*, start=None, end=None, limit=1000):
+        rows = []
+        for hour in range(4):
+            opened = base.replace(hour=hour)
+            if start <= opened < end and opened != missing:
+                rows.append(
+                    {
+                        "timestamp": str(int(opened.timestamp())),
+                        "open": "100",
+                        "high": "102",
+                        "low": "99",
+                        "close": "101",
+                        "volume": "1",
+                    }
+                )
+        return parse_hourly_ohlc(
+            {"data": {"ohlc": rows}},
+            ingested_at=datetime(2026, 1, 1, tzinfo=UTC),
+        )
+
+    monkeypatch.setattr(bitstamp, "fetch_hourly", fake_fetch)
+    bars = bitstamp.fetch_hourly_range(start=base, end=base.replace(hour=4), page_hours=4)
+    assert missing not in {bar.open_time for bar in bars}
