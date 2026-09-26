@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import urllib.parse
 import urllib.request
+import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -62,9 +63,18 @@ def fetch_hourly(
         query["end"] = int(end.timestamp())
     url = f"{API}/btcusd/?" + urllib.parse.urlencode(query)
     request = urllib.request.Request(url, headers=HEADERS)  # noqa: S310
-    with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
-        payload = json.load(response)
-    return parse_hourly_ohlc(payload, ingested_at=datetime.now(UTC))
+    last_error: Exception | None = None
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+                payload = json.load(response)
+            return parse_hourly_ohlc(payload, ingested_at=datetime.now(UTC))
+        except (OSError, TimeoutError) as exc:
+            last_error = exc
+            if attempt == 3:
+                break
+            time.sleep(2**attempt)
+    raise RuntimeError("Bitstamp OHLC request failed after 4 attempts") from last_error
 
 
 def fetch_hourly_range(
