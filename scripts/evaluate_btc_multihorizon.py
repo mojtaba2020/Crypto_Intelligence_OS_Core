@@ -32,8 +32,7 @@ def plan(horizon: int) -> tuple[int, int]:
 def significance_gate(losses: list[dict[str, object]], model: str, horizon: int, step: int) -> dict:
     """One-sided HAC test that a model has lower mean absolute error than persistence."""
     differences = [
-        float(row[f"{model}_abs_error"]) - float(row["persistence_abs_error"])
-        for row in losses
+        float(row[f"{model}_abs_error"]) - float(row["persistence_abs_error"]) for row in losses
     ]
     n = len(differences)
     minimum_examples = 40
@@ -45,9 +44,7 @@ def significance_gate(losses: list[dict[str, object]], model: str, horizon: int,
     gamma0 = sum(value * value for value in centered) / n
     long_run_variance = gamma0
     for lag in range(1, max_lag + 1):
-        covariance = sum(
-            centered[index] * centered[index - lag] for index in range(lag, n)
-        ) / n
+        covariance = sum(centered[index] * centered[index - lag] for index in range(lag, n)) / n
         weight = 1 - lag / (max_lag + 1)
         long_run_variance += 2 * weight * covariance
     standard_error = sqrt(max(long_run_variance, 0.0) / n)
