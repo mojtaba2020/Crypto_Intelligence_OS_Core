@@ -30,9 +30,7 @@ def _leaf(value: float) -> tuple[str, float]:
     return ("leaf", value)
 
 
-def _fit_tree(
-    xs: list[list[float]], ys: list[float], indices: list[int], depth: int = 0
-) -> tuple:
+def _fit_tree(xs: list[list[float]], ys: list[float], indices: list[int], depth: int = 0) -> tuple:
     mean = sum(ys[i] for i in indices) / len(indices)
     if depth >= MAX_DEPTH or len(indices) < 2 * MIN_LEAF:
         return _leaf(mean)
@@ -93,8 +91,7 @@ def _boost_predict(xs: list[list[float]], ys: list[float], x: list[float]) -> fl
         tree = _fit_tree(xs, residuals, indices)
         updates = [_predict_tree(tree, row) for row in xs]
         train_pred = [
-            pred + LEARNING_RATE * update
-            for pred, update in zip(train_pred, updates, strict=True)
+            pred + LEARNING_RATE * update for pred, update in zip(train_pred, updates, strict=True)
         ]
         prediction += LEARNING_RATE * _predict_tree(tree, x)
     return prediction
