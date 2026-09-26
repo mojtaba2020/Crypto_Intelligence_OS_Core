@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from crypto_intelligence_os.adapters.market_data.bitstamp import (
@@ -35,9 +35,6 @@ def run(*, start: datetime, end: datetime, database: Path, report_path: Path) ->
     while cursor < end:
         if cursor not in actual_times:
             missing_times.append(cursor.isoformat())
-        cursor = cursor.replace() + (end - end)  # preserve timezone-aware datetime type
-        from datetime import timedelta
-
         cursor += timedelta(hours=1)
     validate_hourly_continuity(bars)
 
