@@ -28,6 +28,17 @@ def utc_date(value: str) -> datetime:
 
 def run(*, start: datetime, end: datetime, database: Path, report_path: Path) -> dict:
     bars = fetch_hourly_range(start=start, end=end)
+    expected_count = int((end - start).total_seconds() // 3600)
+    actual_times = {bar.open_time for bar in bars}
+    missing_times = []
+    cursor = start
+    while cursor < end:
+        if cursor not in actual_times:
+            missing_times.append(cursor.isoformat())
+        cursor = cursor.replace() + (end - end)  # preserve timezone-aware datetime type
+        from datetime import timedelta
+
+        cursor += timedelta(hours=1)
     validate_hourly_continuity(bars)
 
     with HistoricalOHLCVArchive(database) as archive:
@@ -46,7 +57,10 @@ def run(*, start: datetime, end: datetime, database: Path, report_path: Path) ->
         "timeframe": "1h",
         "requested_start_utc": start.isoformat(),
         "requested_end_utc": end.isoformat(),
+        "expected_count": expected_count,
         "fetched_count": len(bars),
+        "missing_count": len(missing_times),
+        "missing_open_times_utc": missing_times[:100],
         "inserted_count": inserted,
         "stored_count": len(stored),
         "first_open_utc": bars[0].open_time.isoformat(),
