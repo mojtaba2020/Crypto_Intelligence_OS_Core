@@ -1,6 +1,12 @@
 name: BTC Long-History Research
 
 on:
+  pull_request:
+    paths:
+      - "scripts/backfill_bitstamp_hourly.py"
+      - "src/crypto_intelligence_os/adapters/market_data/bitstamp.py"
+      - "src/crypto_intelligence_os/adapters/market_data/historical_archive.py"
+      - ".github/workflows/btc-long-history-research.yml"
   workflow_dispatch:
     inputs:
       start:
@@ -32,11 +38,14 @@ jobs:
         run: python -m pip install -e .
 
       - name: Backfill and validate Bitstamp hourly history
+        env:
+          START: ${{ github.event_name == 'workflow_dispatch' && inputs.start || '2024-01-01T00:00:00+00:00' }}
+          END: ${{ github.event_name == 'workflow_dispatch' && inputs.end || '2024-01-03T00:00:00+00:00' }}
         run: |
           mkdir -p artifacts/long-history
           python scripts/backfill_bitstamp_hourly.py \
-            --start "${{ inputs.start }}" \
-            --end "${{ inputs.end }}" \
+            --start "$START" \
+            --end "$END" \
             --database artifacts/long-history/bitstamp-btcusd-1h.sqlite \
             --report artifacts/long-history/bitstamp-btcusd-1h-report.json
 
