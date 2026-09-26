@@ -42,7 +42,15 @@ def test_archive_is_idempotent(tmp_path: Path) -> None:
 
 def test_archive_keeps_sources_separate(tmp_path: Path) -> None:
     with HistoricalOHLCVArchive(tmp_path / "history.sqlite") as archive:
-        assert archive.persist((bar(0), bar(0, source="source:test.second"),)) == 2
+        assert (
+            archive.persist(
+                (
+                    bar(0),
+                    bar(0, source="source:test.second"),
+                )
+            )
+            == 2
+        )
         assert archive.count() == 2
 
 
