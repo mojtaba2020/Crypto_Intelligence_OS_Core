@@ -65,3 +65,37 @@ def fetch_hourly(
     with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
         payload = json.load(response)
     return parse_hourly_ohlc(payload, ingested_at=datetime.now(UTC))
+
+
+def fetch_hourly_range(
+    *,
+    start: datetime,
+    end: datetime,
+    page_hours: int = 1000,
+) -> tuple[OHLCVBar, ...]:
+    """Fetch a long closed-candle range in deterministic non-overlapping pages."""
+    if start.tzinfo is None or end.tzinfo is None:
+        raise ValueError("start and end must be timezone-aware")
+    if start >= end:
+        raise ValueError("start must be earlier than end")
+    if not 1 <= page_hours <= 1000:
+        raise ValueError("page_hours must be between 1 and 1000")
+
+    cursor = start
+    collected: dict[datetime, OHLCVBar] = {}
+    while cursor < end:
+        page_end = min(end, cursor + timedelta(hours=page_hours))
+        page = fetch_hourly(start=cursor, end=page_end, limit=page_hours)
+        for bar in page:
+            if start <= bar.open_time < end:
+                existing = collected.get(bar.open_time)
+                if existing is not None and existing.model_dump(
+                    exclude={"ingested_at"}
+                ) != bar.model_dump(exclude={"ingested_at"}):
+                    raise ValueError(
+                        f"Bitstamp returned conflicting candle at {bar.open_time.isoformat()}"
+                    )
+                collected[bar.open_time] = bar
+        cursor = page_end
+
+    return tuple(collected[key] for key in sorted(collected))
