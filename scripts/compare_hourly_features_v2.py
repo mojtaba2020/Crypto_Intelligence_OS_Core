@@ -28,7 +28,7 @@ def tournament(candles: list[dict[str, float]], train_min: int = 360, step: int 
             beta_v1 = _ridge_fit(xs_v1, ys, alpha=1.0)
             beta_v2 = _ridge_fit(xs_v2, ys, alpha=1.0)
             r1 = sum(w * v for w, v in zip(beta_v1, _features(closes, test_origin), strict=True))
-            r2 = sum(w * v for w, v in zip(beta_v2, [1.0, *feature_vector(candles, test_origin)], strict=True))
+            x_v2 = [1.0, *feature_vector(candles, test_origin)]\n            r2 = sum(w * v for w, v in zip(beta_v2, x_v2, strict=True))
             current = closes[test_origin]
             actual = closes[test_origin + horizon]
             actual_return = math.log(actual / current)
