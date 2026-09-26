@@ -90,6 +90,18 @@ def run(database: Path) -> dict:
             model: significance_gate(result["paired_losses"], model, horizon, step)
             for model in ("hybrid", "linear")
         }
+        regime_significance = {
+            regime: {
+                model: significance_gate(
+                    [row for row in result["paired_losses"] if row["regime"] == regime],
+                    model,
+                    horizon,
+                    step,
+                )
+                for model in ("hybrid", "linear")
+            }
+            for regime in ("up_90d", "flat_90d", "down_90d")
+        }
         rows.append(
             {
                 "horizon_days": horizon,
@@ -101,6 +113,7 @@ def run(database: Path) -> dict:
                 "metrics": metrics,
                 "regimes": result["regimes"],
                 "significance_vs_persistence": significance,
+                "regime_significance_vs_persistence": regime_significance,
                 "lowest_mae_model_on_this_backtest": best,
                 "mae_improvement_vs_persistence_pct": (
                     100 * (persistence - best_mae) / persistence if persistence else None
