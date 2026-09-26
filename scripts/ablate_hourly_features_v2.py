@@ -30,10 +30,7 @@ def _standardize_train_test(
         [(value - means[j]) / stds[j] if stds[j] else 0.0 for j, value in enumerate(row)]
         for row in train
     ]
-    scaled_test = [
-        (value - means[j]) / stds[j] if stds[j] else 0.0
-        for j, value in enumerate(test)
-    ]
+    scaled_test = [(value - means[j]) / stds[j] if stds[j] else 0.0 for j, value in enumerate(test)]
     return scaled_train, scaled_test
 
 
