@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - "scripts/backfill_bitstamp_hourly.py"
+      - "scripts/evaluate_bitstamp_hourly_features_v2.py"
+      - "scripts/hourly_features_v2.py"
+      - "scripts/attribute_hourly_candle_features_v2.py"
+      - "scripts/ablate_hourly_features_v2.py"
       - "src/crypto_intelligence_os/adapters/market_data/bitstamp.py"
       - "src/crypto_intelligence_os/adapters/market_data/historical_archive.py"
       - ".github/workflows/btc-long-history-research.yml"
@@ -48,6 +52,14 @@ jobs:
             --end "$END" \
             --database artifacts/long-history/bitstamp-btcusd-1h.sqlite \
             --report artifacts/long-history/bitstamp-btcusd-1h-report.json
+
+      - name: Evaluate Feature V2 on validated Bitstamp history
+        run: |
+          python scripts/evaluate_bitstamp_hourly_features_v2.py \
+            --database artifacts/long-history/bitstamp-btcusd-1h.sqlite \
+            --output artifacts/long-history/bitstamp-feature-v2-report.json \
+            --train-min 720 \
+            --step 24
 
       - name: Upload validated research artifact
         uses: actions/upload-artifact@v4
