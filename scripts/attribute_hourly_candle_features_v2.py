@@ -42,9 +42,7 @@ def _evaluate(
         current = closes[test_origin]
         actual = closes[test_origin + horizon]
         actual_return = math.log(actual / current)
-        predicted_return = sum(
-            weight * value for weight, value in zip(beta, test_x, strict=True)
-        )
+        predicted_return = sum(weight * value for weight, value in zip(beta, test_x, strict=True))
         predicted = current * math.exp(predicted_return)
         errors.append(abs(predicted - actual) / actual)
         base_errors.append(abs(current - actual) / actual)
@@ -60,16 +58,15 @@ def _evaluate(
         "mape_pct": round(mape, 5),
         "persistence_mape_pct": round(base_mape, 5),
         "mape_improvement_vs_persistence_pct": round(
-            100 * (base_mape - mape) / base_mape, 3, 
+            100 * (base_mape - mape) / base_mape,
+            3,
         ),
         "direction_accuracy_pct": round(100 * hits / samples, 2),
         "beats_persistence": mape < base_mape,
     }
 
 
-def tournament(
-    candles: list[dict[str, float]], train_min: int = 360, step: int = 24
-) -> dict:
+def tournament(candles: list[dict[str, float]], train_min: int = 360, step: int = 24) -> dict:
     rows = []
     for horizon in HORIZONS:
         single = {}
