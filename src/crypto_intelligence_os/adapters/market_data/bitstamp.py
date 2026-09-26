@@ -108,4 +108,23 @@ def fetch_hourly_range(
                 collected[bar.open_time] = bar
         cursor = page_end
 
+    expected = start
+    while expected < end:
+        if expected not in collected:
+            recovery_end = min(end, expected + timedelta(hours=1))
+            recovery = fetch_hourly(start=expected, end=recovery_end, limit=2)
+            matches = [bar for bar in recovery if bar.open_time == expected]
+            if matches:
+                recovered = matches[0]
+                if any(
+                    bar.model_dump(exclude={"ingested_at"})
+                    != recovered.model_dump(exclude={"ingested_at"})
+                    for bar in matches[1:]
+                ):
+                    raise ValueError(
+                        f"Bitstamp returned conflicting recovery candle at {expected.isoformat()}"
+                    )
+                collected[expected] = recovered
+        expected += timedelta(hours=1)
+
     return tuple(collected[key] for key in sorted(collected))
