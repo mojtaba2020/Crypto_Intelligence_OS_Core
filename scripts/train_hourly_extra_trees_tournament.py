@@ -45,7 +45,7 @@ def _tree_predict(
 def _forest_predict(xs: list[list[float]], ys: list[float], x: list[float], seed: int) -> float:
     predictions = []
     for tree in range(64):
-        rng = random.Random(seed + tree)
+        rng = random.Random(seed + tree)  # noqa: S311 -- deterministic research simulation, not cryptography
         predictions.append(_tree_predict(xs, ys, x, rng))
     return sum(predictions) / len(predictions)
 
