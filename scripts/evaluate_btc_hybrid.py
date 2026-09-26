@@ -47,6 +47,7 @@ def evaluate(
     first = max(365 + horizon + 365 - 1, len(observations) - holdout_days)
     last = len(observations) - horizon - 1
     errors: list[tuple[float, ...]] = []
+    paired_losses: list[dict[str, object]] = []
     ablation_errors: dict[str, list[float]] = {
         group: [] for group in ("no_halving", "no_extrema", "momentum_only")
     }
@@ -76,6 +77,15 @@ def evaluate(
             100 * abs(estimate - actual) / actual for estimate in predictions
         )
         errors.append(row)
+        paired_losses.append(
+            {
+                "origin": history[-1].day.isoformat(),
+                "actual": actual,
+                "hybrid_abs_error": row[0],
+                "linear_abs_error": row[1],
+                "persistence_abs_error": row[2],
+            }
+        )
         change_90d = history[-1].close / history[-91].close - 1
         regime = "up_90d" if change_90d > 0.10 else "down_90d" if change_90d < -0.10 else "flat_90d"
         regime_errors[regime].append(row)
@@ -138,6 +148,7 @@ def evaluate(
         "last_test_origin": observations[first + (count - 1) * step].day.isoformat(),
         "source_transition_day": transition,
         "metrics": metrics,
+        "paired_losses": paired_losses,
         "regimes": regimes,
         "eras": eras,
         "ablation_mae_usd": (
