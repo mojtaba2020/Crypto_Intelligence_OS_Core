@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime
 from pathlib import Path
 
 from crypto_intelligence_os.market_data import BarStatus, OHLCVBar
@@ -91,13 +90,24 @@ class HistoricalOHLCVArchive:
         timeframe: str,
         source_id: str | None = None,
     ) -> tuple[OHLCVBar, ...]:
-        clauses = ["instrument_id = ?", "timeframe = ?"]
-        params: list[str] = [instrument_id, timeframe]
-        if source_id is not None:
-            clauses.append("source_id = ?")
-            params.append(source_id)
-        query = "SELECT record FROM bars WHERE " + " AND ".join(clauses) + " ORDER BY open_time"
-        rows = self._connection.execute(query, params).fetchall()
+        if source_id is None:
+            rows = self._connection.execute(
+                """
+                SELECT record FROM bars
+                WHERE instrument_id = ? AND timeframe = ?
+                ORDER BY open_time
+                """,
+                (instrument_id, timeframe),
+            ).fetchall()
+        else:
+            rows = self._connection.execute(
+                """
+                SELECT record FROM bars
+                WHERE instrument_id = ? AND timeframe = ? AND source_id = ?
+                ORDER BY open_time
+                """,
+                (instrument_id, timeframe, source_id),
+            ).fetchall()
         return tuple(OHLCVBar.model_validate_json(row[0]) for row in rows)
 
     def count(self) -> int:
