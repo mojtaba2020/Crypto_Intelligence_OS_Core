@@ -10,6 +10,7 @@ on:
       - "scripts/hourly_momentum_diagnostic.py"
       - "scripts/hourly_features_v2.py"
       - "scripts/validate_hourly_features_v2.py"
+      - "scripts/compare_hourly_features_v2.py"
       - ".github/workflows/btc-hourly-ridge-tournament.yml"
 
 jobs:
@@ -64,6 +65,9 @@ jobs:
       - name: Validate Feature Engineering V2
         run: |
           python scripts/validate_hourly_features_v2.py --input research/hourly_ohlcv_training.json --output research/hourly_features_v2_validation.json
+      - name: A/B walk-forward test Feature V1 vs V2
+        run: |
+          python scripts/compare_hourly_features_v2.py --input research/hourly_ohlcv_training.json --output research/hourly_features_v2_ab.json
       - name: Train and walk-forward test Ridge
         run: |
           python scripts/train_hourly_ridge_tournament.py --input research/hourly_closes_training.json --output research/hourly_ridge_tournament.json
@@ -87,3 +91,4 @@ jobs:
             research/hourly_boosting_tournament.json
             research/hourly_diagnostic.json
             research/hourly_features_v2_validation.json
+            research/hourly_features_v2_ab.json
