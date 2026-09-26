@@ -12,6 +12,7 @@ on:
       - "scripts/validate_hourly_features_v2.py"
       - "scripts/compare_hourly_features_v2.py"
       - "scripts/ablate_hourly_features_v2.py"
+      - "scripts/attribute_hourly_candle_features_v2.py"
       - ".github/workflows/btc-hourly-ridge-tournament.yml"
 
 jobs:
@@ -72,6 +73,9 @@ jobs:
       - name: Ablate standardized Feature V2 families
         run: |
           python scripts/ablate_hourly_features_v2.py --input research/hourly_ohlcv_training.json --output research/hourly_features_v2_ablation.json
+      - name: Attribute standardized candle features
+        run: |
+          python scripts/attribute_hourly_candle_features_v2.py --input research/hourly_ohlcv_training.json --output research/hourly_candle_feature_attribution.json
       - name: Train and walk-forward test Ridge
         run: |
           python scripts/train_hourly_ridge_tournament.py --input research/hourly_closes_training.json --output research/hourly_ridge_tournament.json
@@ -97,3 +101,4 @@ jobs:
             research/hourly_features_v2_validation.json
             research/hourly_features_v2_ab.json
             research/hourly_features_v2_ablation.json
+            research/hourly_candle_feature_attribution.json
