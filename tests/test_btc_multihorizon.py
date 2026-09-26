@@ -1,6 +1,6 @@
 """Tests for multi-horizon benchmark planning."""
 
-from scripts.evaluate_btc_multihorizon import HORIZONS, plan, significance_gate
+from scripts.evaluate_btc_multihorizon import HORIZONS, holm_adjust, plan, significance_gate
 
 
 def test_supported_horizons_are_ordered_and_complete():
@@ -42,3 +42,10 @@ def test_significance_gate_requires_minimum_examples():
     result = significance_gate(_losses(1.0, 2.0, count=20), "hybrid", horizon=7, step=7)
     assert result["status"] == "FAIL"
     assert result["examples"] == 20
+
+
+def test_holm_adjust_controls_family_wise_error_and_preserves_order():
+    adjusted = holm_adjust([0.001, 0.02, 0.04, 0.8])
+    assert adjusted == [0.004, 0.06, 0.08, 0.8]
+    assert adjusted[0] < 0.05
+    assert all(value >= raw for value, raw in zip(adjusted, [0.001, 0.02, 0.04, 0.8], strict=True))
