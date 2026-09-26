@@ -7,8 +7,8 @@ import argparse
 import csv
 import json
 import math
-from itertools import pairwise
 from datetime import UTC, datetime
+from itertools import pairwise
 from pathlib import Path
 
 REQUIRED = ("timestamp", "open", "high", "low", "close", "volume")
