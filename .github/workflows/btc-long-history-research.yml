@@ -56,3 +56,4 @@ jobs:
           path: artifacts/long-history/
           if-no-files-found: error
           retention-days: 14
+# Smoke trigger: validate PR-based Bitstamp hourly ingestion.
