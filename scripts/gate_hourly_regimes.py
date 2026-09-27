@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import statistics
 from collections import defaultdict
 from pathlib import Path
 
@@ -40,14 +41,32 @@ def main() -> None:
     rows = []
     for regime, losses in sorted(groups.items()):
         n = len(losses["model"])
-        row = {"regime": regime, "samples": n}
+        model_mape = 100 * statistics.mean(losses["model"])
+        baseline_mape = 100 * statistics.mean(losses["baseline"])
+        row = {
+            "regime": regime,
+            "samples": n,
+            "model_mape_pct": model_mape,
+            "persistence_mape_pct": baseline_mape,
+            "mape_improvement_vs_persistence_pct": (
+                100 * (baseline_mape - model_mape) / baseline_mape
+                if baseline_mape
+                else 0.0
+            ),
+        }
         if n >= args.min_samples:
             row["statistical_gate"] = paired_block_bootstrap(
                 losses["model"],
                 losses["baseline"],
                 block_length=min(args.block_length, n),
             )
-            row["decision"] = row["statistical_gate"]["gate"]
+            raw_gate = row["statistical_gate"]["gate"]
+            row["raw_gate"] = raw_gate
+            row["decision"] = (
+                "EXPLORATORY_PASS_REQUIRES_CONFIRMATION"
+                if raw_gate == "PASS"
+                else "FAIL"
+            )
         else:
             row["decision"] = "INSUFFICIENT_SAMPLES"
         rows.append(row)
@@ -55,6 +74,12 @@ def main() -> None:
     result = {
         "status": "HOURLY_REGIME_GATE_V1",
         "regime_definition": "24h trend band x trailing point-in-time 24h volatility median",
+        "research_status": "EXPLORATORY",
+        "confirmation_requirements": [
+            "multiplicity control across tested regimes",
+            "independent time period or independent exchange",
+            "dependence-aware validation that preserves calendar structure",
+        ],
         "rows": rows,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
