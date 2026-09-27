@@ -63,6 +63,14 @@ jobs:
             --train-min 720 \
             --step 24
 
+      - name: Enforce locked primary confirmation period
+        env:
+          START: ${{ github.event_name == 'workflow_dispatch' && inputs.start || '2023-01-01T00:00:00+00:00' }}
+          END: ${{ github.event_name == 'workflow_dispatch' && inputs.end || '2024-01-01T00:00:00+00:00' }}
+        run: |
+          test "$START" = "2023-01-01T00:00:00+00:00"
+          test "$END" = "2024-01-01T00:00:00+00:00"
+
       - name: Run locked 2023 preregistered confirmation
         run: |
           python scripts/confirm_hourly_regime_hypothesis.py \
