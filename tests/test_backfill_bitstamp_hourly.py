@@ -12,6 +12,7 @@ from crypto_intelligence_os.adapters.market_data.bitstamp import (
 )
 from crypto_intelligence_os.adapters.market_data.historical_archive import (
     HistoricalOHLCVArchive,
+    canonical_bar_fingerprint,
 )
 from crypto_intelligence_os.market_data import BarStatus, OHLCVBar, Timeframe
 
@@ -72,7 +73,7 @@ def test_backfill_persists_only_exact_complete_range(monkeypatch, tmp_path):
     assert report["fetched_count"] == 4
     assert report["missing_count"] == 0
     assert report["continuity"] == "PASS"
-    assert report["sqlite_integrity"] == "PASS"
+    assert report["sqlite_integrity"] == "PASS"\n    assert len(report["canonical_data_sha256"]) == 64
     assert report["first_open_utc"] == start.isoformat()
     assert report["last_open_utc"] == (end - timedelta(hours=1)).isoformat()
     assert report_path.exists()
@@ -83,4 +84,4 @@ def test_backfill_persists_only_exact_complete_range(monkeypatch, tmp_path):
             timeframe="1h",
             source_id=SOURCE_ID,
         )
-    assert len(stored) == 4
+    assert len(stored) == 4\n    assert report["canonical_data_sha256"] == canonical_bar_fingerprint(stored)
