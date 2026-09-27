@@ -41,6 +41,9 @@ def main() -> None:
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
 
     if not args.reuse_validated_archive:
+        # Primary confirmation starts clean so stale observations cannot mix in.
+        for stale in (DATABASE, INGESTION_REPORT, CONFIRMATION):
+            stale.unlink(missing_ok=True)
         _run([
             sys.executable,
             "scripts/backfill_bitstamp_hourly.py",
