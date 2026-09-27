@@ -79,6 +79,7 @@ jobs:
             --output artifacts/long-history/range-mean-6h-2023-confirmation.json
 
       - name: Upload validated research artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: btc-long-history-bitstamp
