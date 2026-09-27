@@ -124,3 +124,19 @@ def test_locked_preregistration_rejects_parameter_drift(
     prereg[section][key] = bad_value
     with pytest.raises(ValueError):
         _validate_locked_preregistration(prereg)
+
+
+def test_locked_preregistration_rejects_unlocked_status():
+    prereg = copy.deepcopy(_locked_preregistration())
+    prereg["status"] = "EXPLORATORY"
+    with pytest.raises(ValueError, match="not in locked preregistered status"):
+        _validate_locked_preregistration(prereg)
+
+
+def test_locked_preregistration_rejects_post_access_method_change():
+    prereg = copy.deepcopy(_locked_preregistration())
+    prereg["methodology_amendment_before_confirmatory_data_access"][
+        "status"
+    ] = "CHANGED_AFTER_DATA_ACCESS"
+    with pytest.raises(ValueError, match="not locked before confirmation"):
+        _validate_locked_preregistration(prereg)
