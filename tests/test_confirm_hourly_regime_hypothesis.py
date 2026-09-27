@@ -2,6 +2,7 @@
 
 import copy
 import json
+import math
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -10,6 +11,7 @@ import pytest
 from scripts.confirm_hourly_regime_hypothesis import (
     _assert_exact_primary_period,
     _assert_independent_period,
+    _evaluate_preregistered_feature,
     _validate_locked_preregistration,
 )
 
@@ -140,3 +142,48 @@ def test_locked_preregistration_rejects_post_access_method_change():
     ] = "CHANGED_AFTER_DATA_ACCESS"
     with pytest.raises(ValueError, match="not locked before confirmation"):
         _validate_locked_preregistration(prereg)
+
+
+def _synthetic_candles(count=900):
+    candles = []
+    price = 100.0
+    for index in range(count):
+        price *= math.exp(0.0002 * math.sin(index / 17.0))
+        candles.append(
+            {
+                "open": price * 0.999,
+                "high": price * 1.002,
+                "low": price * 0.998,
+                "close": price,
+                "volume": 1000.0 + index,
+            }
+        )
+    return candles
+
+
+def test_walk_forward_first_prediction_ignores_future_mutation():
+    candles = _synthetic_candles()
+    before = _evaluate_preregistered_feature(copy.deepcopy(candles))
+    assert before["origins"][0] == 720
+
+    mutated = copy.deepcopy(candles)
+    first_origin = before["origins"][0]
+    first_target = first_origin + 12
+    for row in mutated[first_target + 1 :]:
+        row["close"] *= 50.0
+        row["high"] *= 50.0
+        row["low"] *= 50.0
+        row["open"] *= 50.0
+        row["volume"] *= 10.0
+
+    after = _evaluate_preregistered_feature(mutated)
+    assert after["model_losses"][0] == before["model_losses"][0]
+    assert after["baseline_losses"][0] == before["baseline_losses"][0]
+    assert after["direction_hits"][0] == before["direction_hits"][0]
+
+
+def test_walk_forward_training_targets_end_at_test_origin():
+    test_origin = 720
+    train_origins = list(range(168, test_origin - 12 + 1))
+    assert train_origins[-1] + 12 == test_origin
+    assert all(origin + 12 <= test_origin for origin in train_origins)
