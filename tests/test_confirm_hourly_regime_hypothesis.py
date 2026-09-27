@@ -268,3 +268,59 @@ def test_locked_confirmation_run_writes_self_auditing_result(
     assert result["calendar_block_length_days"] == 7
     assert result["bootstrap_repetitions"] == 10000
     assert json.loads(output.read_text(encoding="utf-8")) == result
+
+
+@pytest.mark.parametrize(
+    ("sample_count", "gate", "model_loss", "baseline_loss", "expected"),
+    [
+        (39, "PASS", 0.01, 0.02, "INSUFFICIENT_SAMPLES"),
+        (50, "FAIL", 0.01, 0.02, "CONFIRMATORY_FAIL"),
+        (50, "PASS", 0.03, 0.02, "CONFIRMATORY_FAIL"),
+    ],
+)
+def test_locked_confirmation_decision_contract(
+    tmp_path,
+    monkeypatch,
+    sample_count,
+    gate,
+    model_loss,
+    baseline_loss,
+    expected,
+):
+    database = tmp_path / f"decision-{sample_count}-{gate}.sqlite"
+    start = datetime(2023, 1, 1, tzinfo=UTC)
+    bars = tuple(_bitstamp_bar(start + timedelta(hours=i)) for i in range(8760))
+    with HistoricalOHLCVArchive(database) as archive:
+        archive.persist(bars)
+
+    origins = list(range(720, 720 + sample_count * 24, 24))
+    monkeypatch.setattr(
+        confirm,
+        "_evaluate_preregistered_feature",
+        lambda candles: {
+            "origins": origins,
+            "model_losses": [model_loss] * sample_count,
+            "baseline_losses": [baseline_loss] * sample_count,
+            "direction_hits": [1] * sample_count,
+        },
+    )
+    monkeypatch.setattr(
+        confirm,
+        "classify_regime",
+        lambda candles, origin: confirm.TARGET_REGIME,
+    )
+    monkeypatch.setattr(
+        confirm,
+        "calendar_regime_block_bootstrap",
+        lambda *args, **kwargs: {
+            "gate": gate,
+            "ci_95": [0.001, 0.02] if gate == "PASS" else [-0.001, 0.02],
+        },
+    )
+
+    result = confirm.run(
+        database,
+        Path("research/prereg_range_mean_6h_down_low_vol_12h_v1.json"),
+        tmp_path / "decision.json",
+    )
+    assert result["decision"] == expected
