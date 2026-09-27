@@ -73,7 +73,7 @@ jobs:
             --database artifacts/long-history/bitstamp-btcusd-1h.sqlite \
             --preregistration research/prereg_range_mean_6h_down_low_vol_12h_v1.json \
             --ingestion-report artifacts/long-history/bitstamp-btcusd-1h-report.json \
-            --runner-git-sha "${{ github.sha }}" \\
+            --runner-git-sha "${{ github.sha }}" \
             --output artifacts/long-history/range-mean-6h-2023-confirmation.json
 
       - name: Evaluate Feature V2 on validated Bitstamp history
