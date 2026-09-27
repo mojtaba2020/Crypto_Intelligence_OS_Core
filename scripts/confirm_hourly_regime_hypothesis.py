@@ -30,6 +30,7 @@ MIN_REGIME_SAMPLES = 40
 BOOTSTRAP_METHOD = "calendar_preserving_moving_block"
 CALENDAR_BLOCK_LENGTH_DAYS = 7
 BOOTSTRAP_REPETITIONS = 10_000
+BOOTSTRAP_SEED = 20260927
 LOSS = "absolute_percentage_error"
 SCALING = "training_only_zscore_per_walk_forward_split"
 EXPLORATORY_PERIOD = "2024-01-01T00:00:00Z/2024-12-31T23:00:00Z"
@@ -77,6 +78,7 @@ def _validate_locked_preregistration(prereg: dict) -> None:
         "bootstrap_method": BOOTSTRAP_METHOD,
         "calendar_block_length_days": CALENDAR_BLOCK_LENGTH_DAYS,
         "bootstrap_repetitions": BOOTSTRAP_REPETITIONS,
+        "bootstrap_seed": BOOTSTRAP_SEED,
         "must_beat_persistence": True,
         "independent_period_required": True,
         "promotion_after_single_pass": False,
@@ -323,6 +325,7 @@ def run(database: Path, preregistration: Path, output: Path) -> dict:
         "bootstrap_method": BOOTSTRAP_METHOD,
         "calendar_block_length_days": CALENDAR_BLOCK_LENGTH_DAYS,
         "bootstrap_repetitions": BOOTSTRAP_REPETITIONS,
+        "bootstrap_seed": BOOTSTRAP_SEED,
         "independent_period_guard": "PASS",
         "continuity": "PASS",
         "sqlite_integrity": "PASS",
@@ -343,6 +346,7 @@ def run(database: Path, preregistration: Path, output: Path) -> dict:
             repetitions=int(
                 prereg["acceptance_rule"]["bootstrap_repetitions"]
             ),
+            seed=int(prereg["acceptance_rule"]["bootstrap_seed"]),
         )
         result.update(
             {
