@@ -24,9 +24,10 @@ This is an exploratory research record, not a production signal.
 - Walk-forward train minimum: **720 hours**
 - Test step: **24 hours**
 - Walk-forward predictions: **336**
-- Statistical gate: paired moving-block bootstrap
+- Global statistical gate: paired moving-block bootstrap
+- Regime statistical gate: **calendar-preserving moving-block bootstrap**
 - Bootstrap repetitions: **10,000**
-- Block length: **7**
+- Primary block length: **7 daily walk-forward observations**
 
 ## Global result
 
@@ -46,30 +47,35 @@ The point estimate favored the model, but the confidence interval crossed zero.
 
 Regime definition: 24h trend band (up/range/down, +/-1% neutral threshold) crossed with trailing 24h realized volatility versus its point-in-time trailing median.
 
-| Regime | Samples | MAPE improvement vs Persistence | Direction accuracy | 95% bootstrap CI | Decision |
-|---|---:|---:|---:|---|---|
-| down__high_vol | 64 | +0.7188% | 59.38% | [-0.00028038, +0.00052314] | FAIL |
-| down__low_vol | 36 | +3.4581% | 61.11% | not gated (<40) | INSUFFICIENT_SAMPLES |
-| range__high_vol | 38 | -2.9872% | 44.74% | not gated (<40) | INSUFFICIENT_SAMPLES |
-| range__low_vol | 81 | +0.3420% | 53.09% | [-0.00009830, +0.00023466] | FAIL |
-| up__high_vol | 65 | +1.9142% | 56.92% | [-0.00024342, +0.00060648] | FAIL |
-| up__low_vol | 52 | +0.9154% | 57.69% | [-0.00013170, +0.00039498] | FAIL |
+The regime bootstrap resamples contiguous blocks from the **full chronological daily walk-forward sequence** and preserves the regime indicator inside those blocks. This avoids pretending that irregularly spaced regime observations are adjacent in calendar time.
+
+| Regime | Samples | MAPE improvement vs Persistence | Direction accuracy | 95% calendar-preserving CI | P(improvement > 0) | Decision |
+|---|---:|---:|---:|---|---:|---|
+| down__high_vol | 64 | +0.7188% | 59.38% | [-0.00047710, +0.00061920] | 62.03% | FAIL |
+| down__low_vol | 36 | +3.4581% | 61.11% | not gated (<40) | — | INSUFFICIENT_SAMPLES |
+| range__high_vol | 38 | -2.9872% | 44.74% | not gated (<40) | — | INSUFFICIENT_SAMPLES |
+| range__low_vol | 81 | +0.3420% | 53.09% | [-0.00023850, +0.00032198] | 58.65% | FAIL |
+| up__high_vol | 65 | +1.9142% | 56.92% | [-0.00021652, +0.00068338] | 83.88% | FAIL |
+| up__low_vol | 52 | +0.9154% | 57.69% | [-0.00030548, +0.00049377] | 67.46% | FAIL |
 
 ## Scientific interpretation
 
-- No regime with enough samples passed the raw 95% bootstrap gate.
-- `down__low_vol` is an **exploratory hypothesis only** because it had just 36 samples; its apparent +3.46% improvement must not be treated as evidence of a real edge.
+- No regime with enough samples passed the improved 95% calendar-preserving bootstrap gate.
+- The stronger dependence-aware method widened several intervals, but **did not change the scientific conclusion**.
+- `down__low_vol` remains an exploratory hypothesis only because it had just 36 samples; its apparent +3.46% improvement must not be treated as evidence of a real edge.
 - `range__high_vol` was worse than Persistence in the point estimate.
-- Because six regimes were inspected after the global candidate was selected, any future apparent pass also requires multiple-testing control.
-- The current filtered-regime moving-block bootstrap is exploratory; confirmatory validation should preserve calendar dependence more explicitly.
-- Any candidate that survives must be tested on an independent period and/or independent exchange before promotion.
+- Because six regimes were inspected after the global candidate was selected, the exploratory table is not a confirmatory multiple-comparison result.
+- The one follow-up hypothesis (`down__low_vol`) is preregistered before accessing independent confirmation data.
+- The confirmatory plan now treats **2023 as primary** and **2025 as replication**, with no threshold tuning allowed on either dataset.
 
 ## Engineering notes
 
 During local verification, a floating-point edge case was found in the volatility split: effectively equal near-zero volatilities could be separated by numerical noise. The classifier was stabilized with a negligible tolerance. The real Bitstamp regime assignments and research conclusions were unchanged after the fix.
 
+A locked confirmation runner now rejects any archive overlapping the 2024 exploratory period, and the confirmatory statistical gate preserves calendar dependence.
+
 ## Decision
 
 `range_mean_6h` is **not promoted** to a validated 12h signal.
 
-Keep `down__low_vol` only as a pre-registered follow-up hypothesis for independent validation. The main research path should move on to stronger feature/regime discovery rather than tuning this feature on the same 2024 sample.
+Keep `down__low_vol` only as a preregistered independent-test hypothesis. If the primary 2023 confirmation fails, retire `range_mean_6h` as an active 12h candidate rather than retuning it on the failed period.
