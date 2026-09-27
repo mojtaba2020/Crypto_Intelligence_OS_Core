@@ -219,14 +219,20 @@ def _bitstamp_bar(opened: datetime) -> OHLCVBar:
     )
 
 
-def test_locked_confirmation_run_writes_self_auditing_result(
-    tmp_path, monkeypatch
-):
-    database = tmp_path / "primary-2023.sqlite"
+@pytest.fixture(scope="module")
+def primary_2023_database(tmp_path_factory):
+    database = tmp_path_factory.mktemp("confirm-primary") / "primary-2023.sqlite"
     start = datetime(2023, 1, 1, tzinfo=UTC)
     bars = tuple(_bitstamp_bar(start + timedelta(hours=i)) for i in range(8760))
     with HistoricalOHLCVArchive(database) as archive:
         assert archive.persist(bars) == 8760
+    return database
+
+
+def test_locked_confirmation_run_writes_self_auditing_result(
+    tmp_path, monkeypatch, primary_2023_database
+):
+    database = primary_2023_database
 
     origins = list(range(720, 720 + 50 * 24, 24))
     monkeypatch.setattr(
@@ -286,12 +292,9 @@ def test_locked_confirmation_decision_contract(
     model_loss,
     baseline_loss,
     expected,
+    primary_2023_database,
 ):
-    database = tmp_path / f"decision-{sample_count}-{gate}.sqlite"
-    start = datetime(2023, 1, 1, tzinfo=UTC)
-    bars = tuple(_bitstamp_bar(start + timedelta(hours=i)) for i in range(8760))
-    with HistoricalOHLCVArchive(database) as archive:
-        archive.persist(bars)
+    database = primary_2023_database
 
     origins = list(range(720, 720 + sample_count * 24, 24))
     monkeypatch.setattr(
