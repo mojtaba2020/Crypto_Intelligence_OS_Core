@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import sqlite3
 from pathlib import Path
 
@@ -112,6 +114,28 @@ class HistoricalOHLCVArchive:
     def count(self) -> int:
         row = self._connection.execute("SELECT COUNT(*) FROM bars").fetchone()
         return int(row[0])
+
+
+def canonical_bar_fingerprint(bars: tuple[OHLCVBar, ...]) -> str:
+    """SHA-256 over stable provider observations, excluding ingestion metadata."""
+    digest = hashlib.sha256()
+    for bar in bars:
+        stable = {
+            "source_id": bar.source_id,
+            "instrument_id": bar.instrument_id,
+            "timeframe": bar.timeframe.value,
+            "open_time": bar.open_time.isoformat(),
+            "close_time": bar.close_time.isoformat(),
+            "open": str(bar.open),
+            "high": str(bar.high),
+            "low": str(bar.low),
+            "close": str(bar.close),
+            "volume": str(bar.volume),
+            "status": bar.status.value,
+        }
+        encoded = json.dumps(stable, sort_keys=True, separators=(",", ":"))
+        digest.update((encoded + "\n").encode("utf-8"))
+    return digest.hexdigest()
 
 
 def validate_hourly_continuity(bars: tuple[OHLCVBar, ...]) -> None:
