@@ -37,6 +37,16 @@ def run(*, start: datetime, end: datetime, database: Path, report_path: Path) ->
             missing_times.append(cursor.isoformat())
         cursor += timedelta(hours=1)
     validate_hourly_continuity(bars)
+    if len(bars) != expected_count or missing_times:
+        raise ValueError(
+            "Bitstamp backfill is incomplete: "
+            f"expected={expected_count} fetched={len(bars)} "
+            f"missing={len(missing_times)}"
+        )
+    if bars[0].open_time != start or bars[-1].open_time != end - timedelta(hours=1):
+        raise ValueError(
+            "Bitstamp backfill boundaries do not exactly match requested period"
+        )
 
     with HistoricalOHLCVArchive(database) as archive:
         inserted = archive.persist(bars)
