@@ -20,7 +20,7 @@ EXPECTED_BARS = 8760
 def _git_sha() -> str:
     try:
         return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"],
+            ["git", "rev-parse", "HEAD"],  # noqa: S607
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip()

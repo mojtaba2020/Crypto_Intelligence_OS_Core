@@ -8,13 +8,12 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-
+import scripts.confirm_hourly_regime_hypothesis as confirm
 from crypto_intelligence_os.adapters.market_data.historical_archive import (
     HistoricalOHLCVArchive,
     canonical_bar_fingerprint,
 )
 from crypto_intelligence_os.market_data import BarStatus, OHLCVBar, Timeframe
-import scripts.confirm_hourly_regime_hypothesis as confirm
 from scripts.confirm_hourly_regime_hypothesis import (
     _assert_exact_primary_period,
     _assert_independent_period,

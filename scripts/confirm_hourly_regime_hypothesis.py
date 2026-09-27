@@ -12,15 +12,15 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from calendar_regime_block_bootstrap import calendar_regime_block_bootstrap
-from hourly_features_v2 import feature_names, feature_vector
-from hourly_regime_v1 import classify_regime
-from train_hourly_ridge_tournament import _ridge_fit
 from crypto_intelligence_os.adapters.market_data.bitstamp import INSTRUMENT_ID, SOURCE_ID
 from crypto_intelligence_os.adapters.market_data.historical_archive import (
     HistoricalOHLCVArchive,
     canonical_bar_fingerprint,
     validate_hourly_continuity,
 )
+from hourly_features_v2 import feature_names, feature_vector
+from hourly_regime_v1 import classify_regime
+from train_hourly_ridge_tournament import _ridge_fit
 
 FEATURE = "range_mean_6h"
 HORIZON_HOURS = 12
@@ -255,7 +255,13 @@ def _evaluate_preregistered_feature(
     }
 
 
-def run(database: Path, preregistration: Path, output: Path, ingestion_report: Path | None = None, runner_git_sha: str | None = None) -> dict:
+def run(
+    database: Path,
+    preregistration: Path,
+    output: Path,
+    ingestion_report: Path | None = None,
+    runner_git_sha: str | None = None,
+) -> dict:
     prereg_bytes = preregistration.read_bytes()
     prereg_sha256 = hashlib.sha256(prereg_bytes).hexdigest()
     prereg = json.loads(prereg_bytes.decode("utf-8"))
@@ -420,7 +426,13 @@ def main() -> None:
     args = parser.parse_args()
     print(
         json.dumps(
-            run(args.database, args.preregistration, args.output, args.ingestion_report, args.runner_git_sha),
+            run(
+                args.database,
+                args.preregistration,
+                args.output,
+                args.ingestion_report,
+                args.runner_git_sha,
+            ),
             indent=2,
         )
     )

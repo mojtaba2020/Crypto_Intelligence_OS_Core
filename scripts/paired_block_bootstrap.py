@@ -26,7 +26,8 @@ def paired_block_bootstrap(
     diffs = [b - m for m, b in zip(model_losses, baseline_losses, strict=True)]
     n = len(diffs)
     observed = statistics.mean(diffs)
-    rng = random.Random(seed)
+    # Deterministic PRNG is required for reproducible statistical bootstrap.
+    rng = random.Random(seed)  # noqa: S311
     starts = list(range(n - block_length + 1))
     means: list[float] = []
     blocks_needed = math.ceil(n / block_length)

@@ -6,10 +6,16 @@ import argparse
 import hashlib
 import json
 import statistics
-from datetime import UTC, datetime
+from datetime import UTC
 from pathlib import Path
 
 from calendar_regime_block_bootstrap import calendar_regime_block_bootstrap
+from crypto_intelligence_os.adapters.market_data.bitstamp import INSTRUMENT_ID, SOURCE_ID
+from crypto_intelligence_os.adapters.market_data.historical_archive import (
+    HistoricalOHLCVArchive,
+    canonical_bar_fingerprint,
+    validate_hourly_continuity,
+)
 from confirm_hourly_regime_hypothesis import (
     BOOTSTRAP_METHOD,
     BOOTSTRAP_REPETITIONS,
@@ -31,12 +37,6 @@ from confirm_hourly_regime_hypothesis import (
     _validate_locked_preregistration,
 )
 from hourly_regime_v1 import classify_regime
-from crypto_intelligence_os.adapters.market_data.bitstamp import INSTRUMENT_ID, SOURCE_ID
-from crypto_intelligence_os.adapters.market_data.historical_archive import (
-    HistoricalOHLCVArchive,
-    canonical_bar_fingerprint,
-    validate_hourly_continuity,
-)
 
 REPLICATION_START = "2025-01-01T00:00:00+00:00"
 REPLICATION_END_EXCLUSIVE = "2026-01-01T00:00:00+00:00"
@@ -78,7 +78,13 @@ def _validate_replication_ingestion(report: dict, bars) -> str:
     return fingerprint
 
 
-def run(database: Path, preregistration: Path, output: Path, ingestion_report: Path, runner_git_sha: str | None = None) -> dict:
+def run(
+    database: Path,
+    preregistration: Path,
+    output: Path,
+    ingestion_report: Path,
+    runner_git_sha: str | None = None,
+) -> dict:
     prereg_bytes = preregistration.read_bytes()
     prereg = json.loads(prereg_bytes.decode("utf-8"))
     prereg_sha = hashlib.sha256(prereg_bytes).hexdigest()
@@ -87,7 +93,11 @@ def run(database: Path, preregistration: Path, output: Path, ingestion_report: P
 
     with HistoricalOHLCVArchive(database) as archive:
         archive.integrity_check()
-        bars = archive.read(instrument_id=INSTRUMENT_ID, timeframe="1h", source_id=SOURCE_ID)
+        bars = archive.read(
+            instrument_id=INSTRUMENT_ID,
+            timeframe="1h",
+            source_id=SOURCE_ID,
+        )
     validate_hourly_continuity(bars)
 
     if bars[0].open_time.astimezone(UTC) != _parse_utc(REPLICATION_START):
@@ -104,15 +114,36 @@ def run(database: Path, preregistration: Path, output: Path, ingestion_report: P
     fingerprint = _validate_replication_ingestion(report, bars)
 
     candles = [
-        {"open": float(b.open), "high": float(b.high), "low": float(b.low), "close": float(b.close), "volume": float(b.volume)}
+        {
+            "open": float(b.open),
+            "high": float(b.high),
+            "low": float(b.low),
+            "close": float(b.close),
+            "volume": float(b.volume),
+        }
         for b in bars
     ]
     paired = _evaluate_preregistered_feature(candles)
-    regimes = [classify_regime(candles, int(origin)) for origin in paired["origins"]]
+    regimes = [
+        classify_regime(candles, int(origin))
+        for origin in paired["origins"]
+    ]
     selected = [regime == TARGET_REGIME for regime in regimes]
-    model = [float(x) for x, keep in zip(paired["model_losses"], selected, strict=True) if keep]
-    baseline = [float(x) for x, keep in zip(paired["baseline_losses"], selected, strict=True) if keep]
-    hits = [int(x) for x, keep in zip(paired["direction_hits"], selected, strict=True) if keep]
+    model = [
+        float(x)
+        for x, keep in zip(paired["model_losses"], selected, strict=True)
+        if keep
+    ]
+    baseline = [
+        float(x)
+        for x, keep in zip(paired["baseline_losses"], selected, strict=True)
+        if keep
+    ]
+    hits = [
+        int(x)
+        for x, keep in zip(paired["direction_hits"], selected, strict=True)
+        if keep
+    ]
     n = len(model)
 
     result = {
@@ -163,11 +194,17 @@ def run(database: Path, preregistration: Path, output: Path, ingestion_report: P
             "model_mape_pct": model_mape,
             "persistence_mape_pct": baseline_mape,
             "mape_improvement_vs_persistence_pct": (
-                100 * (baseline_mape - model_mape) / baseline_mape if baseline_mape else 0.0
+                100 * (baseline_mape - model_mape) / baseline_mape
+                if baseline_mape
+                else 0.0
             ),
             "direction_accuracy_pct": 100 * sum(hits) / n,
             "statistical_gate": gate,
-            "decision": "REPLICATION_SUPPORTS_HYPOTHESIS" if supports else "REPLICATION_DOES_NOT_SUPPORT_HYPOTHESIS",
+            "decision": (
+                "REPLICATION_SUPPORTS_HYPOTHESIS"
+                if supports
+                else "REPLICATION_DOES_NOT_SUPPORT_HYPOTHESIS"
+            ),
         })
 
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -183,7 +220,18 @@ def main() -> None:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--runner-git-sha")
     args = parser.parse_args()
-    print(json.dumps(run(args.database, args.preregistration, args.output, args.ingestion_report, args.runner_git_sha), indent=2))
+    print(
+        json.dumps(
+            run(
+                args.database,
+                args.preregistration,
+                args.output,
+                args.ingestion_report,
+                args.runner_git_sha,
+            ),
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

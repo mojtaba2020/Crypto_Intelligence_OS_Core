@@ -1,7 +1,6 @@
 """Tests for the calendar-preserving regime bootstrap."""
 
 import pytest
-
 from scripts.calendar_regime_block_bootstrap import (
     calendar_regime_block_bootstrap,
 )

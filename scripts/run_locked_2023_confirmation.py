@@ -20,14 +20,17 @@ PREREG = ROOT / "research" / "prereg_range_mean_6h_down_low_vol_12h_v1.json"
 def _git_sha() -> str:
     try:
         return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+            ["git", "rev-parse", "HEAD"],  # noqa: S607
+            cwd=ROOT,
+            text=True,
         ).strip()
     except (OSError, subprocess.CalledProcessError):
         return "LOCAL_GIT_SHA_UNAVAILABLE"
 
 
 def _run(command: list[str]) -> None:
-    subprocess.run(command, cwd=ROOT, check=True)
+    # Command lists are constructed only from fixed repo paths and sys.executable.
+    subprocess.run(command, cwd=ROOT, check=True)  # noqa: S603
 
 
 def main() -> None:

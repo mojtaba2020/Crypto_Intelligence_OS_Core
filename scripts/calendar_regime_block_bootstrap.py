@@ -34,7 +34,8 @@ def calendar_regime_block_bootstrap(
         diff for diff, keep in zip(diffs, selected, strict=True) if keep
     )
 
-    rng = random.Random(seed)
+    # Deterministic PRNG is required for reproducible statistical bootstrap.
+    rng = random.Random(seed)  # noqa: S311
     starts = list(range(n - block_length + 1))
     blocks_needed = math.ceil(n / block_length)
     means: list[float] = []
