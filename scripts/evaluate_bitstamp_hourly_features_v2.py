@@ -54,7 +54,7 @@ def main() -> None:
     parser.add_argument("--train-min", type=int, default=720)
     parser.add_argument("--step", type=int, default=24)
     args = parser.parse_args()
-    print(json.dumps(run(args.database, args.output, train_min=args.train_min, step=args.step), indent=2))
+    report = run(\n        args.database,\n        args.output,\n        train_min=args.train_min,\n        step=args.step,\n    )\n    print(json.dumps(report, indent=2))
 
 
 if __name__ == "__main__":
