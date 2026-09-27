@@ -171,6 +171,9 @@ def run(database: Path, preregistration: Path, output: Path) -> dict:
         prereg["created_from_exploratory_dataset"]["period"],
     )
 
+    primary_start, primary_last_open = _period(
+        prereg["confirmatory_data"]["primary_period"]
+    )
     _assert_exact_primary_period(
         bars[0].open_time,
         bars[-1].open_time,
@@ -226,6 +229,9 @@ def run(database: Path, preregistration: Path, output: Path) -> dict:
         "data_source": SOURCE_ID,
         "instrument_id": INSTRUMENT_ID,
         "validated_bar_count": len(bars),
+        "expected_primary_bar_count": int(
+            (primary_last_open - primary_start).total_seconds() // 3600
+        ) + 1,
         "first_open_utc": bars[0].open_time.isoformat(),
         "last_open_utc": bars[-1].open_time.isoformat(),
         "walk_forward_step_hours": STEP_HOURS,
