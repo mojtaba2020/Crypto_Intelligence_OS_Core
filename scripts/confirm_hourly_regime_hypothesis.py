@@ -17,6 +17,7 @@ from train_hourly_ridge_tournament import _ridge_fit
 from crypto_intelligence_os.adapters.market_data.bitstamp import INSTRUMENT_ID, SOURCE_ID
 from crypto_intelligence_os.adapters.market_data.historical_archive import (
     HistoricalOHLCVArchive,
+    canonical_bar_fingerprint,
     validate_hourly_continuity,
 )
 
@@ -329,6 +330,7 @@ def run(database: Path, preregistration: Path, output: Path) -> dict:
         "independent_period_guard": "PASS",
         "continuity": "PASS",
         "sqlite_integrity": "PASS",
+        "canonical_data_sha256": canonical_bar_fingerprint(bars),
     }
 
     if n < min_samples:
