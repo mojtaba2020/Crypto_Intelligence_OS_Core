@@ -64,6 +64,7 @@ def _validate_locked_preregistration(prereg: dict) -> None:
         "independent_period_required": True,
         "promotion_after_single_pass": False,
         "promotion_requires_replication": True,
+        "primary_requirement": "95% CI lower bound of paired loss improvement > 0",
     }
     for key, expected in expected_acceptance.items():
         if acceptance.get(key) != expected:
