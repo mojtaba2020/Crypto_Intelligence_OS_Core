@@ -99,6 +99,7 @@ def test_locked_preregistration_is_accepted_unchanged():
         ("acceptance_rule", "bootstrap_method", "iid"),
         ("acceptance_rule", "calendar_block_length_days", 3),
         ("acceptance_rule", "bootstrap_repetitions", 9999),
+        ("acceptance_rule", "bootstrap_seed", 1),
         ("acceptance_rule", "must_beat_persistence", False),
         ("acceptance_rule", "independent_period_required", False),
         ("acceptance_rule", "promotion_after_single_pass", True),
@@ -273,6 +274,7 @@ def test_locked_confirmation_run_writes_self_auditing_result(
     assert result["walk_forward_step_hours"] == 24
     assert result["calendar_block_length_days"] == 7
     assert result["bootstrap_repetitions"] == 10000
+    assert result["bootstrap_seed"] == 20260927
     assert json.loads(output.read_text(encoding="utf-8")) == result
 
 
