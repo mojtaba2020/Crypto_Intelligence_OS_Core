@@ -6,11 +6,10 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
-from collections import defaultdict
 from pathlib import Path
 
+from calendar_regime_block_bootstrap import calendar_regime_block_bootstrap
 from hourly_regime_v1 import classify_regime
-from paired_block_bootstrap import paired_block_bootstrap
 
 
 def main() -> None:
@@ -30,19 +29,20 @@ def main() -> None:
     if not (len(origins) == len(model) == len(baseline)):
         raise ValueError("Paired origins/losses must have equal length")
 
-    groups: dict[str, dict[str, list[float]]] = defaultdict(
-        lambda: {"model": [], "baseline": []}
-    )
-    for origin, m, b in zip(origins, model, baseline, strict=True):
-        regime = classify_regime(candles, origin)
-        groups[regime]["model"].append(m)
-        groups[regime]["baseline"].append(b)
+    regimes = [classify_regime(candles, origin) for origin in origins]
 
     rows = []
-    for regime, losses in sorted(groups.items()):
-        n = len(losses["model"])
-        model_mape = 100 * statistics.mean(losses["model"])
-        baseline_mape = 100 * statistics.mean(losses["baseline"])
+    for regime in sorted(set(regimes)):
+        selected = [value == regime for value in regimes]
+        selected_model = [
+            loss for loss, keep in zip(model, selected, strict=True) if keep
+        ]
+        selected_baseline = [
+            loss for loss, keep in zip(baseline, selected, strict=True) if keep
+        ]
+        n = len(selected_model)
+        model_mape = 100 * statistics.mean(selected_model)
+        baseline_mape = 100 * statistics.mean(selected_baseline)
         row = {
             "regime": regime,
             "samples": n,
@@ -55,10 +55,11 @@ def main() -> None:
             ),
         }
         if n >= args.min_samples:
-            row["statistical_gate"] = paired_block_bootstrap(
-                losses["model"],
-                losses["baseline"],
-                block_length=min(args.block_length, n),
+            row["statistical_gate"] = calendar_regime_block_bootstrap(
+                model,
+                baseline,
+                selected,
+                block_length=min(args.block_length, len(model)),
             )
             raw_gate = row["statistical_gate"]["gate"]
             row["raw_gate"] = raw_gate
@@ -72,13 +73,14 @@ def main() -> None:
         rows.append(row)
 
     result = {
-        "status": "HOURLY_REGIME_GATE_V1",
+        "status": "HOURLY_REGIME_GATE_V2",
         "regime_definition": "24h trend band x trailing point-in-time 24h volatility median",
         "research_status": "EXPLORATORY",
+        "bootstrap": "calendar_preserving_moving_block",
         "confirmation_requirements": [
             "multiplicity control across tested regimes",
             "independent time period or independent exchange",
-            "dependence-aware validation that preserves calendar structure",
+            "predeclared confirmatory hypothesis",
         ],
         "rows": rows,
     }
