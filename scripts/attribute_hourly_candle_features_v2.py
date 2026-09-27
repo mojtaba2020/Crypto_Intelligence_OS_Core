@@ -63,6 +63,10 @@ def _evaluate(
         ),
         "direction_accuracy_pct": round(100 * hits / samples, 2),
         "beats_persistence": mape < base_mape,
+        "paired_losses": {
+            "model_losses": errors,
+            "baseline_losses": base_errors,
+        },
     }
 
 
