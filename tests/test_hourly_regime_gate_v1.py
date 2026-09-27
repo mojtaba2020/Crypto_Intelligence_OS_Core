@@ -1,6 +1,7 @@
 """Tests for point-in-time hourly regime research gates."""
 
 import math
+import statistics
 
 from scripts.hourly_regime_v1 import classify_regime
 from scripts.paired_block_bootstrap import paired_block_bootstrap
@@ -71,10 +72,10 @@ def test_regime_volatility_reference_excludes_current_estimate():
         math.log(closes[i] / closes[i - 1])
         for i in range(1, len(closes))
     ]
-    current_vol = __import__("statistics").pstdev(hourly_returns[-24:])
+    current_vol = statistics.pstdev(hourly_returns[-24:])
     historical = [
-        __import__("statistics").pstdev(hourly_returns[i - 24 : i])
+        statistics.pstdev(hourly_returns[i - 24 : i])
         for i in range(24, len(hourly_returns))
     ]
-    assert current_vol > __import__("statistics").median(historical)
+    assert current_vol > statistics.median(historical)
     assert classify_regime(candles, origin).endswith("__high_vol")
