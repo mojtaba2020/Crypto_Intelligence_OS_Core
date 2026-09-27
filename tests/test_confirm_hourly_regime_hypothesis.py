@@ -11,6 +11,7 @@ import pytest
 from scripts.confirm_hourly_regime_hypothesis import (
     _assert_exact_primary_period,
     _assert_independent_period,
+    _assert_locked_walk_forward_design,
     _evaluate_preregistered_feature,
     _validate_locked_preregistration,
 )
@@ -187,3 +188,7 @@ def test_walk_forward_training_targets_end_at_test_origin():
     train_origins = list(range(168, test_origin - 12 + 1))
     assert train_origins[-1] + 12 == test_origin
     assert all(origin + 12 <= test_origin for origin in train_origins)
+
+
+def test_locked_walk_forward_design_is_accepted():
+    _assert_locked_walk_forward_design()
