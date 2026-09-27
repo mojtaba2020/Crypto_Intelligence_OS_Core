@@ -37,6 +37,17 @@ PRIMARY_PERIOD = "2023-01-01T00:00:00Z/2023-12-31T23:00:00Z"
 PRIMARY_SOURCE = "Bitstamp"
 
 
+def _assert_locked_walk_forward_design() -> None:
+    if TRAIN_MIN_HOURS != 720:
+        raise ValueError("Confirmatory train minimum drifted from locked 720 hours")
+    if STEP_HOURS != 24:
+        raise ValueError(
+            "Confirmatory cadence drifted from one observation per calendar day"
+        )
+    if RIDGE_ALPHA != 1.0:
+        raise ValueError("Confirmatory Ridge alpha drifted from locked value 1.0")
+
+
 def _validate_locked_preregistration(prereg: dict) -> None:
     if prereg.get("status") != "PREREGISTERED_CONFIRMATORY_HYPOTHESIS":
         raise ValueError("Hypothesis is not in locked preregistered status")
@@ -216,6 +227,7 @@ def _evaluate_preregistered_feature(
 
 def run(database: Path, preregistration: Path, output: Path) -> dict:
     prereg = json.loads(preregistration.read_text(encoding="utf-8"))
+    _assert_locked_walk_forward_design()
     _validate_locked_preregistration(prereg)
     hypothesis = prereg["hypothesis"]
     target_regime = str(hypothesis["regime"])
