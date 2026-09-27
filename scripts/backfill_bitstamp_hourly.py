@@ -15,6 +15,7 @@ from crypto_intelligence_os.adapters.market_data.bitstamp import (
 )
 from crypto_intelligence_os.adapters.market_data.historical_archive import (
     HistoricalOHLCVArchive,
+    canonical_bar_fingerprint,
     validate_hourly_continuity,
 )
 
@@ -74,6 +75,7 @@ def run(*, start: datetime, end: datetime, database: Path, report_path: Path) ->
         "last_open_utc": bars[-1].open_time.isoformat(),
         "continuity": "PASS",
         "sqlite_integrity": "PASS",
+        "canonical_data_sha256": canonical_bar_fingerprint(stored),
     }
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
