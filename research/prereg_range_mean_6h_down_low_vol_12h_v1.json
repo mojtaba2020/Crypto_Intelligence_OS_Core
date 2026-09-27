@@ -1,0 +1,50 @@
+{
+  "status": "PREREGISTERED_CONFIRMATORY_HYPOTHESIS",
+  "created_from_exploratory_dataset": {
+    "source": "Bitstamp BTC/USD 1h",
+    "period": "2024-01-01T00:00:00Z/2024-12-31T23:00:00Z",
+    "artifact_id": 10915745274,
+    "bars": 8784
+  },
+  "hypothesis": {
+    "feature": "range_mean_6h",
+    "horizon_hours": 12,
+    "regime": "down__low_vol",
+    "regime_definition": {
+      "trend": "24h log return < -0.01",
+      "volatility": "current trailing 24h realized volatility <= point-in-time median of trailing 24h vol estimates over the previous 168h"
+    },
+    "model": "ridge_alpha_1",
+    "scaling": "training_only_zscore_per_walk_forward_split",
+    "benchmark": "persistence",
+    "loss": "absolute_percentage_error"
+  },
+  "exploratory_observation_only": {
+    "samples": 36,
+    "mape_improvement_vs_persistence_pct": 3.4581431306118398,
+    "direction_accuracy_pct": 61.111111111111114,
+    "reason_not_accepted": "INSUFFICIENT_SAMPLES"
+  },
+  "confirmatory_data": {
+    "primary_periods": [
+      "2023-01-01T00:00:00Z/2023-12-31T23:00:00Z",
+      "2025-01-01T00:00:00Z/2025-12-31T23:00:00Z"
+    ],
+    "primary_source": "Bitstamp",
+    "secondary_source_after_primary": "Bitfinex",
+    "no_threshold_tuning_on_confirmatory_data": true
+  },
+  "acceptance_rule": {
+    "minimum_regime_samples": 40,
+    "paired_block_bootstrap_repetitions": 10000,
+    "primary_requirement": "95% CI lower bound of paired loss improvement > 0",
+    "must_beat_persistence": true,
+    "independent_period_required": true,
+    "promotion_after_single_pass": false,
+    "promotion_requires_replication": true
+  },
+  "failure_rule": {
+    "if_primary_confirmatory_test_fails": "retire range_mean_6h as an active 12h candidate",
+    "do_not_retune_same_hypothesis_on_failed_confirmatory_period": true
+  }
+}
