@@ -55,14 +55,6 @@ jobs:
             --database artifacts/long-history/bitstamp-btcusd-1h.sqlite \
             --report artifacts/long-history/bitstamp-btcusd-1h-report.json
 
-      - name: Evaluate Feature V2 on validated Bitstamp history
-        run: |
-          python scripts/evaluate_bitstamp_hourly_features_v2.py \
-            --database artifacts/long-history/bitstamp-btcusd-1h.sqlite \
-            --output artifacts/long-history/bitstamp-feature-v2-report.json \
-            --train-min 720 \
-            --step 24
-
       - name: Enforce locked primary confirmation period
         env:
           START: ${{ github.event_name == 'workflow_dispatch' && inputs.start || '2023-01-01T00:00:00+00:00' }}
@@ -77,6 +69,14 @@ jobs:
             --database artifacts/long-history/bitstamp-btcusd-1h.sqlite \
             --preregistration research/prereg_range_mean_6h_down_low_vol_12h_v1.json \
             --output artifacts/long-history/range-mean-6h-2023-confirmation.json
+
+      - name: Evaluate Feature V2 on validated Bitstamp history
+        run: |
+          python scripts/evaluate_bitstamp_hourly_features_v2.py \
+            --database artifacts/long-history/bitstamp-btcusd-1h.sqlite \
+            --output artifacts/long-history/bitstamp-feature-v2-report.json \
+            --train-min 720 \
+            --step 24
 
       - name: Upload validated research artifact
         if: always()
