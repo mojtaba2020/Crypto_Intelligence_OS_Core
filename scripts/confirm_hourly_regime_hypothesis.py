@@ -10,9 +10,9 @@ import statistics
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from calendar_regime_block_bootstrap import calendar_regime_block_bootstrap
 from hourly_features_v2 import feature_names, feature_vector
 from hourly_regime_v1 import classify_regime
-from paired_block_bootstrap import paired_block_bootstrap
 from train_hourly_ridge_tournament import _ridge_fit
 from crypto_intelligence_os.adapters.market_data.bitstamp import INSTRUMENT_ID, SOURCE_ID
 from crypto_intelligence_os.adapters.market_data.historical_archive import (
@@ -167,25 +167,37 @@ def run(database: Path, preregistration: Path, output: Path) -> dict:
     ]
     paired = _evaluate_preregistered_feature(candles)
 
-    selected_model: list[float] = []
-    selected_baseline: list[float] = []
-    selected_hits: list[int] = []
-    for origin, model_loss, baseline_loss, hit in zip(
-        paired["origins"],
-        paired["model_losses"],
-        paired["baseline_losses"],
-        paired["direction_hits"],
-        strict=True,
-    ):
-        if classify_regime(candles, int(origin)) == target_regime:
-            selected_model.append(float(model_loss))
-            selected_baseline.append(float(baseline_loss))
-            selected_hits.append(int(hit))
+    regimes = [
+        classify_regime(candles, int(origin))
+        for origin in paired["origins"]
+    ]
+    selected = [regime == target_regime for regime in regimes]
+    selected_model = [
+        float(loss)
+        for loss, keep in zip(
+            paired["model_losses"], selected, strict=True
+        )
+        if keep
+    ]
+    selected_baseline = [
+        float(loss)
+        for loss, keep in zip(
+            paired["baseline_losses"], selected, strict=True
+        )
+        if keep
+    ]
+    selected_hits = [
+        int(hit)
+        for hit, keep in zip(
+            paired["direction_hits"], selected, strict=True
+        )
+        if keep
+    ]
 
     n = len(selected_model)
     min_samples = int(prereg["acceptance_rule"]["minimum_regime_samples"])
     result: dict = {
-        "status": "PREREGISTERED_CONFIRMATORY_RESULT_V1",
+        "status": "PREREGISTERED_CONFIRMATORY_RESULT_V2",
         "feature": FEATURE,
         "horizon_hours": HORIZON_HOURS,
         "regime": target_regime,
@@ -197,6 +209,7 @@ def run(database: Path, preregistration: Path, output: Path) -> dict:
         "walk_forward_step_hours": STEP_HOURS,
         "train_min_hours": TRAIN_MIN_HOURS,
         "regime_samples": n,
+        "bootstrap_method": prereg["acceptance_rule"]["bootstrap_method"],
         "independent_period_guard": "PASS",
         "continuity": "PASS",
         "sqlite_integrity": "PASS",
@@ -207,12 +220,15 @@ def run(database: Path, preregistration: Path, output: Path) -> dict:
     else:
         model_mape = 100 * statistics.mean(selected_model)
         baseline_mape = 100 * statistics.mean(selected_baseline)
-        gate = paired_block_bootstrap(
-            selected_model,
-            selected_baseline,
-            block_length=min(7, n),
+        gate = calendar_regime_block_bootstrap(
+            [float(x) for x in paired["model_losses"]],
+            [float(x) for x in paired["baseline_losses"]],
+            selected,
+            block_length=int(
+                prereg["acceptance_rule"]["calendar_block_length_days"]
+            ),
             repetitions=int(
-                prereg["acceptance_rule"]["paired_block_bootstrap_repetitions"]
+                prereg["acceptance_rule"]["bootstrap_repetitions"]
             ),
         )
         result.update(
