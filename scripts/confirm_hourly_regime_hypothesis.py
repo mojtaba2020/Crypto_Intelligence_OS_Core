@@ -32,6 +32,9 @@ CALENDAR_BLOCK_LENGTH_DAYS = 7
 BOOTSTRAP_REPETITIONS = 10_000
 LOSS = "absolute_percentage_error"
 SCALING = "training_only_zscore_per_walk_forward_split"
+EXPLORATORY_PERIOD = "2024-01-01T00:00:00Z/2024-12-31T23:00:00Z"
+PRIMARY_PERIOD = "2023-01-01T00:00:00Z/2023-12-31T23:00:00Z"
+PRIMARY_SOURCE = "Bitstamp"
 
 
 def _validate_locked_preregistration(prereg: dict) -> None:
@@ -69,7 +72,21 @@ def _validate_locked_preregistration(prereg: dict) -> None:
                 "locked runner"
             )
 
+    exploratory = prereg["created_from_exploratory_dataset"]
+    if exploratory.get("period") != EXPLORATORY_PERIOD:
+        raise ValueError(
+            "Exploratory period does not match locked 2024 dataset"
+        )
+
     confirmatory = prereg["confirmatory_data"]
+    if confirmatory.get("primary_period") != PRIMARY_PERIOD:
+        raise ValueError(
+            "Primary period does not match locked 2023 dataset"
+        )
+    if confirmatory.get("primary_source") != PRIMARY_SOURCE:
+        raise ValueError(
+            "Primary source does not match locked Bitstamp source"
+        )
     if confirmatory.get("no_threshold_tuning_on_confirmatory_data") is not True:
         raise ValueError(
             "Preregistration must prohibit threshold tuning on confirmatory data"
