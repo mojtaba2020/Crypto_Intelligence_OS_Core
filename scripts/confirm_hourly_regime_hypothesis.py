@@ -406,7 +406,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--database", required=True, type=Path)
     parser.add_argument("--preregistration", required=True, type=Path)
-    parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--output", required=True, type=Path)\n    parser.add_argument("--ingestion-report", type=Path)
     args = parser.parse_args()
     print(
         json.dumps(
