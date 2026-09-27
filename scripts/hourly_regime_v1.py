@@ -24,7 +24,12 @@ def classify_regime(candles: list[dict[str, float]], origin: int) -> str:
         for i in range(24, len(hourly_returns) + 1)
     ]
     median_vol = statistics.median(historical_vol_24h)
-    volatility = "high_vol" if vol_24h > median_vol else "low_vol"
+
+    # Avoid floating-point noise turning effectively equal volatilities into a
+    # false high-volatility regime. The tolerance is negligible at BTC-scale
+    # realized volatility but stabilizes near-zero synthetic/quiet histories.
+    vol_tolerance = max(1e-12, abs(median_vol) * 1e-9)
+    volatility = "high_vol" if vol_24h > median_vol + vol_tolerance else "low_vol"
 
     # A small neutral band avoids calling tiny 24h moves trends.
     if ret_24h > 0.01:
