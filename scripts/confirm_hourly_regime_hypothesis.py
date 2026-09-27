@@ -406,8 +406,7 @@ def run(database: Path, preregistration: Path, output: Path, ingestion_report: P
         )
 
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(result, indent=2) + "
-", encoding="utf-8")
+    output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     return result
 
 
