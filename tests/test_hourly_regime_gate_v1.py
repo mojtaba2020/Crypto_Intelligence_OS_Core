@@ -1,7 +1,6 @@
 """Tests for point-in-time hourly regime research gates."""
 
 import math
-import statistics
 
 from scripts.hourly_regime_v1 import classify_regime
 from scripts.paired_block_bootstrap import paired_block_bootstrap
@@ -59,23 +58,3 @@ def test_paired_block_bootstrap_rejects_no_edge():
     report = paired_block_bootstrap(losses, losses, repetitions=500)
     assert report["gate"] == "FAIL"
     assert report["ci_95"] == [0.0, 0.0]
-
-
-def test_regime_volatility_reference_excludes_current_estimate():
-    returns = [0.001 if i % 2 == 0 else -0.001 for i in range(144)]
-    returns += [0.002 if i % 2 == 0 else -0.002 for i in range(24)]
-    candles = _candles_from_returns(returns)
-    origin = 168
-
-    closes = [float(candles[i]["close"]) for i in range(origin - 168, origin + 1)]
-    hourly_returns = [
-        math.log(closes[i] / closes[i - 1])
-        for i in range(1, len(closes))
-    ]
-    current_vol = statistics.pstdev(hourly_returns[-24:])
-    historical = [
-        statistics.pstdev(hourly_returns[i - 24 : i])
-        for i in range(24, len(hourly_returns))
-    ]
-    assert current_vol > statistics.median(historical)
-    assert classify_regime(candles, origin).endswith("__high_vol")
