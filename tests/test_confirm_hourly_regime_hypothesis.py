@@ -11,6 +11,7 @@ import pytest
 
 from crypto_intelligence_os.adapters.market_data.historical_archive import (
     HistoricalOHLCVArchive,
+    canonical_bar_fingerprint,
 )
 from crypto_intelligence_os.market_data import BarStatus, OHLCVBar, Timeframe
 import scripts.confirm_hourly_regime_hypothesis as confirm
@@ -18,6 +19,7 @@ from scripts.confirm_hourly_regime_hypothesis import (
     _assert_exact_primary_period,
     _assert_independent_period,
     _assert_locked_walk_forward_design,
+    _validate_ingestion_chain,
     _evaluate_preregistered_feature,
     _validate_locked_preregistration,
 )
@@ -75,6 +77,47 @@ def test_exact_primary_period_guard_rejects_partial_or_extra_archive(
     with pytest.raises(ValueError, match="exactly match"):
         _assert_exact_primary_period(first_open, last_open, PRIMARY)
 
+
+
+def _ingestion_report_for(bars):
+    return {
+        "status": "BITSTAMP_LONG_HISTORY_INGESTED",
+        "source_id": confirm.SOURCE_ID,
+        "instrument_id": confirm.INSTRUMENT_ID,
+        "timeframe": "1h",
+        "expected_count": len(bars),
+        "fetched_count": len(bars),
+        "stored_count": len(bars),
+        "missing_count": 0,
+        "first_open_utc": bars[0].open_time.isoformat(),
+        "last_open_utc": bars[-1].open_time.isoformat(),
+        "continuity": "PASS",
+        "sqlite_integrity": "PASS",
+        "canonical_data_sha256": canonical_bar_fingerprint(bars),
+    }
+
+
+def test_ingestion_chain_accepts_exact_archive_identity():
+    bars = tuple(_bar(hour) for hour in range(4))
+    fingerprint = _validate_ingestion_chain(_ingestion_report_for(bars), bars)
+    assert fingerprint == canonical_bar_fingerprint(bars)
+
+
+@pytest.mark.parametrize(
+    ("field", "bad_value"),
+    [
+        ("canonical_data_sha256", "0" * 64),
+        ("stored_count", 3),
+        ("missing_count", 1),
+        ("source_id", "source:other"),
+    ],
+)
+def test_ingestion_chain_rejects_provenance_drift(field, bad_value):
+    bars = tuple(_bar(hour) for hour in range(4))
+    report = _ingestion_report_for(bars)
+    report[field] = bad_value
+    with pytest.raises(ValueError, match="chain-of-custody mismatch"):
+        _validate_ingestion_chain(report, bars)
 
 def _locked_preregistration():
     path = Path("research/prereg_range_mean_6h_down_low_vol_12h_v1.json")
