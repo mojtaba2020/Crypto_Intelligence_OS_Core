@@ -7,7 +7,7 @@ import argparse
 import json
 import math
 import statistics
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from hourly_features_v2 import feature_names, feature_vector
@@ -44,16 +44,15 @@ def _assert_independent_period(
     last_open: datetime,
     exploratory_period: str,
 ) -> None:
-    exp_start, exp_end = _period(exploratory_period)
+    exp_start, exp_last_open = _period(exploratory_period)
+    # Stored research periods use first/last candle open times, both inclusive.
+    exp_end_exclusive = exp_last_open + timedelta(hours=1)
     confirm_start = first_open.astimezone(UTC)
-    confirm_end_exclusive = last_open.astimezone(UTC)
-    # The archived last candle opens one hour before the exclusive dataset end.
-    confirm_end_exclusive = confirm_end_exclusive.replace(
-        minute=0, second=0, microsecond=0
+    confirm_end_exclusive = last_open.astimezone(UTC) + timedelta(hours=1)
+    overlaps = (
+        confirm_start < exp_end_exclusive
+        and confirm_end_exclusive > exp_start
     )
-    confirm_end_exclusive = confirm_end_exclusive.timestamp() + 3600
-    confirm_end_exclusive = datetime.fromtimestamp(confirm_end_exclusive, tz=UTC)
-    overlaps = confirm_start < exp_end and confirm_end_exclusive > exp_start
     if overlaps:
         raise ValueError(
             "Confirmatory archive overlaps the exploratory period; "
