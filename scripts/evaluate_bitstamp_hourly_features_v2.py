@@ -5,10 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from attribute_hourly_candle_features_v2 import tournament
 from crypto_intelligence_os.adapters.market_data.bitstamp import INSTRUMENT_ID, SOURCE_ID
