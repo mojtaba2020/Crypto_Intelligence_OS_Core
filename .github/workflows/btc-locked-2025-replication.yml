@@ -1,0 +1,55 @@
+name: BTC Locked 2025 Replication
+
+on:
+  pull_request:
+    paths:
+      - "scripts/replicate_hourly_regime_hypothesis_2025.py"
+      - "research/prereg_range_mean_6h_down_low_vol_12h_v1.json"
+      - ".github/workflows/btc-locked-2025-replication.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  locked-2025-replication:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install project
+        run: python -m pip install -e .
+
+      - name: Backfill exact 2025 Bitstamp archive
+        run: |
+          mkdir -p artifacts/replication-2025
+          python scripts/backfill_bitstamp_hourly.py \
+            --start "2025-01-01T00:00:00+00:00" \
+            --end "2026-01-01T00:00:00+00:00" \
+            --database artifacts/replication-2025/bitstamp-btcusd-1h-2025.sqlite \
+            --report artifacts/replication-2025/bitstamp-btcusd-1h-2025-report.json
+
+      - name: Run locked 2025 replication
+        run: |
+          python scripts/replicate_hourly_regime_hypothesis_2025.py \
+            --database artifacts/replication-2025/bitstamp-btcusd-1h-2025.sqlite \
+            --preregistration research/prereg_range_mean_6h_down_low_vol_12h_v1.json \
+            --ingestion-report artifacts/replication-2025/bitstamp-btcusd-1h-2025-report.json \
+            --runner-git-sha "${{ github.sha }}" \
+            --output artifacts/replication-2025/range-mean-6h-2025-replication.json
+
+      - name: Upload locked replication artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-locked-2025-replication
+          path: artifacts/replication-2025/
+          if-no-files-found: error
+          retention-days: 14
