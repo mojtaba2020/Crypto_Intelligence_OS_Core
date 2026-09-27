@@ -168,6 +168,8 @@ def _validate_ingestion_chain(report: dict, bars) -> str:
     fingerprint = canonical_bar_fingerprint(bars)
     expected = {
         "status": "BITSTAMP_LONG_HISTORY_INGESTED",
+        "requested_start_utc": "2023-01-01T00:00:00+00:00",
+        "requested_end_utc": "2024-01-01T00:00:00+00:00",
         "source_id": SOURCE_ID,
         "instrument_id": INSTRUMENT_ID,
         "timeframe": "1h",
