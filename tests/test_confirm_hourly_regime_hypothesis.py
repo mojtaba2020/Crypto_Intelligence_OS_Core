@@ -103,6 +103,8 @@ def _provenance_bar(hour: int) -> OHLCVBar:
 def _ingestion_report_for(bars):
     return {
         "status": "BITSTAMP_LONG_HISTORY_INGESTED",
+        "requested_start_utc": "2023-01-01T00:00:00+00:00",
+        "requested_end_utc": "2024-01-01T00:00:00+00:00",
         "source_id": confirm.SOURCE_ID,
         "instrument_id": confirm.INSTRUMENT_ID,
         "timeframe": "1h",
@@ -127,6 +129,8 @@ def test_ingestion_chain_accepts_exact_archive_identity():
 @pytest.mark.parametrize(
     ("field", "bad_value"),
     [
+        ("requested_start_utc", "2022-01-01T00:00:00+00:00"),
+        ("requested_end_utc", "2023-12-31T00:00:00+00:00"),
         ("canonical_data_sha256", "0" * 64),
         ("stored_count", 3),
         ("missing_count", 1),
