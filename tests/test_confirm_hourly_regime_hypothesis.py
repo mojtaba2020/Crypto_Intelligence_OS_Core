@@ -79,6 +79,27 @@ def test_exact_primary_period_guard_rejects_partial_or_extra_archive(
 
 
 
+
+def _provenance_bar(hour: int) -> OHLCVBar:
+    opened = datetime(2023, 1, 1, tzinfo=UTC) + timedelta(hours=hour)
+    closed = opened + timedelta(hours=1)
+    price = Decimal("20000")
+    return OHLCVBar(
+        instrument_id=confirm.INSTRUMENT_ID,
+        timeframe=Timeframe.ONE_HOUR,
+        status=BarStatus.FINAL,
+        open_time=opened,
+        close_time=closed,
+        available_at=closed,
+        ingested_at=datetime(2026, 9, 27, tzinfo=UTC),
+        open=price,
+        high=price + Decimal("10"),
+        low=price - Decimal("10"),
+        close=price,
+        volume=Decimal("1"),
+        source_id=confirm.SOURCE_ID,
+    )
+
 def _ingestion_report_for(bars):
     return {
         "status": "BITSTAMP_LONG_HISTORY_INGESTED",
@@ -98,7 +119,7 @@ def _ingestion_report_for(bars):
 
 
 def test_ingestion_chain_accepts_exact_archive_identity():
-    bars = tuple(_bar(hour) for hour in range(4))
+    bars = tuple(_provenance_bar(hour) for hour in range(4))
     fingerprint = _validate_ingestion_chain(_ingestion_report_for(bars), bars)
     assert fingerprint == canonical_bar_fingerprint(bars)
 
@@ -113,7 +134,7 @@ def test_ingestion_chain_accepts_exact_archive_identity():
     ],
 )
 def test_ingestion_chain_rejects_provenance_drift(field, bad_value):
-    bars = tuple(_bar(hour) for hour in range(4))
+    bars = tuple(_provenance_bar(hour) for hour in range(4))
     report = _ingestion_report_for(bars)
     report[field] = bad_value
     with pytest.raises(ValueError, match="chain-of-custody mismatch"):
