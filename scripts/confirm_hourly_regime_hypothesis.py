@@ -60,6 +60,22 @@ def _assert_independent_period(
         )
 
 
+def _assert_exact_primary_period(
+    first_open: datetime,
+    last_open: datetime,
+    primary_period: str,
+) -> None:
+    primary_start, primary_last_open = _period(primary_period)
+    if (
+        first_open.astimezone(UTC) != primary_start
+        or last_open.astimezone(UTC) != primary_last_open
+    ):
+        raise ValueError(
+            "Confirmatory archive must exactly match the preregistered "
+            "primary 2023 period"
+        )
+
+
 def _evaluate_preregistered_feature(
     candles: list[dict[str, float]],
 ) -> dict:
@@ -155,17 +171,11 @@ def run(database: Path, preregistration: Path, output: Path) -> dict:
         prereg["created_from_exploratory_dataset"]["period"],
     )
 
-    primary_start, primary_last_open = _period(
-        prereg["confirmatory_data"]["primary_period"]
+    _assert_exact_primary_period(
+        bars[0].open_time,
+        bars[-1].open_time,
+        prereg["confirmatory_data"]["primary_period"],
     )
-    if (
-        bars[0].open_time.astimezone(UTC) != primary_start
-        or bars[-1].open_time.astimezone(UTC) != primary_last_open
-    ):
-        raise ValueError(
-            "Confirmatory archive must exactly match the preregistered "
-            "primary 2023 period"
-        )
 
     candles = [
         {
