@@ -163,6 +163,30 @@ def _assert_exact_primary_period(
         )
 
 
+def _validate_ingestion_chain(report: dict, bars) -> str:
+    fingerprint = canonical_bar_fingerprint(bars)
+    expected = {
+        "status": "BITSTAMP_LONG_HISTORY_INGESTED",
+        "source_id": SOURCE_ID,
+        "instrument_id": INSTRUMENT_ID,
+        "timeframe": "1h",
+        "expected_count": len(bars),
+        "fetched_count": len(bars),
+        "stored_count": len(bars),
+        "first_open_utc": bars[0].open_time.isoformat(),
+        "last_open_utc": bars[-1].open_time.isoformat(),
+        "continuity": "PASS",
+        "sqlite_integrity": "PASS",
+        "canonical_data_sha256": fingerprint,
+    }
+    for key, value in expected.items():
+        if report.get(key) != value:
+            raise ValueError(f"Ingestion chain-of-custody mismatch: {key}")
+    if report.get("missing_count") != 0:
+        raise ValueError("Ingestion chain-of-custody mismatch: missing_count")
+    return fingerprint
+
+
 def _evaluate_preregistered_feature(
     candles: list[dict[str, float]],
 ) -> dict:
@@ -228,7 +252,7 @@ def _evaluate_preregistered_feature(
     }
 
 
-def run(database: Path, preregistration: Path, output: Path) -> dict:
+def run(database: Path, preregistration: Path, output: Path, ingestion_report: Path | None = None) -> dict:
     prereg = json.loads(preregistration.read_text(encoding="utf-8"))
     _assert_locked_walk_forward_design()
     _validate_locked_preregistration(prereg)
@@ -243,6 +267,10 @@ def run(database: Path, preregistration: Path, output: Path) -> dict:
             source_id=SOURCE_ID,
         )
     validate_hourly_continuity(bars)
+    data_fingerprint = canonical_bar_fingerprint(bars)
+    if ingestion_report is not None:
+        ingestion = json.loads(ingestion_report.read_text(encoding="utf-8"))
+        data_fingerprint = _validate_ingestion_chain(ingestion, bars)
     if len(bars) < TRAIN_MIN_HOURS + HORIZON_HOURS + 1:
         raise ValueError("Independent archive is too short for confirmatory test")
 
@@ -330,7 +358,7 @@ def run(database: Path, preregistration: Path, output: Path) -> dict:
         "independent_period_guard": "PASS",
         "continuity": "PASS",
         "sqlite_integrity": "PASS",
-        "canonical_data_sha256": canonical_bar_fingerprint(bars),
+        "canonical_data_sha256": data_fingerprint,\n        "ingestion_chain_of_custody": "PASS" if ingestion_report is not None else "NOT_PROVIDED",
     }
 
     if n < min_samples:
@@ -382,7 +410,7 @@ def main() -> None:
     args = parser.parse_args()
     print(
         json.dumps(
-            run(args.database, args.preregistration, args.output),
+            run(args.database, args.preregistration, args.output, args.ingestion_report),
             indent=2,
         )
     )
