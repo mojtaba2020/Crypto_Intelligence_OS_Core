@@ -155,6 +155,18 @@ def run(database: Path, preregistration: Path, output: Path) -> dict:
         prereg["created_from_exploratory_dataset"]["period"],
     )
 
+    primary_start, primary_last_open = _period(
+        prereg["confirmatory_data"]["primary_period"]
+    )
+    if (
+        bars[0].open_time.astimezone(UTC) != primary_start
+        or bars[-1].open_time.astimezone(UTC) != primary_last_open
+    ):
+        raise ValueError(
+            "Confirmatory archive must exactly match the preregistered "
+            "primary 2023 period"
+        )
+
     candles = [
         {
             "open": float(bar.open),
