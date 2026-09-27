@@ -25,6 +25,55 @@ HORIZON_HOURS = 12
 TRAIN_MIN_HOURS = 720
 STEP_HOURS = 24
 RIDGE_ALPHA = 1.0
+TARGET_REGIME = "down__low_vol"
+MIN_REGIME_SAMPLES = 40
+BOOTSTRAP_METHOD = "calendar_preserving_moving_block"
+CALENDAR_BLOCK_LENGTH_DAYS = 7
+BOOTSTRAP_REPETITIONS = 10_000
+LOSS = "absolute_percentage_error"
+SCALING = "training_only_zscore_per_walk_forward_split"
+
+
+def _validate_locked_preregistration(prereg: dict) -> None:
+    hypothesis = prereg["hypothesis"]
+    expected_hypothesis = {
+        "feature": FEATURE,
+        "horizon_hours": HORIZON_HOURS,
+        "regime": TARGET_REGIME,
+        "model": "ridge_alpha_1",
+        "scaling": SCALING,
+        "benchmark": "persistence",
+        "loss": LOSS,
+    }
+    for key, expected in expected_hypothesis.items():
+        if hypothesis.get(key) != expected:
+            raise ValueError(
+                f"Preregistration {key} does not match locked runner"
+            )
+
+    acceptance = prereg["acceptance_rule"]
+    expected_acceptance = {
+        "minimum_regime_samples": MIN_REGIME_SAMPLES,
+        "bootstrap_method": BOOTSTRAP_METHOD,
+        "calendar_block_length_days": CALENDAR_BLOCK_LENGTH_DAYS,
+        "bootstrap_repetitions": BOOTSTRAP_REPETITIONS,
+        "must_beat_persistence": True,
+        "independent_period_required": True,
+        "promotion_after_single_pass": False,
+        "promotion_requires_replication": True,
+    }
+    for key, expected in expected_acceptance.items():
+        if acceptance.get(key) != expected:
+            raise ValueError(
+                f"Preregistration acceptance rule {key} does not match "
+                "locked runner"
+            )
+
+    confirmatory = prereg["confirmatory_data"]
+    if confirmatory.get("no_threshold_tuning_on_confirmatory_data") is not True:
+        raise ValueError(
+            "Preregistration must prohibit threshold tuning on confirmatory data"
+        )
 
 
 def _parse_utc(value: str) -> datetime:
@@ -143,15 +192,8 @@ def _evaluate_preregistered_feature(
 
 def run(database: Path, preregistration: Path, output: Path) -> dict:
     prereg = json.loads(preregistration.read_text(encoding="utf-8"))
+    _validate_locked_preregistration(prereg)
     hypothesis = prereg["hypothesis"]
-    if hypothesis["feature"] != FEATURE:
-        raise ValueError("Preregistration feature does not match locked runner")
-    if int(hypothesis["horizon_hours"]) != HORIZON_HOURS:
-        raise ValueError("Preregistration horizon does not match locked runner")
-    if hypothesis["model"] != "ridge_alpha_1":
-        raise ValueError("Preregistration model does not match locked runner")
-    if hypothesis["benchmark"] != "persistence":
-        raise ValueError("Preregistration benchmark does not match locked runner")
     target_regime = str(hypothesis["regime"])
 
     with HistoricalOHLCVArchive(database) as archive:
