@@ -95,6 +95,11 @@ def test_locked_preregistration_is_accepted_unchanged():
         ("acceptance_rule", "promotion_after_single_pass", True),
         ("acceptance_rule", "promotion_requires_replication", False),
         (
+            "acceptance_rule",
+            "primary_requirement",
+            "point estimate improvement > 0",
+        ),
+        (
             "created_from_exploratory_dataset",
             "period",
             "2022-01-01T00:00:00Z/2022-12-31T23:00:00Z",
