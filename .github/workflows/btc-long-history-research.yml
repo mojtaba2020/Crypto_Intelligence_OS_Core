@@ -8,6 +8,7 @@ on:
       - "scripts/confirm_hourly_regime_hypothesis.py"
       - "scripts/hourly_regime_v1.py"
       - "tests/test_confirm_hourly_regime_hypothesis.py"
+      - "tests/test_backfill_bitstamp_hourly.py"
       - "tests/test_hourly_regime_gate_v1.py"
       - "research/prereg_range_mean_6h_down_low_vol_12h_v1.json"
       - "scripts/hourly_features_v2.py"
