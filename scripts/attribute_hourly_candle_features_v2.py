@@ -23,6 +23,7 @@ def _evaluate(
     horizon: int,
 ) -> dict:
     closes = [float(c["close"]) for c in candles]
+    test_origins: list[int] = []
     errors: list[float] = []
     base_errors: list[float] = []
     hits = 0
@@ -42,8 +43,11 @@ def _evaluate(
         current = closes[test_origin]
         actual = closes[test_origin + horizon]
         actual_return = math.log(actual / current)
-        predicted_return = sum(weight * value for weight, value in zip(beta, test_x, strict=True))
+        predicted_return = sum(
+            weight * value for weight, value in zip(beta, test_x, strict=True)
+        )
         predicted = current * math.exp(predicted_return)
+        test_origins.append(test_origin)
         errors.append(abs(predicted - actual) / actual)
         base_errors.append(abs(current - actual) / actual)
         hits += int((predicted_return >= 0) == (actual_return >= 0))
@@ -64,6 +68,7 @@ def _evaluate(
         "direction_accuracy_pct": round(100 * hits / samples, 2),
         "beats_persistence": mape < base_mape,
         "paired_losses": {
+            "origins": test_origins,
             "model_losses": errors,
             "baseline_losses": base_errors,
         },
