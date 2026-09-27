@@ -25,23 +25,35 @@
     "direction_accuracy_pct": 61.111111111111114,
     "reason_not_accepted": "INSUFFICIENT_SAMPLES"
   },
+  "methodology_amendment_before_confirmatory_data_access": {
+    "status": "LOCKED_BEFORE_INDEPENDENT_TEST",
+    "reason": "Preserve original calendar dependence instead of bootstrapping an irregularly filtered regime-only sequence.",
+    "changes": [
+      "Use calendar-preserving moving-block bootstrap on the full chronological walk-forward sequence with the regime indicator resampled inside each block.",
+      "Treat 2023 as the primary confirmatory period and 2025 as replication rather than testing two co-primary periods."
+    ]
+  },
   "confirmatory_data": {
-    "primary_periods": [
-      "2023-01-01T00:00:00Z/2023-12-31T23:00:00Z",
-      "2025-01-01T00:00:00Z/2025-12-31T23:00:00Z"
-    ],
+    "primary_period": "2023-01-01T00:00:00Z/2023-12-31T23:00:00Z",
+    "replication_period": "2025-01-01T00:00:00Z/2025-12-31T23:00:00Z",
     "primary_source": "Bitstamp",
-    "secondary_source_after_primary": "Bitfinex",
+    "external_exchange_replication_source": "Bitfinex",
     "no_threshold_tuning_on_confirmatory_data": true
   },
   "acceptance_rule": {
     "minimum_regime_samples": 40,
-    "paired_block_bootstrap_repetitions": 10000,
+    "bootstrap_method": "calendar_preserving_moving_block",
+    "calendar_block_length_days": 7,
+    "bootstrap_repetitions": 10000,
     "primary_requirement": "95% CI lower bound of paired loss improvement > 0",
     "must_beat_persistence": true,
     "independent_period_required": true,
     "promotion_after_single_pass": false,
     "promotion_requires_replication": true
+  },
+  "robustness_checks_after_primary_decision": {
+    "calendar_block_lengths_days": [3, 14],
+    "note": "These are sensitivity checks only and cannot rescue a failed primary 7-day-block test."
   },
   "failure_rule": {
     "if_primary_confirmatory_test_fails": "retire range_mean_6h as an active 12h candidate",
