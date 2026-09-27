@@ -1,12 +1,16 @@
 """Tests for the locked preregistered hourly-regime confirmation guards."""
 
+import copy
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
 from scripts.confirm_hourly_regime_hypothesis import (
     _assert_exact_primary_period,
     _assert_independent_period,
+    _validate_locked_preregistration,
 )
 
 
@@ -61,3 +65,46 @@ def test_exact_primary_period_guard_rejects_partial_or_extra_archive(
 ):
     with pytest.raises(ValueError, match="exactly match"):
         _assert_exact_primary_period(first_open, last_open, PRIMARY)
+
+
+def _locked_preregistration():
+    path = Path("research/prereg_range_mean_6h_down_low_vol_12h_v1.json")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_locked_preregistration_is_accepted_unchanged():
+    _validate_locked_preregistration(_locked_preregistration())
+
+
+@pytest.mark.parametrize(
+    ("section", "key", "bad_value"),
+    [
+        ("hypothesis", "feature", "other_feature"),
+        ("hypothesis", "horizon_hours", 24),
+        ("hypothesis", "regime", "up__low_vol"),
+        ("hypothesis", "model", "ridge_alpha_2"),
+        ("hypothesis", "scaling", "global_zscore"),
+        ("hypothesis", "benchmark", "zero_return"),
+        ("hypothesis", "loss", "squared_error"),
+        ("acceptance_rule", "minimum_regime_samples", 39),
+        ("acceptance_rule", "bootstrap_method", "iid"),
+        ("acceptance_rule", "calendar_block_length_days", 3),
+        ("acceptance_rule", "bootstrap_repetitions", 9999),
+        ("acceptance_rule", "must_beat_persistence", False),
+        ("acceptance_rule", "independent_period_required", False),
+        ("acceptance_rule", "promotion_after_single_pass", True),
+        ("acceptance_rule", "promotion_requires_replication", False),
+        (
+            "confirmatory_data",
+            "no_threshold_tuning_on_confirmatory_data",
+            False,
+        ),
+    ],
+)
+def test_locked_preregistration_rejects_parameter_drift(
+    section, key, bad_value
+):
+    prereg = copy.deepcopy(_locked_preregistration())
+    prereg[section][key] = bad_value
+    with pytest.raises(ValueError):
+        _validate_locked_preregistration(prereg)
