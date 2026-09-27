@@ -95,6 +95,17 @@ def test_locked_preregistration_is_accepted_unchanged():
         ("acceptance_rule", "promotion_after_single_pass", True),
         ("acceptance_rule", "promotion_requires_replication", False),
         (
+            "created_from_exploratory_dataset",
+            "period",
+            "2022-01-01T00:00:00Z/2022-12-31T23:00:00Z",
+        ),
+        (
+            "confirmatory_data",
+            "primary_period",
+            "2022-01-01T00:00:00Z/2022-12-31T23:00:00Z",
+        ),
+        ("confirmatory_data", "primary_source", "OtherExchange"),
+        (
             "confirmatory_data",
             "no_threshold_tuning_on_confirmatory_data",
             False,
