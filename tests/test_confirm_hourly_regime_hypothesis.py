@@ -3,10 +3,18 @@
 import copy
 import json
 import math
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
+
+import scripts.confirm_hourly_regime_hypothesis as confirm
+
+from crypto_intelligence_os.adapters.market_data.historical_archive import (
+    HistoricalOHLCVArchive,
+)
+from crypto_intelligence_os.market_data import BarStatus, OHLCVBar, Timeframe
 
 from scripts.confirm_hourly_regime_hypothesis import (
     _assert_exact_primary_period,
@@ -192,3 +200,73 @@ def test_walk_forward_training_targets_end_at_test_origin():
 
 def test_locked_walk_forward_design_is_accepted():
     _assert_locked_walk_forward_design()
+
+
+def _bitstamp_bar(opened: datetime) -> OHLCVBar:
+    closed = opened + timedelta(hours=1)
+    return OHLCVBar(
+        instrument_id=confirm.INSTRUMENT_ID,
+        timeframe=Timeframe.ONE_HOUR,
+        status=BarStatus.FINAL,
+        open_time=opened,
+        close_time=closed,
+        available_at=closed,
+        ingested_at=datetime(2026, 1, 1, tzinfo=UTC),
+        open=Decimal("100"),
+        high=Decimal("102"),
+        low=Decimal("99"),
+        close=Decimal("101"),
+        volume=Decimal("5"),
+        source_id=confirm.SOURCE_ID,
+    )
+
+
+def test_locked_confirmation_run_writes_self_auditing_result(
+    tmp_path, monkeypatch
+):
+    database = tmp_path / "primary-2023.sqlite"
+    start = datetime(2023, 1, 1, tzinfo=UTC)
+    bars = tuple(_bitstamp_bar(start + timedelta(hours=i)) for i in range(8760))
+    with HistoricalOHLCVArchive(database) as archive:
+        assert archive.persist(bars) == 8760
+
+    origins = list(range(720, 720 + 50 * 24, 24))
+    monkeypatch.setattr(
+        confirm,
+        "_evaluate_preregistered_feature",
+        lambda candles: {
+            "origins": origins,
+            "model_losses": [0.01] * len(origins),
+            "baseline_losses": [0.02] * len(origins),
+            "direction_hits": [1] * len(origins),
+        },
+    )
+    monkeypatch.setattr(
+        confirm,
+        "classify_regime",
+        lambda candles, origin: confirm.TARGET_REGIME,
+    )
+    monkeypatch.setattr(
+        confirm,
+        "calendar_regime_block_bootstrap",
+        lambda *args, **kwargs: {
+            "gate": "PASS",
+            "ci_95": [0.001, 0.02],
+        },
+    )
+
+    output = tmp_path / "confirmation.json"
+    result = confirm.run(
+        database,
+        Path("research/prereg_range_mean_6h_down_low_vol_12h_v1.json"),
+        output,
+    )
+
+    assert result["decision"] == "CONFIRMATORY_PASS_PENDING_REPLICATION"
+    assert result["validated_bar_count"] == 8760
+    assert result["expected_primary_bar_count"] == 8760
+    assert result["ridge_alpha"] == 1.0
+    assert result["walk_forward_step_hours"] == 24
+    assert result["calendar_block_length_days"] == 7
+    assert result["bootstrap_repetitions"] == 10000
+    assert json.loads(output.read_text(encoding="utf-8")) == result
