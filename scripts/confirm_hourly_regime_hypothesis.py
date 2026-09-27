@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import statistics
@@ -252,8 +253,7 @@ def _evaluate_preregistered_feature(
     }
 
 
-def run(database: Path, preregistration: Path, output: Path, ingestion_report: Path | None = None) -> dict:
-    prereg = json.loads(preregistration.read_text(encoding="utf-8"))
+def run(database: Path, preregistration: Path, output: Path, ingestion_report: Path | None = None, runner_git_sha: str | None = None) -> dict:\n    prereg_bytes = preregistration.read_bytes()\n    prereg_sha256 = hashlib.sha256(prereg_bytes).hexdigest()\n    prereg = json.loads(prereg_bytes.decode("utf-8"))
     _assert_locked_walk_forward_design()
     _validate_locked_preregistration(prereg)
     hypothesis = prereg["hypothesis"]
@@ -358,7 +358,7 @@ def run(database: Path, preregistration: Path, output: Path, ingestion_report: P
         "independent_period_guard": "PASS",
         "continuity": "PASS",
         "sqlite_integrity": "PASS",
-        "canonical_data_sha256": data_fingerprint,\n        "ingestion_chain_of_custody": "PASS" if ingestion_report is not None else "NOT_PROVIDED",
+        "canonical_data_sha256": data_fingerprint,\n        "preregistration_sha256": prereg_sha256,\n        "runner_git_sha": runner_git_sha or "NOT_PROVIDED",\n        "ingestion_chain_of_custody": "PASS" if ingestion_report is not None else "NOT_PROVIDED",
     }
 
     if n < min_samples:
@@ -406,11 +406,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--database", required=True, type=Path)
     parser.add_argument("--preregistration", required=True, type=Path)
-    parser.add_argument("--output", required=True, type=Path)\n    parser.add_argument("--ingestion-report", type=Path)
+    parser.add_argument("--output", required=True, type=Path)\n    parser.add_argument("--ingestion-report", type=Path)\n    parser.add_argument("--runner-git-sha")
     args = parser.parse_args()
     print(
         json.dumps(
-            run(args.database, args.preregistration, args.output, args.ingestion_report),
+            run(args.database, args.preregistration, args.output, args.ingestion_report, args.runner_git_sha),
             indent=2,
         )
     )
