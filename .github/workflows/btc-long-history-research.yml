@@ -76,6 +76,17 @@ jobs:
             --runner-git-sha "${{ github.sha }}" \
             --output artifacts/long-history/range-mean-6h-2023-confirmation.json
 
+      - name: Upload locked 2023 confirmation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-locked-2023-confirmation
+          path: |
+            artifacts/long-history/range-mean-6h-2023-confirmation.json
+            artifacts/long-history/bitstamp-btcusd-1h-report.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Evaluate Feature V2 on validated Bitstamp history
         if: success()
         run: |
