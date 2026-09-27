@@ -71,6 +71,7 @@ jobs:
             --output artifacts/long-history/range-mean-6h-2023-confirmation.json
 
       - name: Evaluate Feature V2 on validated Bitstamp history
+        if: success()
         run: |
           python scripts/evaluate_bitstamp_hourly_features_v2.py \
             --database artifacts/long-history/bitstamp-btcusd-1h.sqlite \
