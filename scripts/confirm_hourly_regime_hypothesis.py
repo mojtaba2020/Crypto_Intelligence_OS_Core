@@ -38,6 +38,12 @@ PRIMARY_SOURCE = "Bitstamp"
 
 
 def _validate_locked_preregistration(prereg: dict) -> None:
+    if prereg.get("status") != "PREREGISTERED_CONFIRMATORY_HYPOTHESIS":
+        raise ValueError("Hypothesis is not in locked preregistered status")
+    amendment = prereg["methodology_amendment_before_confirmatory_data_access"]
+    if amendment.get("status") != "LOCKED_BEFORE_INDEPENDENT_TEST":
+        raise ValueError("Methodology amendment is not locked before confirmation")
+
     hypothesis = prereg["hypothesis"]
     expected_hypothesis = {
         "feature": FEATURE,
