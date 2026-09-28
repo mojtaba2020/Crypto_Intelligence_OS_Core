@@ -85,7 +85,8 @@ def test_rejects_candidate_drift():
 
 def test_v3_uses_seven_origin_blocks_and_holm_familywise_gate():
     report = judge(_payload())
-    assert report["status"] == "HOURLY_CHAMPION_CHALLENGER_RESEARCH_V3"\n    assert report["bootstrap_block_length_origins"] == 7
+    assert report["status"] == "HOURLY_CHAMPION_CHALLENGER_RESEARCH_V3"
+    assert report["bootstrap_block_length_origins"] == 7
     assert report["multiple_comparison_method"] == "holm_bonferroni_5_horizons"
     assert report["familywise_alpha"] == 0.05
     assert all(row["statistical_gate"]["block_length"] == 7 for row in report["results"])
@@ -107,7 +108,8 @@ def test_familywise_gate_is_fail_closed_after_first_holm_failure(monkeypatch):
             "paired_samples": 50,
             "mean_loss_improvement": 0.01,
             "ci_95": [0.001, 0.02],
-            "bootstrap_probability_improvement_positive": next(probabilities),\n            "one_sided_null_centered_p_value": 0.001,
+            "bootstrap_probability_improvement_positive": next(probabilities),
+            "one_sided_null_centered_p_value": 0.001,
             "block_length": kwargs["block_length"],
             "repetitions": kwargs["repetitions"],
             "gate": "PASS",
