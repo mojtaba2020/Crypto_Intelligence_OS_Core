@@ -15,6 +15,8 @@ import urllib.request
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from hourly_live_inference import predict as predict_hourly_model
+
 DAILY_HORIZONS = (1, 2, 3, 7, 14, 21, 30, 90, 180, 365)
 HOURLY_HORIZONS = (1, 2, 3, 4, 12)
 API = "https://api.exchange.coinbase.com"
@@ -110,7 +112,8 @@ def run(selection_report: Path, now: datetime | None = None, hourly_registry: Pa
         if model == "persistence":
             value = spot
         else:
-            raise ValueError("Authorized hourly champion lacks a live inference adapter: " + model)
+            closed = [hourly[t] for t in sorted(hourly)]
+            value = predict_hourly_model(model, closed, horizon)
         forecasts.append(
             {
                 "timeframe": f"{horizon}h",
