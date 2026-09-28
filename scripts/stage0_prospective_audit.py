@@ -10,7 +10,10 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-from paired_block_bootstrap import paired_block_bootstrap
+try:
+    from .paired_block_bootstrap import paired_block_bootstrap
+except ImportError:
+    from paired_block_bootstrap import paired_block_bootstrap
 
 
 def audit(forecasts: list[dict], scores: list[dict], min_resolved: int = 100) -> dict:
