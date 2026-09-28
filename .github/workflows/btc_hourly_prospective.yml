@@ -6,6 +6,9 @@ on:
     paths:
       - ".github/workflows/btc_hourly_prospective.yml"
       - "scripts/btc_hourly_prospective.py"
+      - "scripts/stage0_prospective_audit.py"
+      - "scripts/paired_block_bootstrap.py"
+      - "scripts/build_hourly_model_registry.py"
   workflow_dispatch:
   schedule:
     - cron: "9 * * * *"
@@ -34,6 +37,9 @@ jobs:
         run: python scripts/btc_hourly_prospective.py --ledger research/hourly_forecasts.jsonl --scores-ledger research/hourly_scores.jsonl --report .research/hourly_report.json
       - name: Audit resolved prospective forecasts
         run: python scripts/stage0_prospective_audit.py --forecasts research/hourly_forecasts.jsonl --scores research/hourly_scores.jsonl --report .research/prospective_audit.json
+      - name: Build fail-closed model registry when historical judge exists
+        if: hashFiles('research/hourly_champion_challenger.json') != ''
+        run: python scripts/build_hourly_model_registry.py --judge research/hourly_champion_challenger.json --prospective .research/prospective_audit.json --output .research/hourly_model_registry.json
       - name: Validate generated ledger
         run: |
           python -c 'import json,pathlib; p=pathlib.Path("research/hourly_forecasts.jsonl"); rows=[json.loads(x) for x in p.read_text().splitlines() if x.strip()]; assert len(rows)>=4; assert all(x["forecast_usd"]>0 for x in rows[-4:]); print("Validated hourly ledger",len(rows))'
@@ -58,3 +64,4 @@ jobs:
           path: |
             .research/hourly_report.json
             .research/prospective_audit.json
+            .research/hourly_model_registry.json
