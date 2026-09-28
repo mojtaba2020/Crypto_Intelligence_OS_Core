@@ -8,6 +8,9 @@ on:
       - "scripts/train_hourly_extra_trees_tournament.py"
       - "scripts/train_hourly_boosting_tournament.py"
       - "scripts/hourly_momentum_diagnostic.py"
+      - "scripts/generate_hourly_champion_losses.py"
+      - "scripts/hourly_champion_challenger.py"
+      - "scripts/paired_block_bootstrap.py"
       - "scripts/hourly_features_v2.py"
       - "scripts/validate_hourly_features_v2.py"
       - "scripts/compare_hourly_features_v2.py"
@@ -85,6 +88,12 @@ jobs:
       - name: Train and walk-forward test Gradient Boosting
         run: |
           python scripts/train_hourly_boosting_tournament.py --input research/hourly_closes_training.json --output research/hourly_boosting_tournament.json
+      - name: Generate point-in-time losses for Champion/Challenger judge
+        run: |
+          python scripts/generate_hourly_champion_losses.py --input research/hourly_closes_training.json --output research/hourly_champion_losses.json
+      - name: Run fail-closed Champion/Challenger judge
+        run: |
+          python scripts/hourly_champion_challenger.py --input research/hourly_champion_losses.json --output research/hourly_champion_challenger.json
       - name: Print tournament reports
         run: |
           cat research/hourly_ridge_tournament.json
@@ -102,3 +111,5 @@ jobs:
             research/hourly_features_v2_ab.json
             research/hourly_features_v2_ablation.json
             research/hourly_candle_feature_attribution.json
+            research/hourly_champion_losses.json
+            research/hourly_champion_challenger.json
