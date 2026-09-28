@@ -1,0 +1,36 @@
+name: One-off Ruff Format
+
+on:
+  push:
+    branches:
+      - research/hourly-statistical-judge-v3
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: research/hourly-statistical-judge-v3
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Install Ruff
+        run: python -m pip install 'ruff>=0.16.7,<1'
+      - name: Format repository
+        run: ruff format .
+      - name: Commit formatting only
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- '*.py'
+          git commit -m "Apply Ruff formatting"
+          git push origin HEAD:research/hourly-statistical-judge-v3
