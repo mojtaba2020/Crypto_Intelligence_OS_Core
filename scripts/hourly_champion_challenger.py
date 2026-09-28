@@ -11,6 +11,7 @@ import argparse
 import json
 import math
 import statistics
+from datetime import UTC, datetime
 from pathlib import Path
 
 from paired_block_bootstrap import paired_block_bootstrap
@@ -118,7 +119,8 @@ def judge(payload: dict) -> dict:
         reject = holm_still_rejecting and p_value <= threshold
         if not reject:
             holm_still_rejecting = False
-        gate["one_sided_bootstrap_p_value"] = p_value\n        gate["p_value_method"] = "null_centered_paired_moving_block_bootstrap"
+        gate["one_sided_bootstrap_p_value"] = p_value
+        gate["p_value_method"] = "null_centered_paired_moving_block_bootstrap"
         gate["holm_rank"] = rank
         gate["holm_threshold"] = threshold
         gate["holm_reject"] = reject
@@ -131,7 +133,11 @@ def judge(payload: dict) -> dict:
         )
 
     return {
-        "status": "HOURLY_CHAMPION_CHALLENGER_RESEARCH_V3",\n        "generated_at_utc": datetime.now(UTC).isoformat(),\n        "provenance": payload.get("provenance", {}),\n        "validation_end_origin": payload["validation_end_origin"],\n        "locked_test_start_origin": payload["locked_test_start_origin"],
+        "status": "HOURLY_CHAMPION_CHALLENGER_RESEARCH_V3",
+        "generated_at_utc": datetime.now(UTC).isoformat(),
+        "provenance": payload.get("provenance", {}),
+        "validation_end_origin": payload["validation_end_origin"],
+        "locked_test_start_origin": payload["locked_test_start_origin"],
         "selection_rule": "lowest_validation_mape_then_name",
         "locked_test_used_for_selection": False,
         "automatic_production_promotion": False,
@@ -153,7 +159,8 @@ def main() -> None:
     report = judge(payload)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n",
+        json.dumps(report, indent=2, sort_keys=True) + "
+",
         encoding="utf-8",
     )
     print(json.dumps(report, indent=2, sort_keys=True))
