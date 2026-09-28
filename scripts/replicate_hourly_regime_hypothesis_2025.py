@@ -10,12 +10,6 @@ from datetime import UTC
 from pathlib import Path
 
 from calendar_regime_block_bootstrap import calendar_regime_block_bootstrap
-from crypto_intelligence_os.adapters.market_data.bitstamp import INSTRUMENT_ID, SOURCE_ID
-from crypto_intelligence_os.adapters.market_data.historical_archive import (
-    HistoricalOHLCVArchive,
-    canonical_bar_fingerprint,
-    validate_hourly_continuity,
-)
 from confirm_hourly_regime_hypothesis import (
     BOOTSTRAP_METHOD,
     BOOTSTRAP_REPETITIONS,
@@ -35,6 +29,12 @@ from confirm_hourly_regime_hypothesis import (
     _evaluate_preregistered_feature,
     _parse_utc,
     _validate_locked_preregistration,
+)
+from crypto_intelligence_os.adapters.market_data.bitstamp import INSTRUMENT_ID, SOURCE_ID
+from crypto_intelligence_os.adapters.market_data.historical_archive import (
+    HistoricalOHLCVArchive,
+    canonical_bar_fingerprint,
+    validate_hourly_continuity,
 )
 from hourly_regime_v1 import classify_regime
 
