@@ -7,8 +7,11 @@ one challenger has been selected for each horizon.
 
 from __future__ import annotations
 
+import argparse
+import json
 import math
 import statistics
+from pathlib import Path
 
 from paired_block_bootstrap import paired_block_bootstrap
 
@@ -111,3 +114,22 @@ def judge(payload: dict) -> dict:
         "bootstrap_seed": BOOTSTRAP_SEED,
         "results": results,
     }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    payload = json.loads(args.input.read_text(encoding="utf-8"))
+    report = judge(payload)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    print(json.dumps(report, indent=2, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()
