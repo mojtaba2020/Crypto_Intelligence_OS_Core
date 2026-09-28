@@ -9,7 +9,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-import backfill_bitstamp_hourly as backfill
+try:
+    from . import backfill_bitstamp_hourly as backfill
+except ImportError:  # pragma: no cover - direct script execution
+    import backfill_bitstamp_hourly as backfill
 import confirm_hourly_regime_hypothesis as confirm
 
 START = backfill.utc_date("2023-01-01T00:00:00+00:00")
