@@ -81,3 +81,56 @@ def test_rejects_candidate_drift():
     payload["candidates"] = ["ridge", "boosting"]
     with pytest.raises(ValueError, match="locked candidate set"):
         judge(payload)
+
+
+def test_v2_uses_seven_origin_blocks_and_holm_familywise_gate():
+    report = judge(_payload())
+    assert report["bootstrap_block_length_origins"] == 7
+    assert report["multiple_comparison_method"] == "holm_bonferroni_5_horizons"
+    assert report["familywise_alpha"] == 0.05
+    assert all(row["statistical_gate"]["block_length"] == 7 for row in report["results"])
+    ordered = sorted(
+        report["results"],
+        key=lambda row: row["statistical_gate"]["holm_rank"],
+    )
+    assert [row["statistical_gate"]["holm_rank"] for row in ordered] == [1, 2, 3, 4, 5]
+    assert [row["statistical_gate"]["holm_threshold"] for row in ordered] == pytest.approx(
+        [0.01, 0.0125, 0.05 / 3, 0.025, 0.05]
+    )
+
+
+def test_familywise_gate_is_fail_closed_after_first_holm_failure(monkeypatch):
+    probabilities = iter([0.995, 0.98, 0.999, 0.999, 0.999])
+
+    def fake_bootstrap(*args, **kwargs):
+        return {
+            "paired_samples": 50,
+            "mean_loss_improvement": 0.01,
+            "ci_95": [0.001, 0.02],
+            "bootstrap_probability_improvement_positive": next(probabilities),
+            "block_length": kwargs["block_length"],
+            "repetitions": kwargs["repetitions"],
+            "gate": "PASS",
+        }
+
+    monkeypatch.setattr(
+        "scripts.hourly_champion_challenger.paired_block_bootstrap",
+        fake_bootstrap,
+    )
+    report = judge(_payload())
+    by_horizon = {row["horizon_hours"]: row for row in report["results"]}
+    # Holm ordering is by p-value, not horizon. Once a sorted hypothesis fails,
+    # all later hypotheses must remain rejected=False even with smaller-looking
+    # unadjusted thresholds downstream.
+    ordered = sorted(
+        report["results"],
+        key=lambda row: row["statistical_gate"]["holm_rank"],
+    )
+    seen_failure = False
+    for row in ordered:
+        rejected = row["statistical_gate"]["holm_reject"]
+        if seen_failure:
+            assert rejected is False
+        if not rejected:
+            seen_failure = True
+    assert all(row["production_promotion"] is False for row in by_horizon.values())
