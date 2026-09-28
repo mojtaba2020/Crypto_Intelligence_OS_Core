@@ -72,13 +72,35 @@ def main() -> None:
             row["decision"] = "INSUFFICIENT_SAMPLES"
         rows.append(row)
 
+    eligible = [row for row in rows if row.get("statistical_gate")]
+    ordered = sorted(eligible, key=lambda row: (row["statistical_gate"]["one_sided_null_centered_p_value"], row["regime"]))
+    holm_open = True
+    for rank, row in enumerate(ordered, start=1):
+        gate = row["statistical_gate"]
+        p_value = gate["one_sided_null_centered_p_value"]
+        threshold = 0.05 / (len(ordered) - rank + 1)
+        reject = holm_open and p_value <= threshold
+        if not reject:
+            holm_open = False
+        gate["holm_rank"] = rank
+        gate["holm_threshold"] = threshold
+        gate["holm_reject"] = reject
+        row["decision"] = (
+            "EXPLORATORY_PASS_REQUIRES_INDEPENDENT_CONFIRMATION"
+            if reject and gate["gate"] == "PASS"
+            else "FAIL"
+        )
+
     result = {
-        "status": "HOURLY_REGIME_GATE_V2",
+        "status": "HOURLY_REGIME_GATE_V3",
         "regime_definition": "24h trend band x trailing point-in-time 24h volatility median",
         "research_status": "EXPLORATORY",
-        "bootstrap": "calendar_preserving_moving_block",
+        "bootstrap": "null_centered_calendar_preserving_moving_block",
+        "multiple_comparison_method": "holm_bonferroni_over_observed_regimes",
+        "familywise_alpha": 0.05,
+        "automatic_promotion": False,
         "confirmation_requirements": [
-            "multiplicity control across tested regimes",
+            "independent confirmation after Holm-controlled exploratory discovery",
             "independent time period or independent exchange",
             "predeclared confirmatory hypothesis",
         ],
