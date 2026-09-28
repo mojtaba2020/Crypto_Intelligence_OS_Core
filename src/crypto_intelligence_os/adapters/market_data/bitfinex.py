@@ -16,7 +16,7 @@ INSTRUMENT_ID = "market:bitfinex:spot:btc-usd"
 HEADERS = {"User-Agent": "Crypto-Intelligence-OS/1.0", "Accept": "application/json"}
 
 
-def parse_hourly(payload: list, *, ingested_at: datetime) -> tuple[OHLCVBar, ...]:
+def parse_hourly(payload: list[list[object]], *, ingested_at: datetime) -> tuple[OHLCVBar, ...]:
     bars = []
     for row in payload:
         if len(row) < 6:
