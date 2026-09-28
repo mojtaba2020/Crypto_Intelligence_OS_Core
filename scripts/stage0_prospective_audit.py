@@ -10,6 +10,8 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+from paired_block_bootstrap import paired_block_bootstrap
+
 
 def audit(forecasts: list[dict], scores: list[dict], min_resolved: int = 100) -> dict:
     issued = {}
@@ -72,15 +74,48 @@ def audit(forecasts: list[dict], scores: list[dict], min_resolved: int = 100) ->
                 "persistence_mae_usd": baseline,
                 "improvement_pct": 100 * (baseline - model) / baseline if baseline else None,
                 "sample_threshold_met": distinct_targets >= min_resolved,
+                "statistical_gate": (
+                    paired_block_bootstrap(
+                        [r[1] for r in rows],
+                        [r[2] for r in rows],
+                        block_length=min(7, len(rows)),
+                    )
+                    if distinct_targets >= max(min_resolved, 40)
+                    else None
+                ),
                 "status": "RESEARCH_ONLY_NO_AUTOMATIC_PROMOTION",
             }
         )
+    eligible = [row for row in results if row["statistical_gate"] is not None]
+    ordered = sorted(eligible, key=lambda row: (
+        row["statistical_gate"]["one_sided_null_centered_p_value"],
+        row["horizon_hours"],
+    ))
+    holm_open = True
+    for rank, row in enumerate(ordered, start=1):
+        gate = row["statistical_gate"]
+        threshold = 0.05 / (len(ordered) - rank + 1)
+        reject = holm_open and gate["one_sided_null_centered_p_value"] <= threshold
+        if not reject:
+            holm_open = False
+        gate["holm_rank"] = rank
+        gate["holm_threshold"] = threshold
+        gate["holm_reject"] = reject
+        row["prospective_evidence"] = (
+            "STATISTICALLY_CONFIRMED_RESEARCH_EDGE"
+            if reject and gate["gate"] == "PASS" and row["improvement_pct"] > 0
+            else "NO_CONFIRMED_EDGE"
+        )
+
     return {
         "forecast_rows": len(forecasts),
         "scored_rows": len(scores),
         "min_distinct_targets": min_resolved,
         "results": results,
-        "status": "RESEARCH_ONLY_NO_AUTOMATIC_PROMOTION",
+        "multiple_comparison_method": "holm_bonferroni_over_eligible_horizons",
+        "familywise_alpha": 0.05,
+        "automatic_promotion": False,
+        "status": "PROSPECTIVE_STATISTICAL_AUDIT_V2_RESEARCH_ONLY",
     }
 
 
