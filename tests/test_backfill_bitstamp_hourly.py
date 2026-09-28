@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+
 import scripts.backfill_bitstamp_hourly as backfill
 from crypto_intelligence_os.adapters.market_data.bitstamp import (
     INSTRUMENT_ID,
