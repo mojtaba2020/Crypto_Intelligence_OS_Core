@@ -71,7 +71,7 @@ def forecast(
     return max(0.01, current + 0.25 * horizon * (origin_close - previous) / lookback)
 
 
-def run(selection_report: Path, now: datetime | None = None) -> dict:
+def run(selection_report: Path, now: datetime | None = None, hourly_registry: Path | None = None) -> dict:
     now = now or datetime.now(UTC)
     if now.tzinfo is None:
         raise ValueError("Time must be timezone-aware")
@@ -93,12 +93,24 @@ def run(selection_report: Path, now: datetime | None = None) -> dict:
     hourly = candles(3600, now)
     daily_origin = int(now.timestamp()) // 86400 * 86400 - 86400
     hourly_origin = int(now.timestamp()) // 3600 * 3600 - 3600
+    registry = None
+    if hourly_registry is not None:
+        registry = json.loads(hourly_registry.read_text(encoding="utf-8"))
+        if registry.get("status") != "HOURLY_MODEL_REGISTRY_V1":
+            raise ValueError("Invalid hourly model registry")
+        registry = {int(r["horizon_hours"]): r for r in registry["entries"]}
+        if set(registry) != set(HOURLY_HORIZONS):
+            raise ValueError("Hourly registry must cover locked horizons")
     forecasts = []
     for horizon in HOURLY_HORIZONS:
-        # A simple horizon-dependent hourly momentum candidate; NOT a trained or validated AI model.
-        # Use the last 24 fully closed hourly candles; never peek into the forming candle.
-        hourly_change = hourly[hourly_origin] - hourly[hourly_origin - 23 * 3600]
-        value = max(0.01, spot + 0.25 * horizon * hourly_change / 24)
+        registry_row = registry[horizon] if registry else None
+        authorized = bool(registry_row and registry_row.get("live_authorized"))
+        model = registry_row["champion"] if authorized else "persistence"
+        # Fail closed: unsupported/unauthorized hourly champions never reach live output.
+        if model == "persistence":
+            value = spot
+        else:
+            raise ValueError("Authorized hourly champion lacks a live inference adapter: " + model)
         forecasts.append(
             {
                 "timeframe": f"{horizon}h",
@@ -106,8 +118,8 @@ def run(selection_report: Path, now: datetime | None = None) -> dict:
                 "target_utc": (now + timedelta(hours=horizon)).isoformat(),
                 "predicted_price_usd": round(value, 2),
                 "change_pct": round(100 * (value / spot - 1), 4),
-                "model": "hourly_momentum_24h_quarter_UNVALIDATED",
-                "evidence": "UNVALIDATED_HOURLY_MOMENTUM_CANDIDATE",
+                "model": model,
+                "evidence": "REGISTRY_AUTHORIZED" if authorized else "FAIL_CLOSED_PERSISTENCE",
             }
         )
     for horizon in DAILY_HORIZONS:
@@ -138,8 +150,7 @@ def run(selection_report: Path, now: datetime | None = None) -> dict:
         "spot_price_usd": round(spot, 2),
         "forecasts": forecasts,
         "warning": (
-            "Hourly values use an unvalidated 24-hour momentum candidate, not trained AI; "
-            "daily historical selection does not establish future accuracy."
+            "Hourly forecasts fail closed to persistence unless the model registry records both historical and prospective confirmation; daily historical selection does not establish future accuracy."
         ),
     }
 
@@ -148,8 +159,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--selection-report", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--hourly-registry", type=Path)
     args = parser.parse_args()
-    result = run(args.selection_report)
+    result = run(args.selection_report, hourly_registry=args.hourly_registry)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2, sort_keys=True))
