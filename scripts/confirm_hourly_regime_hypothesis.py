@@ -21,6 +21,7 @@ from crypto_intelligence_os.adapters.market_data.historical_archive import (
     canonical_bar_fingerprint,
     validate_hourly_continuity,
 )
+
 try:
     from .hourly_features_v2 import feature_names, feature_vector
     from .hourly_regime_v1 import classify_regime
