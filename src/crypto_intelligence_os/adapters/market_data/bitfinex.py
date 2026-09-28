@@ -53,7 +53,7 @@ def fetch_hourly(
             "sort": 1,
         }
     )
-    request = urllib.request.Request(API + "?" + query, headers=HEADERS)
+    request = urllib.request.Request(API + "?" + query, headers=HEADERS)  # noqa: S310
     with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
         payload = json.load(response)
     if not isinstance(payload, list):
