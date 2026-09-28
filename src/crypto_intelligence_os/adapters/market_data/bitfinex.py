@@ -7,7 +7,6 @@ import urllib.parse
 import urllib.request
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import TypeAlias
 
 from crypto_intelligence_os.market_data import BarStatus, OHLCVBar, Timeframe
 
@@ -15,8 +14,8 @@ API = "https://api-pub.bitfinex.com/v2/candles/trade:1h:tBTCUSD/hist"
 SOURCE_ID = "source:bitfinex.public"
 INSTRUMENT_ID = "market:bitfinex:spot:btc-usd"
 HEADERS = {"User-Agent": "Crypto-Intelligence-OS/1.0", "Accept": "application/json"}
-BitfinexScalar: TypeAlias = int | float | str
-BitfinexCandle: TypeAlias = list[BitfinexScalar]
+type BitfinexScalar = int | float | str
+type BitfinexCandle = list[BitfinexScalar]
 
 
 def parse_hourly(payload: list[BitfinexCandle], *, ingested_at: datetime) -> tuple[OHLCVBar, ...]:
