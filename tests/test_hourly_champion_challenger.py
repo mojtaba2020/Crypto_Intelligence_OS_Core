@@ -83,9 +83,9 @@ def test_rejects_candidate_drift():
         judge(payload)
 
 
-def test_v2_uses_seven_origin_blocks_and_holm_familywise_gate():
+def test_v3_uses_seven_origin_blocks_and_holm_familywise_gate():
     report = judge(_payload())
-    assert report["bootstrap_block_length_origins"] == 7
+    assert report["status"] == "HOURLY_CHAMPION_CHALLENGER_RESEARCH_V3"\n    assert report["bootstrap_block_length_origins"] == 7
     assert report["multiple_comparison_method"] == "holm_bonferroni_5_horizons"
     assert report["familywise_alpha"] == 0.05
     assert all(row["statistical_gate"]["block_length"] == 7 for row in report["results"])
@@ -107,7 +107,7 @@ def test_familywise_gate_is_fail_closed_after_first_holm_failure(monkeypatch):
             "paired_samples": 50,
             "mean_loss_improvement": 0.01,
             "ci_95": [0.001, 0.02],
-            "bootstrap_probability_improvement_positive": next(probabilities),
+            "bootstrap_probability_improvement_positive": next(probabilities),\n            "one_sided_null_centered_p_value": 0.001,
             "block_length": kwargs["block_length"],
             "repetitions": kwargs["repetitions"],
             "gate": "PASS",
@@ -134,3 +134,30 @@ def test_familywise_gate_is_fail_closed_after_first_holm_failure(monkeypatch):
         if not rejected:
             seen_failure = True
     assert all(row["production_promotion"] is False for row in by_horizon.values())
+
+
+def test_v3_uses_null_centered_p_values_for_holm(monkeypatch):
+    pvalues = iter([0.001, 0.02, 0.03, 0.04, 0.05])
+
+    def fake_bootstrap(*args, **kwargs):
+        p = next(pvalues)
+        return {
+            "paired_samples": 50,
+            "mean_loss_improvement": 0.01,
+            "ci_95": [0.001, 0.02],
+            "bootstrap_probability_improvement_positive": 0.999,
+            "one_sided_null_centered_p_value": p,
+            "block_length": kwargs["block_length"],
+            "repetitions": kwargs["repetitions"],
+            "gate": "PASS",
+        }
+
+    monkeypatch.setattr(
+        "scripts.hourly_champion_challenger.paired_block_bootstrap",
+        fake_bootstrap,
+    )
+    report = judge(_payload())
+    ordered = sorted(report["results"], key=lambda r: r["statistical_gate"]["holm_rank"])
+    assert ordered[0]["statistical_gate"]["holm_reject"] is True
+    assert all(r["statistical_gate"]["p_value_method"] == "null_centered_paired_moving_block_bootstrap" for r in ordered)
+    assert all(r["production_promotion"] is False for r in ordered)
