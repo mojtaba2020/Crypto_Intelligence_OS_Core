@@ -1,0 +1,72 @@
+name: BTC Hourly Independent Replication
+
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: UTC start, hour aligned
+        required: true
+        default: "2025-01-01T00:00:00+00:00"
+      end:
+        description: UTC end, hour aligned
+        required: true
+        default: "2026-01-01T00:00:00+00:00"
+      model:
+        description: Locked challenger family
+        required: true
+        type: choice
+        options: [ridge, extra_trees, boosting]
+        default: ridge
+  pull_request:
+    paths:
+      - ".github/workflows/btc-hourly-independent-replication.yml"
+      - "scripts/backfill_bitstamp_hourly.py"
+      - "scripts/backfill_bitfinex_hourly.py"
+      - "scripts/evaluate_independent_hourly_replication.py"
+      - "scripts/hourly_live_inference.py"
+      - "src/crypto_intelligence_os/adapters/market_data/bitfinex.py"
+      - "tests/test_independent_hourly_replication.py"
+      - "tests/test_bitfinex_adapter.py"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - run: python -m pip install -e . pytest
+      - run: pytest -q tests/test_bitfinex_adapter.py tests/test_independent_hourly_replication.py tests/test_forecast_btc_live.py tests/test_stage0_prospective_audit.py tests/test_hourly_model_registry.py
+
+  replicate:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - run: python -m pip install -e .
+      - name: Backfill Bitstamp
+        run: python scripts/backfill_bitstamp_hourly.py --start "${{ inputs.start }}" --end "${{ inputs.end }}" --database .research/bitstamp.sqlite --report .research/bitstamp_provenance.json
+      - name: Backfill Bitfinex
+        run: python scripts/backfill_bitfinex_hourly.py --start "${{ inputs.start }}" --end "${{ inputs.end }}" --database .research/bitfinex.sqlite --report .research/bitfinex_provenance.json
+      - name: Replicate Bitstamp
+        run: python scripts/evaluate_independent_hourly_replication.py --database .research/bitstamp.sqlite --source source:bitstamp.public --instrument market:bitstamp:spot:btc-usd --model "${{ inputs.model }}" --output .research/bitstamp_replication.json
+      - name: Replicate Bitfinex
+        run: python scripts/evaluate_independent_hourly_replication.py --database .research/bitfinex.sqlite --source source:bitfinex.public --instrument market:bitfinex:spot:btc-usd --model "${{ inputs.model }}" --output .research/bitfinex_replication.json
+      - name: Record run provenance
+        run: |
+          python - <<'PY'
+          import json,os,pathlib
+          p=pathlib.Path(".research/run_provenance.json")
+          p.write_text(json.dumps({"commit_sha":os.environ["GITHUB_SHA"],"workflow_run_id":os.environ["GITHUB_RUN_ID"],"model":"${{ inputs.model }}","start":"${{ inputs.start }}","end":"${{ inputs.end }}"},indent=2)+"\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: independent-hourly-replication
+          path: .research/*.json
