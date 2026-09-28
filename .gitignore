@@ -16,3 +16,22 @@ htmlcov/
 .DS_Store
 .idea/
 .vscode/
+
+# Secrets and private credentials
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+credentials.json
+secrets.json
+.env.local
+.env.production
+.env.development
+
+# Local research artifacts / databases
+artifacts/
+*.sqlite
+*.sqlite3
+*.db
