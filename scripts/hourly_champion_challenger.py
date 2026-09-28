@@ -106,19 +106,19 @@ def judge(payload: dict) -> dict:
     ordered = sorted(
         eligible,
         key=lambda r: (
-            1.0 - r["statistical_gate"]["bootstrap_probability_improvement_positive"],
+            r["statistical_gate"]["one_sided_null_centered_p_value"],
             r["horizon_hours"],
         ),
     )
     holm_still_rejecting = True
     for rank, row in enumerate(ordered, start=1):
         gate = row["statistical_gate"]
-        p_value = 1.0 - gate["bootstrap_probability_improvement_positive"]
+        p_value = gate["one_sided_null_centered_p_value"]
         threshold = FAMILYWISE_ALPHA / (len(ordered) - rank + 1)
         reject = holm_still_rejecting and p_value <= threshold
         if not reject:
             holm_still_rejecting = False
-        gate["one_sided_bootstrap_p_value"] = p_value
+        gate["one_sided_bootstrap_p_value"] = p_value\n        gate["p_value_method"] = "null_centered_paired_moving_block_bootstrap"
         gate["holm_rank"] = rank
         gate["holm_threshold"] = threshold
         gate["holm_reject"] = reject
@@ -131,7 +131,7 @@ def judge(payload: dict) -> dict:
         )
 
     return {
-        "status": "HOURLY_CHAMPION_CHALLENGER_RESEARCH_V2",
+        "status": "HOURLY_CHAMPION_CHALLENGER_RESEARCH_V3",\n        "generated_at_utc": datetime.now(UTC).isoformat(),\n        "provenance": payload.get("provenance", {}),\n        "validation_end_origin": payload["validation_end_origin"],\n        "locked_test_start_origin": payload["locked_test_start_origin"],
         "selection_rule": "lowest_validation_mape_then_name",
         "locked_test_used_for_selection": False,
         "automatic_production_promotion": False,
