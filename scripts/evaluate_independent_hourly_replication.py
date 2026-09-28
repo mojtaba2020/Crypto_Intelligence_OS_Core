@@ -3,8 +3,12 @@
 from __future__ import annotations
 import argparse,json,math
 from pathlib import Path
-from paired_block_bootstrap import paired_block_bootstrap
-from hourly_live_inference import predict
+try:
+    from .paired_block_bootstrap import paired_block_bootstrap
+    from .hourly_live_inference import predict
+except ImportError:
+    from paired_block_bootstrap import paired_block_bootstrap
+    from hourly_live_inference import predict
 from crypto_intelligence_os.adapters.market_data.historical_archive import HistoricalOHLCVArchive,validate_hourly_continuity
 
 HORIZONS=(1,2,3,4,12)
