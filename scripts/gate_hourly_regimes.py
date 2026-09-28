@@ -73,7 +73,13 @@ def main() -> None:
         rows.append(row)
 
     eligible = [row for row in rows if row.get("statistical_gate")]
-    ordered = sorted(eligible, key=lambda row: (row["statistical_gate"]["one_sided_null_centered_p_value"], row["regime"]))
+    ordered = sorted(
+        eligible,
+        key=lambda row: (
+            row["statistical_gate"]["one_sided_null_centered_p_value"],
+            row["regime"],
+        ),
+    )
     holm_open = True
     for rank, row in enumerate(ordered, start=1):
         gate = row["statistical_gate"]
@@ -93,7 +99,7 @@ def main() -> None:
 
     result = {
         "status": "HOURLY_REGIME_GATE_V3",
-        "regime_definition": "24h trend band x trailing point-in-time 24h volatility median",
+        "regime_definition": (\n            "24h trend band x trailing point-in-time 24h volatility median"\n        ),
         "research_status": "EXPLORATORY",
         "bootstrap": "null_centered_calendar_preserving_moving_block",
         "multiple_comparison_method": "holm_bonferroni_over_observed_regimes",
