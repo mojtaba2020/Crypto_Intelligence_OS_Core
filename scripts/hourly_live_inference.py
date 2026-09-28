@@ -2,9 +2,14 @@
 """Deterministic live inference adapters matching locked hourly tournament families."""
 from __future__ import annotations
 import math
-from train_hourly_ridge_tournament import _features as ridge_features, _ridge_fit
-from train_hourly_extra_trees_tournament import _features as tree_features, _forest_predict
-from train_hourly_boosting_tournament import _features as boost_features, _boost_predict
+try:
+    from .train_hourly_ridge_tournament import _features as ridge_features, _ridge_fit
+    from .train_hourly_extra_trees_tournament import _features as tree_features, _forest_predict
+    from .train_hourly_boosting_tournament import _features as boost_features, _boost_predict
+except ImportError:
+    from train_hourly_ridge_tournament import _features as ridge_features, _ridge_fit
+    from train_hourly_extra_trees_tournament import _features as tree_features, _forest_predict
+    from train_hourly_boosting_tournament import _features as boost_features, _boost_predict
 
 SUPPORTED=("ridge","extra_trees","boosting")
 
