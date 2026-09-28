@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Backfill validated Bitfinex BTC/USD hourly history into the immutable research archive."""
+
 from __future__ import annotations
 
 import argparse
@@ -44,9 +45,7 @@ def run(*, start: datetime, end: datetime, database: Path, report_path: Path) ->
         or bars[0].open_time != start
         or bars[-1].open_time != end - timedelta(hours=1)
     ):
-        raise ValueError(
-            f"Bitfinex backfill incomplete: expected={expected} fetched={len(bars)}"
-        )
+        raise ValueError(f"Bitfinex backfill incomplete: expected={expected} fetched={len(bars)}")
     with HistoricalOHLCVArchive(database) as archive:
         inserted = archive.persist(bars)
         stored = archive.read(

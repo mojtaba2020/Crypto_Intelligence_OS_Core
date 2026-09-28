@@ -113,10 +113,7 @@ def test_hourly_registry_rejects_unknown_live_adapter(tmp_path: Path) -> None:
             return {"price": "100000", "time": now.isoformat()}
         granularity = 86400 if "granularity=86400" in path else 3600
         end = int(now.timestamp()) // granularity * granularity
-        return [
-            [end - index * granularity, 1, 1, 1, 100000 - index, 1]
-            for index in range(1, 201)
-        ]
+        return [[end - index * granularity, 1, 1, 1, 100000 - index, 1] for index in range(1, 201)]
 
     with patch.object(live, "fetch_json", side_effect=market):
         with pytest.raises(ValueError, match="Unsupported hourly model"):

@@ -43,9 +43,7 @@ def _evaluate(
         current = closes[test_origin]
         actual = closes[test_origin + horizon]
         actual_return = math.log(actual / current)
-        predicted_return = sum(
-            weight * value for weight, value in zip(beta, test_x, strict=True)
-        )
+        predicted_return = sum(weight * value for weight, value in zip(beta, test_x, strict=True))
         predicted = current * math.exp(predicted_return)
         test_origins.append(test_origin)
         errors.append(abs(predicted - actual) / actual)

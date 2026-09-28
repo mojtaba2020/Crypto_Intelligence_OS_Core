@@ -1,4 +1,5 @@
 """Bitfinex public hourly BTC/USD adapter normalized to provider-neutral OHLCV."""
+
 from __future__ import annotations
 
 import json
@@ -42,9 +43,7 @@ def parse_hourly(payload: list, *, ingested_at: datetime) -> tuple[OHLCVBar, ...
     return tuple(sorted(bars, key=lambda bar: bar.open_time))
 
 
-def fetch_hourly(
-    *, start: datetime, end: datetime, limit: int = 10000
-) -> tuple[OHLCVBar, ...]:
+def fetch_hourly(*, start: datetime, end: datetime, limit: int = 10000) -> tuple[OHLCVBar, ...]:
     query = urllib.parse.urlencode(
         {
             "start": int(start.timestamp() * 1000),

@@ -90,10 +90,13 @@ def audit(forecasts: list[dict], scores: list[dict], min_resolved: int = 100) ->
             }
         )
     eligible = [row for row in results if row["statistical_gate"] is not None]
-    ordered = sorted(eligible, key=lambda row: (
-        row["statistical_gate"]["one_sided_null_centered_p_value"],
-        row["horizon_hours"],
-    ))
+    ordered = sorted(
+        eligible,
+        key=lambda row: (
+            row["statistical_gate"]["one_sided_null_centered_p_value"],
+            row["horizon_hours"],
+        ),
+    )
     holm_open = True
     for rank, row in enumerate(ordered, start=1):
         gate = row["statistical_gate"]

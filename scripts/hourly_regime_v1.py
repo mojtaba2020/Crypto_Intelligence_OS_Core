@@ -20,8 +20,7 @@ def classify_regime(candles: list[dict[str, float]], origin: int) -> str:
     hourly_returns = [math.log(closes[i] / closes[i - 1]) for i in range(1, len(closes))]
     vol_24h = statistics.pstdev(hourly_returns[-24:])
     historical_vol_24h = [
-        statistics.pstdev(hourly_returns[i - 24 : i])
-        for i in range(24, len(hourly_returns) + 1)
+        statistics.pstdev(hourly_returns[i - 24 : i]) for i in range(24, len(hourly_returns) + 1)
     ]
     median_vol = statistics.median(historical_vol_24h)
 

@@ -46,9 +46,7 @@ def run(output_dir: Path) -> dict:
         report_path=ingestion_report,
     )
     if ingestion["stored_count"] != EXPECTED_BARS:
-        raise RuntimeError(
-            f"Locked 2023 archive must contain exactly {EXPECTED_BARS} bars"
-        )
+        raise RuntimeError(f"Locked 2023 archive must contain exactly {EXPECTED_BARS} bars")
 
     result = confirm.run(
         database,

@@ -128,11 +128,7 @@ def run(
                 "predicted_price_usd": round(value, 2),
                 "change_pct": round(100 * (value / spot - 1), 4),
                 "model": model,
-                "evidence": (
-                    "REGISTRY_AUTHORIZED"
-                    if authorized
-                    else "FAIL_CLOSED_PERSISTENCE"
-                ),
+                "evidence": ("REGISTRY_AUTHORIZED" if authorized else "FAIL_CLOSED_PERSISTENCE"),
             }
         )
     for horizon in DAILY_HORIZONS:

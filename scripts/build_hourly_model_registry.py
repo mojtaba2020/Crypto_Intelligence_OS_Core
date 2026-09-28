@@ -24,15 +24,12 @@ def build(judge: dict, prospective: dict | None = None) -> dict:
     for horizon in HORIZONS:
         row = rows[horizon]
         challenger = row["selected_on_validation"]
-        historical_ok = (
-            row.get("decision") == "CHALLENGER_ELIGIBLE_FOR_FURTHER_VALIDATION"
-        )
+        historical_ok = row.get("decision") == "CHALLENGER_ELIGIBLE_FOR_FURTHER_VALIDATION"
         matching = [
             candidate
             for (_version, candidate_horizon), candidate in prospective_rows.items()
             if candidate_horizon == horizon
-            and candidate.get("prospective_evidence")
-            == "STATISTICALLY_CONFIRMED_RESEARCH_EDGE"
+            and candidate.get("prospective_evidence") == "STATISTICALLY_CONFIRMED_RESEARCH_EDGE"
         ]
         prospective_ok = bool(matching)
         champion = challenger if historical_ok and prospective_ok else "persistence"

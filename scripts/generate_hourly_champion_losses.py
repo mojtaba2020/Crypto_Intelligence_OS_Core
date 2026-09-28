@@ -80,9 +80,7 @@ def generate(closes: list[float]) -> dict:
                 {
                     "horizon_hours": horizon,
                     "origin": origin,
-                    "split": (
-                        "validation" if origin in validation_origins else "locked_test"
-                    ),
+                    "split": ("validation" if origin in validation_origins else "locked_test"),
                     "losses": losses,
                 }
             )

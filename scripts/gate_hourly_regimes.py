@@ -34,12 +34,8 @@ def main() -> None:
     rows = []
     for regime in sorted(set(regimes)):
         selected = [value == regime for value in regimes]
-        selected_model = [
-            loss for loss, keep in zip(model, selected, strict=True) if keep
-        ]
-        selected_baseline = [
-            loss for loss, keep in zip(baseline, selected, strict=True) if keep
-        ]
+        selected_model = [loss for loss, keep in zip(model, selected, strict=True) if keep]
+        selected_baseline = [loss for loss, keep in zip(baseline, selected, strict=True) if keep]
         n = len(selected_model)
         model_mape = 100 * statistics.mean(selected_model)
         baseline_mape = 100 * statistics.mean(selected_baseline)
@@ -49,9 +45,7 @@ def main() -> None:
             "model_mape_pct": model_mape,
             "persistence_mape_pct": baseline_mape,
             "mape_improvement_vs_persistence_pct": (
-                100 * (baseline_mape - model_mape) / baseline_mape
-                if baseline_mape
-                else 0.0
+                100 * (baseline_mape - model_mape) / baseline_mape if baseline_mape else 0.0
             ),
         }
         if n >= args.min_samples:
@@ -64,9 +58,7 @@ def main() -> None:
             raw_gate = row["statistical_gate"]["gate"]
             row["raw_gate"] = raw_gate
             row["decision"] = (
-                "EXPLORATORY_PASS_REQUIRES_CONFIRMATION"
-                if raw_gate == "PASS"
-                else "FAIL"
+                "EXPLORATORY_PASS_REQUIRES_CONFIRMATION" if raw_gate == "PASS" else "FAIL"
             )
         else:
             row["decision"] = "INSUFFICIENT_SAMPLES"
@@ -99,9 +91,7 @@ def main() -> None:
 
     result = {
         "status": "HOURLY_REGIME_GATE_V3",
-        "regime_definition": (
-            "24h trend band x trailing point-in-time 24h volatility median"
-        ),
+        "regime_definition": ("24h trend band x trailing point-in-time 24h volatility median"),
         "research_status": "EXPLORATORY",
         "bootstrap": "null_centered_calendar_preserving_moving_block",
         "multiple_comparison_method": "holm_bonferroni_over_observed_regimes",

@@ -29,11 +29,7 @@ def main() -> int:
     with BTCArchive(DB_PATH) as store:
         last_open = store.last_open_time()
         # First run: 90 complete days. Later runs: overlap by 2 days to detect revisions.
-        start = (
-            last_open - timedelta(days=2)
-            if last_open is not None
-            else end - timedelta(days=90)
-        )
+        start = last_open - timedelta(days=2) if last_open is not None else end - timedelta(days=90)
         if start >= end:
             raise ValueError("Stored last candle is in the future")
         bars = source.fetch_final_bars(

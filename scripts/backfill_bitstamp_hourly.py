@@ -45,9 +45,7 @@ def run(*, start: datetime, end: datetime, database: Path, report_path: Path) ->
             f"missing={len(missing_times)}"
         )
     if bars[0].open_time != start or bars[-1].open_time != end - timedelta(hours=1):
-        raise ValueError(
-            "Bitstamp backfill boundaries do not exactly match requested period"
-        )
+        raise ValueError("Bitstamp backfill boundaries do not exactly match requested period")
 
     with HistoricalOHLCVArchive(database) as archive:
         inserted = archive.persist(bars)

@@ -44,9 +44,7 @@ def _assert_locked_walk_forward_design() -> None:
     if TRAIN_MIN_HOURS != 720:
         raise ValueError("Confirmatory train minimum drifted from locked 720 hours")
     if STEP_HOURS != 24:
-        raise ValueError(
-            "Confirmatory cadence drifted from one observation per calendar day"
-        )
+        raise ValueError("Confirmatory cadence drifted from one observation per calendar day")
     if RIDGE_ALPHA != 1.0:
         raise ValueError("Confirmatory Ridge alpha drifted from locked value 1.0")
 
@@ -70,9 +68,7 @@ def _validate_locked_preregistration(prereg: dict) -> None:
     }
     for key, expected in expected_hypothesis.items():
         if hypothesis.get(key) != expected:
-            raise ValueError(
-                f"Preregistration {key} does not match locked runner"
-            )
+            raise ValueError(f"Preregistration {key} does not match locked runner")
 
     acceptance = prereg["acceptance_rule"]
     expected_acceptance = {
@@ -89,30 +85,19 @@ def _validate_locked_preregistration(prereg: dict) -> None:
     }
     for key, expected in expected_acceptance.items():
         if acceptance.get(key) != expected:
-            raise ValueError(
-                f"Preregistration acceptance rule {key} does not match "
-                "locked runner"
-            )
+            raise ValueError(f"Preregistration acceptance rule {key} does not match locked runner")
 
     exploratory = prereg["created_from_exploratory_dataset"]
     if exploratory.get("period") != EXPLORATORY_PERIOD:
-        raise ValueError(
-            "Exploratory period does not match locked 2024 dataset"
-        )
+        raise ValueError("Exploratory period does not match locked 2024 dataset")
 
     confirmatory = prereg["confirmatory_data"]
     if confirmatory.get("primary_period") != PRIMARY_PERIOD:
-        raise ValueError(
-            "Primary period does not match locked 2023 dataset"
-        )
+        raise ValueError("Primary period does not match locked 2023 dataset")
     if confirmatory.get("primary_source") != PRIMARY_SOURCE:
-        raise ValueError(
-            "Primary source does not match locked Bitstamp source"
-        )
+        raise ValueError("Primary source does not match locked Bitstamp source")
     if confirmatory.get("no_threshold_tuning_on_confirmatory_data") is not True:
-        raise ValueError(
-            "Preregistration must prohibit threshold tuning on confirmatory data"
-        )
+        raise ValueError("Preregistration must prohibit threshold tuning on confirmatory data")
 
 
 def _parse_utc(value: str) -> datetime:
@@ -137,10 +122,7 @@ def _assert_independent_period(
     exp_end_exclusive = exp_last_open + timedelta(hours=1)
     confirm_start = first_open.astimezone(UTC)
     confirm_end_exclusive = last_open.astimezone(UTC) + timedelta(hours=1)
-    overlaps = (
-        confirm_start < exp_end_exclusive
-        and confirm_end_exclusive > exp_start
-    )
+    overlaps = confirm_start < exp_end_exclusive and confirm_end_exclusive > exp_start
     if overlaps:
         raise ValueError(
             "Confirmatory archive overlaps the exploratory period; "
@@ -159,8 +141,7 @@ def _assert_exact_primary_period(
         or last_open.astimezone(UTC) != primary_last_open
     ):
         raise ValueError(
-            "Confirmatory archive must exactly match the preregistered "
-            "primary 2023 period"
+            "Confirmatory archive must exactly match the preregistered primary 2023 period"
         )
 
 
@@ -220,18 +201,10 @@ def _evaluate_preregistered_feature(
         raw_test = feature_cache[test_origin]
         mean = statistics.mean(raw_train)
         std = statistics.pstdev(raw_train)
-        scaled_train = [
-            (value - mean) / std if std else 0.0
-            for value in raw_train
-        ]
+        scaled_train = [(value - mean) / std if std else 0.0 for value in raw_train]
         scaled_test = (raw_test - mean) / std if std else 0.0
         xs = [[1.0, value] for value in scaled_train]
-        ys = [
-            math.log(
-                closes[origin + HORIZON_HOURS] / closes[origin]
-            )
-            for origin in train_origins
-        ]
+        ys = [math.log(closes[origin + HORIZON_HOURS] / closes[origin]) for origin in train_origins]
         beta = _ridge_fit(xs, ys, alpha=RIDGE_ALPHA)
         predicted_return = beta[0] + beta[1] * scaled_test
 
@@ -243,9 +216,7 @@ def _evaluate_preregistered_feature(
         test_origins.append(test_origin)
         model_losses.append(abs(predicted - actual) / actual)
         baseline_losses.append(abs(current - actual) / actual)
-        direction_hits.append(
-            int((predicted_return >= 0) == (actual_return >= 0))
-        )
+        direction_hits.append(int((predicted_return >= 0) == (actual_return >= 0)))
 
     return {
         "origins": test_origins,
@@ -291,9 +262,7 @@ def run(
         prereg["created_from_exploratory_dataset"]["period"],
     )
 
-    primary_start, primary_last_open = _period(
-        prereg["confirmatory_data"]["primary_period"]
-    )
+    primary_start, primary_last_open = _period(prereg["confirmatory_data"]["primary_period"])
     _assert_exact_primary_period(
         bars[0].open_time,
         bars[-1].open_time,
@@ -312,31 +281,16 @@ def run(
     ]
     paired = _evaluate_preregistered_feature(candles)
 
-    regimes = [
-        classify_regime(candles, int(origin))
-        for origin in paired["origins"]
-    ]
+    regimes = [classify_regime(candles, int(origin)) for origin in paired["origins"]]
     selected = [regime == target_regime for regime in regimes]
     selected_model = [
-        float(loss)
-        for loss, keep in zip(
-            paired["model_losses"], selected, strict=True
-        )
-        if keep
+        float(loss) for loss, keep in zip(paired["model_losses"], selected, strict=True) if keep
     ]
     selected_baseline = [
-        float(loss)
-        for loss, keep in zip(
-            paired["baseline_losses"], selected, strict=True
-        )
-        if keep
+        float(loss) for loss, keep in zip(paired["baseline_losses"], selected, strict=True) if keep
     ]
     selected_hits = [
-        int(hit)
-        for hit, keep in zip(
-            paired["direction_hits"], selected, strict=True
-        )
-        if keep
+        int(hit) for hit, keep in zip(paired["direction_hits"], selected, strict=True) if keep
     ]
 
     n = len(selected_model)
@@ -351,7 +305,8 @@ def run(
         "validated_bar_count": len(bars),
         "expected_primary_bar_count": int(
             (primary_last_open - primary_start).total_seconds() // 3600
-        ) + 1,
+        )
+        + 1,
         "first_open_utc": bars[0].open_time.isoformat(),
         "last_open_utc": bars[-1].open_time.isoformat(),
         "walk_forward_step_hours": STEP_HOURS,
@@ -384,12 +339,8 @@ def run(
             [float(x) for x in paired["model_losses"]],
             [float(x) for x in paired["baseline_losses"]],
             selected,
-            block_length=int(
-                prereg["acceptance_rule"]["calendar_block_length_days"]
-            ),
-            repetitions=int(
-                prereg["acceptance_rule"]["bootstrap_repetitions"]
-            ),
+            block_length=int(prereg["acceptance_rule"]["calendar_block_length_days"]),
+            repetitions=int(prereg["acceptance_rule"]["bootstrap_repetitions"]),
             seed=int(prereg["acceptance_rule"]["bootstrap_seed"]),
         )
         result.update(
@@ -397,9 +348,7 @@ def run(
                 "model_mape_pct": model_mape,
                 "persistence_mape_pct": baseline_mape,
                 "mape_improvement_vs_persistence_pct": (
-                    100 * (baseline_mape - model_mape) / baseline_mape
-                    if baseline_mape
-                    else 0.0
+                    100 * (baseline_mape - model_mape) / baseline_mape if baseline_mape else 0.0
                 ),
                 "direction_accuracy_pct": 100 * sum(selected_hits) / n,
                 "statistical_gate": gate,

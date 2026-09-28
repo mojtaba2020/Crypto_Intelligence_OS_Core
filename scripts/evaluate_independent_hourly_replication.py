@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Evaluate locked hourly model families on an independent exchange archive."""
+
 from __future__ import annotations
 
 import argparse
@@ -60,9 +61,7 @@ def evaluate(
                 "samples": len(model_losses),
                 "model": model,
                 "model_mape_pct": 100 * sum(model_losses) / len(model_losses),
-                "persistence_mape_pct": (
-                    100 * sum(baseline_losses) / len(baseline_losses)
-                ),
+                "persistence_mape_pct": (100 * sum(baseline_losses) / len(baseline_losses)),
                 "statistical_gate": gate,
             }
         )
@@ -77,10 +76,7 @@ def evaluate(
     for rank, row in enumerate(ordered, 1):
         gate = row["statistical_gate"]
         threshold = 0.05 / (len(ordered) - rank + 1)
-        reject = (
-            gate_open
-            and gate["one_sided_null_centered_p_value"] <= threshold
-        )
+        reject = gate_open and gate["one_sided_null_centered_p_value"] <= threshold
         if not reject:
             gate_open = False
         gate.update(
@@ -91,9 +87,7 @@ def evaluate(
             }
         )
         row["replication_decision"] = (
-            "REPLICATED_RESEARCH_EDGE"
-            if reject and gate["gate"] == "PASS"
-            else "NOT_REPLICATED"
+            "REPLICATED_RESEARCH_EDGE" if reject and gate["gate"] == "PASS" else "NOT_REPLICATED"
         )
     return {
         "status": "INDEPENDENT_EXCHANGE_REPLICATION_V1",

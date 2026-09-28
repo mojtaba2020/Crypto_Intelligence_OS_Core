@@ -1,4 +1,5 @@
 """Offline tests for independent exchange replication evaluator."""
+
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -43,6 +44,5 @@ def test_replication_is_fail_closed_and_complete(tmp_path):
     assert output["automatic_promotion"] is False
     assert {row["horizon_hours"] for row in output["rows"]} == {1, 2, 3, 4, 12}
     assert all(
-        "one_sided_null_centered_p_value" in row["statistical_gate"]
-        for row in output["rows"]
+        "one_sided_null_centered_p_value" in row["statistical_gate"] for row in output["rows"]
     )

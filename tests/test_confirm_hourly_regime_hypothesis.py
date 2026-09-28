@@ -70,13 +70,9 @@ def test_exact_primary_period_guard_accepts_full_2023_archive():
         ),
     ],
 )
-def test_exact_primary_period_guard_rejects_partial_or_extra_archive(
-    first_open, last_open
-):
+def test_exact_primary_period_guard_rejects_partial_or_extra_archive(first_open, last_open):
     with pytest.raises(ValueError, match="exactly match"):
         _assert_exact_primary_period(first_open, last_open, PRIMARY)
-
-
 
 
 def _provenance_bar(hour: int) -> OHLCVBar:
@@ -98,6 +94,7 @@ def _provenance_bar(hour: int) -> OHLCVBar:
         volume=Decimal("1"),
         source_id=confirm.SOURCE_ID,
     )
+
 
 def _ingestion_report_for(bars):
     return {
@@ -142,6 +139,7 @@ def test_ingestion_chain_rejects_provenance_drift(field, bad_value):
     report[field] = bad_value
     with pytest.raises(ValueError, match="chain-of-custody mismatch"):
         _validate_ingestion_chain(report, bars)
+
 
 def _locked_preregistration():
     path = Path("research/prereg_range_mean_6h_down_low_vol_12h_v1.json")
@@ -194,9 +192,7 @@ def test_locked_preregistration_is_accepted_unchanged():
         ),
     ],
 )
-def test_locked_preregistration_rejects_parameter_drift(
-    section, key, bad_value
-):
+def test_locked_preregistration_rejects_parameter_drift(section, key, bad_value):
     prereg = copy.deepcopy(_locked_preregistration())
     prereg[section][key] = bad_value
     with pytest.raises(ValueError):
@@ -212,9 +208,9 @@ def test_locked_preregistration_rejects_unlocked_status():
 
 def test_locked_preregistration_rejects_post_access_method_change():
     prereg = copy.deepcopy(_locked_preregistration())
-    prereg["methodology_amendment_before_confirmatory_data_access"][
-        "status"
-    ] = "CHANGED_AFTER_DATA_ACCESS"
+    prereg["methodology_amendment_before_confirmatory_data_access"]["status"] = (
+        "CHANGED_AFTER_DATA_ACCESS"
+    )
     with pytest.raises(ValueError, match="not locked before confirmation"):
         _validate_locked_preregistration(prereg)
 

@@ -55,8 +55,6 @@ def test_calendar_regime_v3_reports_null_centered_one_sided_p_value():
     model = [0.01] * 100
     baseline = [0.02] * 100
     selected = [index % 2 == 0 for index in range(100)]
-    report = calendar_regime_block_bootstrap(
-        model, baseline, selected, repetitions=500
-    )
+    report = calendar_regime_block_bootstrap(model, baseline, selected, repetitions=500)
     assert report["null_hypothesis"] == "conditional_mean_loss_improvement_lte_zero"
     assert 0.0 < report["one_sided_null_centered_p_value"] <= 0.05

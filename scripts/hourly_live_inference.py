@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Deterministic live inference adapters matching locked hourly tournament families."""
+
 from __future__ import annotations
 
 import math
@@ -45,8 +46,7 @@ def predict(model: str, closes: list[float], horizon: int) -> float:
     if model == "ridge":
         weights = _ridge_fit(features, targets, 1.0)
         predicted_return = sum(
-            weight * value
-            for weight, value in zip(weights, current_features, strict=True)
+            weight * value for weight, value in zip(weights, current_features, strict=True)
         )
     elif model == "extra_trees":
         predicted_return = _forest_predict(

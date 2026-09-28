@@ -1,4 +1,5 @@
 """Offline Bitfinex adapter contract tests."""
+
 from datetime import UTC, datetime
 
 import pytest

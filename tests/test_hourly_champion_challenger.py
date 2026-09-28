@@ -165,8 +165,7 @@ def test_v3_uses_null_centered_p_values_for_holm(monkeypatch):
     )
     assert ordered[0]["statistical_gate"]["holm_reject"] is True
     assert all(
-        row["statistical_gate"]["p_value_method"]
-        == "null_centered_paired_moving_block_bootstrap"
+        row["statistical_gate"]["p_value_method"] == "null_centered_paired_moving_block_bootstrap"
         for row in ordered
     )
     assert all(row["production_promotion"] is False for row in ordered)

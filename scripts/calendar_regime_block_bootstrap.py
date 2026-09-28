@@ -27,12 +27,9 @@ def calendar_regime_block_bootstrap(
         raise ValueError("Invalid block length")
 
     diffs = [
-        baseline - model
-        for model, baseline in zip(model_losses, baseline_losses, strict=True)
+        baseline - model for model, baseline in zip(model_losses, baseline_losses, strict=True)
     ]
-    observed = statistics.mean(
-        diff for diff, keep in zip(diffs, selected, strict=True) if keep
-    )
+    observed = statistics.mean(diff for diff, keep in zip(diffs, selected, strict=True) if keep)
 
     # Deterministic PRNG is required for reproducible statistical bootstrap.
     rng = random.Random(seed)  # noqa: S311
@@ -49,11 +46,7 @@ def calendar_regime_block_bootstrap(
             start = rng.choice(starts)
             sampled_indices.extend(range(start, start + block_length))
         sampled_indices = sampled_indices[:n]
-        selected_diffs = [
-            diffs[index]
-            for index in sampled_indices
-            if selected[index]
-        ]
+        selected_diffs = [diffs[index] for index in sampled_indices if selected[index]]
         if selected_diffs:
             means.append(statistics.mean(selected_diffs))
 
@@ -66,8 +59,7 @@ def calendar_regime_block_bootstrap(
     probability_positive = sum(value > 0 for value in means) / repetitions
     # Null-centered resampling for H0: conditional mean improvement <= 0.
     null_diffs = [
-        value - observed if keep else value
-        for value, keep in zip(diffs, selected, strict=True)
+        value - observed if keep else value for value, keep in zip(diffs, selected, strict=True)
     ]
     null_means: list[float] = []
     attempts = 0
