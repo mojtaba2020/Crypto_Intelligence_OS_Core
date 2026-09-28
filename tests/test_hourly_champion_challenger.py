@@ -3,6 +3,7 @@
 import copy
 
 import pytest
+
 from scripts.hourly_champion_challenger import CANDIDATES, HORIZONS, judge
 
 
@@ -159,7 +160,14 @@ def test_v3_uses_null_centered_p_values_for_holm(monkeypatch):
         fake_bootstrap,
     )
     report = judge(_payload())
-    ordered = sorted(report["results"], key=lambda r: r["statistical_gate"]["holm_rank"])
+    ordered = sorted(
+        report["results"],
+        key=lambda row: row["statistical_gate"]["holm_rank"],
+    )
     assert ordered[0]["statistical_gate"]["holm_reject"] is True
-    assert all(r["statistical_gate"]["p_value_method"] == "null_centered_paired_moving_block_bootstrap" for r in ordered)
-    assert all(r["production_promotion"] is False for r in ordered)
+    assert all(
+        row["statistical_gate"]["p_value_method"]
+        == "null_centered_paired_moving_block_bootstrap"
+        for row in ordered
+    )
+    assert all(row["production_promotion"] is False for row in ordered)
