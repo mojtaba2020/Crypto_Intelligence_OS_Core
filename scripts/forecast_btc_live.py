@@ -15,7 +15,10 @@ import urllib.request
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from hourly_live_inference import predict as predict_hourly_model
+try:
+    from .hourly_live_inference import predict as predict_hourly_model
+except ImportError:
+    from hourly_live_inference import predict as predict_hourly_model
 
 DAILY_HORIZONS = (1, 2, 3, 7, 14, 21, 30, 90, 180, 365)
 HOURLY_HORIZONS = (1, 2, 3, 4, 12)
@@ -73,7 +76,11 @@ def forecast(
     return max(0.01, current + 0.25 * horizon * (origin_close - previous) / lookback)
 
 
-def run(selection_report: Path, now: datetime | None = None, hourly_registry: Path | None = None) -> dict:
+def run(
+    selection_report: Path,
+    now: datetime | None = None,
+    hourly_registry: Path | None = None,
+) -> dict:
     now = now or datetime.now(UTC)
     if now.tzinfo is None:
         raise ValueError("Time must be timezone-aware")
@@ -94,7 +101,6 @@ def run(selection_report: Path, now: datetime | None = None, hourly_registry: Pa
     daily = candles(86400, now)
     hourly = candles(3600, now)
     daily_origin = int(now.timestamp()) // 86400 * 86400 - 86400
-    hourly_origin = int(now.timestamp()) // 3600 * 3600 - 3600
     registry = None
     if hourly_registry is not None:
         registry = json.loads(hourly_registry.read_text(encoding="utf-8"))
@@ -122,7 +128,11 @@ def run(selection_report: Path, now: datetime | None = None, hourly_registry: Pa
                 "predicted_price_usd": round(value, 2),
                 "change_pct": round(100 * (value / spot - 1), 4),
                 "model": model,
-                "evidence": "REGISTRY_AUTHORIZED" if authorized else "FAIL_CLOSED_PERSISTENCE",
+                "evidence": (
+                    "REGISTRY_AUTHORIZED"
+                    if authorized
+                    else "FAIL_CLOSED_PERSISTENCE"
+                ),
             }
         )
     for horizon in DAILY_HORIZONS:
@@ -153,7 +163,9 @@ def run(selection_report: Path, now: datetime | None = None, hourly_registry: Pa
         "spot_price_usd": round(spot, 2),
         "forecasts": forecasts,
         "warning": (
-            "Hourly forecasts fail closed to persistence unless the model registry records both historical and prospective confirmation; daily historical selection does not establish future accuracy."
+            "Hourly forecasts fail closed to persistence unless the model registry "
+            "records both historical and prospective confirmation; daily historical "
+            "selection does not establish future accuracy."
         ),
     }
 
@@ -166,7 +178,10 @@ def main() -> None:
     args = parser.parse_args()
     result = run(args.selection_report, hourly_registry=args.hourly_registry)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    args.output.write_text(
+        json.dumps(result, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     print(json.dumps(result, indent=2, sort_keys=True))
 
 
