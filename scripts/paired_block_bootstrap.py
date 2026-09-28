@@ -45,7 +45,7 @@ def paired_block_bootstrap(
         "paired_samples": n,
         "mean_loss_improvement": observed,
         "ci_95": [lower, upper],
-        "bootstrap_probability_improvement_positive": probability_positive,
+        "bootstrap_probability_improvement_positive": probability_positive,\n        "one_sided_null_centered_p_value": one_sided_null_p_value,\n        "null_hypothesis": "mean_loss_improvement_lte_zero",
         "block_length": block_length,
         "repetitions": repetitions,
         "gate": "PASS" if lower > 0 else "FAIL",
