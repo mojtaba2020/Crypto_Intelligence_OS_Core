@@ -64,8 +64,11 @@ def calendar_regime_block_bootstrap(
     lower = means[int(0.025 * repetitions)]
     upper = means[min(repetitions - 1, int(0.975 * repetitions))]
     probability_positive = sum(value > 0 for value in means) / repetitions
-    # Null-centered calendar-preserving resampling for H0: conditional mean improvement <= 0.
-    null_diffs = [value - observed if keep else value for value, keep in zip(diffs, selected, strict=True)]
+    # Null-centered resampling for H0: conditional mean improvement <= 0.
+    null_diffs = [
+        value - observed if keep else value
+        for value, keep in zip(diffs, selected, strict=True)
+    ]
     null_means: list[float] = []
     attempts = 0
     while len(null_means) < repetitions and attempts < max_attempts:
