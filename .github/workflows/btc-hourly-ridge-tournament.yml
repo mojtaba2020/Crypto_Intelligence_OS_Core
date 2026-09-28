@@ -41,7 +41,7 @@ jobs:
           closes = {}
           candles = {}
           end = now
-          for _ in range(5):
+          for _ in range(9):
               start = end - 290 * 3600
               q = urllib.parse.urlencode({
                   "start": datetime.fromtimestamp(start, UTC).isoformat(),
@@ -58,7 +58,7 @@ jobs:
                       candles[ts] = {"low": float(row[1]), "high": float(row[2]), "open": float(row[3]), "close": float(row[4]), "volume": float(row[5])}
               end = start
           ordered = [closes[k] for k in sorted(closes)]
-          if len(ordered) < 1000:
+          if len(ordered) < 2200:
               raise SystemExit(f"Only {len(ordered)} hourly closes fetched")
           ordered_candles = [candles[k] for k in sorted(candles)]
           with open("research/hourly_closes_training.json", "w", encoding="utf-8") as f:
