@@ -21,6 +21,8 @@ BENCHMARK = "persistence"
 MIN_LOCKED_SAMPLES = 40
 BOOTSTRAP_REPETITIONS = 10_000
 BOOTSTRAP_SEED = 20260927
+BOOTSTRAP_BLOCK_LENGTH_ORIGINS = 7
+FAMILYWISE_ALPHA = 0.05
 
 
 def _mape(losses: list[float]) -> float:
@@ -76,7 +78,7 @@ def judge(payload: dict) -> dict:
             statistical_gate = None
             decision = "INSUFFICIENT_LOCKED_SAMPLES"
         else:
-            block_length = max(1, math.ceil(horizon / 24))
+            block_length = BOOTSTRAP_BLOCK_LENGTH_ORIGINS
             statistical_gate = paired_block_bootstrap(
                 selected_losses,
                 baseline_losses,
@@ -106,12 +108,15 @@ def judge(payload: dict) -> dict:
         )
 
     return {
-        "status": "HOURLY_CHAMPION_CHALLENGER_RESEARCH_V1",
+        "status": "HOURLY_CHAMPION_CHALLENGER_RESEARCH_V2",
         "selection_rule": "lowest_validation_mape_then_name",
         "locked_test_used_for_selection": False,
         "automatic_production_promotion": False,
         "bootstrap_repetitions": BOOTSTRAP_REPETITIONS,
         "bootstrap_seed": BOOTSTRAP_SEED,
+        "bootstrap_block_length_origins": BOOTSTRAP_BLOCK_LENGTH_ORIGINS,
+        "familywise_alpha": FAMILYWISE_ALPHA,
+        "multiple_comparison_method": "holm_bonferroni_5_horizons",
         "results": results,
     }
 
