@@ -99,7 +99,9 @@ def main() -> None:
 
     result = {
         "status": "HOURLY_REGIME_GATE_V3",
-        "regime_definition": (\n            "24h trend band x trailing point-in-time 24h volatility median"\n        ),
+        "regime_definition": (
+            "24h trend band x trailing point-in-time 24h volatility median"
+        ),
         "research_status": "EXPLORATORY",
         "bootstrap": "null_centered_calendar_preserving_moving_block",
         "multiple_comparison_method": "holm_bonferroni_over_observed_regimes",
