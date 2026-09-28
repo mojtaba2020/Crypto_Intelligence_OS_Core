@@ -9,14 +9,14 @@ import math
 from pathlib import Path
 
 from hourly_champion_challenger import BENCHMARK, CANDIDATES, HORIZONS
+from train_hourly_boosting_tournament import _boost_predict
 from train_hourly_boosting_tournament import (
-    _boost_predict,
     _features as _boosting_features,
 )
 from train_hourly_extra_trees_tournament import (
     _features as _extra_trees_features,
-    _forest_predict,
 )
+from train_hourly_extra_trees_tournament import _forest_predict
 from train_hourly_ridge_tournament import _features as _ridge_features
 from train_hourly_ridge_tournament import _ridge_fit
 
