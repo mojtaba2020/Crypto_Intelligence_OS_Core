@@ -41,11 +41,23 @@ def paired_block_bootstrap(
     lower = means[int(0.025 * repetitions)]
     upper = means[min(repetitions - 1, int(0.975 * repetitions))]
     probability_positive = sum(x > 0 for x in means) / repetitions
+    null_diffs = [x - observed for x in diffs]
+    null_means: list[float] = []
+    for _ in range(repetitions):
+        sample: list[float] = []
+        for _ in range(blocks_needed):
+            start = rng.choice(starts)
+            sample.extend(null_diffs[start : start + block_length])
+        null_means.append(statistics.mean(sample[:n]))
+    extreme = sum(x >= observed for x in null_means)
+    one_sided_null_p_value = (extreme + 1) / (repetitions + 1)
     return {
         "paired_samples": n,
         "mean_loss_improvement": observed,
         "ci_95": [lower, upper],
-        "bootstrap_probability_improvement_positive": probability_positive,\n        "one_sided_null_centered_p_value": one_sided_null_p_value,\n        "null_hypothesis": "mean_loss_improvement_lte_zero",
+        "bootstrap_probability_improvement_positive": probability_positive,
+        "one_sided_null_centered_p_value": one_sided_null_p_value,
+        "null_hypothesis": "mean_loss_improvement_lte_zero",
         "block_length": block_length,
         "repetitions": repetitions,
         "gate": "PASS" if lower > 0 else "FAIL",
@@ -67,7 +79,8 @@ def main() -> None:
         repetitions=args.repetitions,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    args.output.write_text(json.dumps(report, indent=2) + "
+", encoding="utf-8")
     print(json.dumps(report, indent=2))
 
 
