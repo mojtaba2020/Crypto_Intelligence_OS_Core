@@ -14,7 +14,10 @@ import statistics
 from datetime import UTC, datetime
 from pathlib import Path
 
-from paired_block_bootstrap import paired_block_bootstrap
+try:
+    from .paired_block_bootstrap import paired_block_bootstrap
+except ImportError:  # pragma: no cover - direct script execution
+    from paired_block_bootstrap import paired_block_bootstrap
 
 HORIZONS = (1, 2, 3, 4, 12)
 CANDIDATES = ("ridge", "extra_trees", "boosting")
