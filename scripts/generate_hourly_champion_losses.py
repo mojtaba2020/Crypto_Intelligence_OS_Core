@@ -9,9 +9,16 @@ import math
 from pathlib import Path
 
 from hourly_champion_challenger import BENCHMARK, CANDIDATES, HORIZONS
-from train_hourly_boosting_tournament import _boost_predict
-from train_hourly_extra_trees_tournament import _forest_predict
-from train_hourly_ridge_tournament import _features, _ridge_fit
+from train_hourly_boosting_tournament import (
+    _boost_predict,
+    _features as _boosting_features,
+)
+from train_hourly_extra_trees_tournament import (
+    _features as _extra_trees_features,
+    _forest_predict,
+)
+from train_hourly_ridge_tournament import _features as _ridge_features
+from train_hourly_ridge_tournament import _ridge_fit
 
 TRAIN_MIN = 240
 STEP = 24
@@ -19,12 +26,20 @@ VALIDATION_FRACTION = 0.5
 
 
 def _predict(model: str, closes: list[float], origin: int, horizon: int) -> float:
+    feature_fn = {
+        "ridge": _ridge_features,
+        "extra_trees": _extra_trees_features,
+        "boosting": _boosting_features,
+    }.get(model)
+    if feature_fn is None:
+        raise ValueError(f"Unknown model: {model}")
+
     xs: list[list[float]] = []
     ys: list[float] = []
     for train_origin in range(48, origin - horizon + 1):
-        xs.append(_features(closes, train_origin))
+        xs.append(feature_fn(closes, train_origin))
         ys.append(math.log(closes[train_origin + horizon] / closes[train_origin]))
-    x = _features(closes, origin)
+    x = feature_fn(closes, origin)
     if model == "ridge":
         beta = _ridge_fit(xs, ys, alpha=1.0)
         return sum(weight * value for weight, value in zip(beta, x, strict=True))
