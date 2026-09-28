@@ -16,6 +16,9 @@ on:
       - "scripts/compare_hourly_features_v2.py"
       - "scripts/ablate_hourly_features_v2.py"
       - "scripts/attribute_hourly_candle_features_v2.py"
+      - "scripts/gate_hourly_feature_candidate.py"
+      - "scripts/calendar_regime_block_bootstrap.py"
+      - "scripts/gate_hourly_regimes.py"
       - ".github/workflows/btc-hourly-ridge-tournament.yml"
 
 jobs:
@@ -94,6 +97,9 @@ jobs:
       - name: Attribute standardized candle features
         run: |
           python scripts/attribute_hourly_candle_features_v2.py --input research/hourly_ohlcv_training.json --output research/hourly_candle_feature_attribution.json
+      - name: Gate strongest attributed feature with V3 statistics
+        run: |
+          python scripts/gate_hourly_feature_candidate.py --attribution research/hourly_candle_feature_attribution.json --output research/hourly_feature_gate_v3.json --feature range_mean_6h --horizon 12
       - name: Print tournament reports
         run: |
           cat research/hourly_ridge_tournament.json
@@ -113,3 +119,4 @@ jobs:
             research/hourly_candle_feature_attribution.json
             research/hourly_champion_losses.json
             research/hourly_champion_challenger.json
+            research/hourly_feature_gate_v3.json
