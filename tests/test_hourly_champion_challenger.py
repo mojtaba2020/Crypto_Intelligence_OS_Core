@@ -3,7 +3,6 @@
 import copy
 
 import pytest
-
 from scripts.hourly_champion_challenger import CANDIDATES, HORIZONS, judge
 
 
