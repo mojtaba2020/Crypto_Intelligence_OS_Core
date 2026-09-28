@@ -24,7 +24,6 @@ from crypto_intelligence_os.adapters.market_data.historical_archive import (
 )
 from crypto_intelligence_os.market_data import BarStatus, OHLCVBar, Timeframe
 
-
 EXPLORATORY = "2024-01-01T00:00:00Z/2024-12-31T23:00:00Z"
 PRIMARY = "2023-01-01T00:00:00Z/2023-12-31T23:00:00Z"
 
