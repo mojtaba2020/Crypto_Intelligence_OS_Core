@@ -77,13 +77,47 @@ def test_stale_ticker_rejected(tmp_path: Path) -> None:
 
 def test_hourly_registry_rejects_unknown_live_adapter(tmp_path: Path) -> None:
     now = datetime(2026, 9, 24, 12, 30, tzinfo=UTC)
-    selection = {"status":"MODEL_TOURNAMENT_RESEARCH_ONLY","results":[{"horizon_days":h,"selected_on_validation":"persistence","locked_test_examples":10,"selected_test_improvement_vs_persistence_pct":0} for h in live.DAILY_HORIZONS]}
-    report=tmp_path/"selection.json"; report.write_text(json.dumps(selection))
-    registry=tmp_path/"registry.json"; registry.write_text(json.dumps({"status":"HOURLY_MODEL_REGISTRY_V1","entries":[{"horizon_hours":h,"champion":"unknown_model","live_authorized":True} for h in live.HOURLY_HORIZONS]}))
+    selection = {
+        "status": "MODEL_TOURNAMENT_RESEARCH_ONLY",
+        "results": [
+            {
+                "horizon_days": horizon,
+                "selected_on_validation": "persistence",
+                "locked_test_examples": 10,
+                "selected_test_improvement_vs_persistence_pct": 0,
+            }
+            for horizon in live.DAILY_HORIZONS
+        ],
+    }
+    report = tmp_path / "selection.json"
+    report.write_text(json.dumps(selection))
+    registry = tmp_path / "registry.json"
+    registry.write_text(
+        json.dumps(
+            {
+                "status": "HOURLY_MODEL_REGISTRY_V1",
+                "entries": [
+                    {
+                        "horizon_hours": horizon,
+                        "champion": "unknown_model",
+                        "live_authorized": True,
+                    }
+                    for horizon in live.HOURLY_HORIZONS
+                ],
+            }
+        )
+    )
+
     def market(path: str) -> object:
-        if path.endswith("/ticker"): return {"price":"100000","time":now.isoformat()}
-        granularity=86400 if "granularity=86400" in path else 3600; end=int(now.timestamp())//granularity*granularity
-        return [[end-i*granularity,1,1,1,100000-i,1] for i in range(1,201)]
-    with patch.object(live,"fetch_json",side_effect=market):
-        with pytest.raises(ValueError,match="Unsupported hourly model"):
-            live.run(report,now,hourly_registry=registry)
+        if path.endswith("/ticker"):
+            return {"price": "100000", "time": now.isoformat()}
+        granularity = 86400 if "granularity=86400" in path else 3600
+        end = int(now.timestamp()) // granularity * granularity
+        return [
+            [end - index * granularity, 1, 1, 1, 100000 - index, 1]
+            for index in range(1, 201)
+        ]
+
+    with patch.object(live, "fetch_json", side_effect=market):
+        with pytest.raises(ValueError, match="Unsupported hourly model"):
+            live.run(report, now, hourly_registry=registry)
