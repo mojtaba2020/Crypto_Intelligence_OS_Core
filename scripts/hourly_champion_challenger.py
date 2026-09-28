@@ -86,12 +86,7 @@ def judge(payload: dict) -> dict:
                 repetitions=BOOTSTRAP_REPETITIONS,
                 seed=BOOTSTRAP_SEED,
             )
-            decision = (
-                "CHALLENGER_ELIGIBLE_FOR_FURTHER_VALIDATION"
-                if statistical_gate["gate"] == "PASS"
-                and selected_mape < baseline_mape
-                else "KEEP_PERSISTENCE_CHAMPION"
-            )
+            decision = "PENDING_FAMILYWISE_GATE"
 
         results.append(
             {
@@ -105,6 +100,34 @@ def judge(payload: dict) -> dict:
                 "decision": decision,
                 "production_promotion": False,
             }
+        )
+
+    eligible = [r for r in results if r["statistical_gate"] is not None]
+    ordered = sorted(
+        eligible,
+        key=lambda r: (
+            1.0 - r["statistical_gate"]["bootstrap_probability_improvement_positive"],
+            r["horizon_hours"],
+        ),
+    )
+    holm_still_rejecting = True
+    for rank, row in enumerate(ordered, start=1):
+        gate = row["statistical_gate"]
+        p_value = 1.0 - gate["bootstrap_probability_improvement_positive"]
+        threshold = FAMILYWISE_ALPHA / (len(ordered) - rank + 1)
+        reject = holm_still_rejecting and p_value <= threshold
+        if not reject:
+            holm_still_rejecting = False
+        gate["one_sided_bootstrap_p_value"] = p_value
+        gate["holm_rank"] = rank
+        gate["holm_threshold"] = threshold
+        gate["holm_reject"] = reject
+        row["decision"] = (
+            "CHALLENGER_ELIGIBLE_FOR_FURTHER_VALIDATION"
+            if reject
+            and gate["gate"] == "PASS"
+            and row["selected_locked_mape_pct"] < row["persistence_locked_mape_pct"]
+            else "KEEP_PERSISTENCE_CHAMPION"
         )
 
     return {
