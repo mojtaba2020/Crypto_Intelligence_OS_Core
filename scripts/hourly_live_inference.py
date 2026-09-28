@@ -5,14 +5,10 @@ from __future__ import annotations
 import math
 
 try:
-    from .train_hourly_boosting_tournament import (
-        _boost_predict,
-        _features as boost_features,
-    )
-    from .train_hourly_extra_trees_tournament import (
-        _features as tree_features,
-        _forest_predict,
-    )
+    from .train_hourly_boosting_tournament import _boost_predict
+    from .train_hourly_boosting_tournament import _features as boost_features
+    from .train_hourly_extra_trees_tournament import _features as tree_features
+    from .train_hourly_extra_trees_tournament import _forest_predict
     from .train_hourly_ridge_tournament import _features as ridge_features
     from .train_hourly_ridge_tournament import _ridge_fit
 except ImportError:
