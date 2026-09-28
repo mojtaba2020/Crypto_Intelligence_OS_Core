@@ -11,7 +11,10 @@ import statistics
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from calendar_regime_block_bootstrap import calendar_regime_block_bootstrap
+try:
+    from .calendar_regime_block_bootstrap import calendar_regime_block_bootstrap
+except ImportError:  # pragma: no cover - direct script execution
+    from calendar_regime_block_bootstrap import calendar_regime_block_bootstrap
 from crypto_intelligence_os.adapters.market_data.bitstamp import INSTRUMENT_ID, SOURCE_ID
 from crypto_intelligence_os.adapters.market_data.historical_archive import (
     HistoricalOHLCVArchive,
