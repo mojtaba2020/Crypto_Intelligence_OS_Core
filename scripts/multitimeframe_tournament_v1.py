@@ -93,7 +93,11 @@ def evaluate(
         row = feature_vector(candles, origin, family)
         for name in CANDIDATES:
             predictor = _fit_candidate(name, x, y)
-            predicted_return = float(predictor([row])[0]) if name != "ridge" else float(predictor(row))
+            predicted_return = (
+                float(predictor([row])[0])
+                if name != "ridge"
+                else float(predictor(row))
+            )
             predicted = current * math.exp(predicted_return)
             candidate_errors[name].append(abs(predicted - actual) / actual)
             candidate_directions[name].append((predicted_return >= 0) == (actual >= current))
