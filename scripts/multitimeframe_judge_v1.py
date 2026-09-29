@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from scripts.multitimeframe_features_v3 import (
     WINDOWS,
     feature_vector,
+    has_valid_feature_history,
+    has_valid_forecast_target,
     is_temporally_valid_sample,
 )
 from scripts.multitimeframe_tournament_v1 import CANDIDATES, _fit_candidate, _known_training_origins
@@ -47,7 +49,8 @@ def _evaluate_candidate(
         train_origins = [
             i
             for i in _known_training_origins(longest, origin, horizon)
-            if is_temporally_valid_sample(candles, family, i, horizon)
+            if has_valid_feature_history(candles, family, i)
+            and has_valid_forecast_target(candles, family, i, horizon)
         ]
         if not is_temporally_valid_sample(candles, family, origin, horizon):
             raise ValueError("Evaluation origin crosses a missing target period")

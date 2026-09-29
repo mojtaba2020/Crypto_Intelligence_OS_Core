@@ -28,22 +28,48 @@ def _next_period_timestamp(timestamp: int, family: str) -> int:
     raise KeyError(family)
 
 
+def _is_contiguous(candles: list[dict[str, float]], family: str, start: int, end: int) -> bool:
+    """Return whether inclusive [start, end] follows the exact declared calendar cadence."""
+    if start < 0 or end >= len(candles) or start > end:
+        return False
+    needed = candles[start : end + 1]
+    if not all("timestamp" in row for row in needed):
+        return True
+    timestamps = [int(row["timestamp"]) for row in needed]
+    return all(
+        right == _next_period_timestamp(left, family) for left, right in pairwise(timestamps)
+    )
+
+
+def has_valid_feature_history(
+    candles: list[dict[str, float]],
+    family: str,
+    origin: int,
+) -> bool:
+    """Feature history must be continuous, independently for each candidate origin."""
+    longest = max(WINDOWS[family])
+    return origin >= longest and _is_contiguous(candles, family, origin - longest, origin)
+
+
+def has_valid_forecast_target(
+    candles: list[dict[str, float]],
+    family: str,
+    origin: int,
+    horizon: int,
+) -> bool:
+    """Forecast target must be continuous from origin through maturity."""
+    return horizon > 0 and _is_contiguous(candles, family, origin, origin + horizon)
+
+
 def is_temporally_valid_sample(
     candles: list[dict[str, float]],
     family: str,
     origin: int,
     horizon: int,
 ) -> bool:
-    """Require exact calendar continuity for both feature history and forecast target."""
-    longest = max(WINDOWS[family])
-    if origin < longest or origin + horizon >= len(candles):
-        return False
-    needed = candles[origin - longest : origin + horizon + 1]
-    if not all("timestamp" in row for row in needed):
-        return True  # Synthetic/unit-test fixtures without time metadata.
-    timestamps = [int(row["timestamp"]) for row in needed]
-    return all(
-        right == _next_period_timestamp(left, family) for left, right in pairwise(timestamps)
+    """Require valid feature history and target, without coupling unrelated gaps."""
+    return has_valid_feature_history(candles, family, origin) and has_valid_forecast_target(
+        candles, family, origin, horizon
     )
 
 

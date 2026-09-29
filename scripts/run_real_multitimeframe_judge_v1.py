@@ -86,6 +86,7 @@ def main() -> None:
                 "gap_safe_validation_origins": len(validation_origins),
                 "raw_locked_origins": len(raw_locked_origins),
                 "gap_safe_locked_origins": len(locked_origins),
+                "gap_policy": "per_origin_feature_history_and_target_continuity_no_imputation",
                 "status": "NOT_EVALUATED_GAP_SAFE_INSUFFICIENT_ORIGINS",
             }
             continue
@@ -115,6 +116,7 @@ def main() -> None:
                 len(raw_validation_origins) - len(validation_origins)
             ),
             "gap_filtered_locked_origins": len(raw_locked_origins) - len(locked_origins),
+            "gap_policy": "per_origin_feature_history_and_target_continuity_no_imputation",
             "validation_selected_candidate": selected,
             "validation_scores": validation_scores,
             "locked": locked,

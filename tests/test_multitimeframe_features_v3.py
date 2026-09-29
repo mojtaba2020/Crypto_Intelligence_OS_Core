@@ -6,6 +6,8 @@ import pytest
 from scripts.multitimeframe_features_v3 import (
     feature_names,
     feature_vector,
+    has_valid_feature_history,
+    has_valid_forecast_target,
     is_temporally_valid_sample,
 )
 
@@ -69,3 +71,24 @@ def test_gap_safe_sample_rejects_target_crossing_gap() -> None:
         row["timestamp"] = float(i * 86_400)
     candles[366]["timestamp"] += 86_400
     assert not is_temporally_valid_sample(candles, "daily", 365, 1)
+
+
+def test_feature_and_target_continuity_are_checked_independently() -> None:
+    candles = _candles(800)
+    for i, row in enumerate(candles):
+        row["timestamp"] = float(i * 86_400)
+    # An old unrelated gap must not poison a later otherwise-valid sample.
+    candles[10]["timestamp"] += 86_400
+    assert has_valid_feature_history(candles, "daily", 700)
+    assert has_valid_forecast_target(candles, "daily", 700, 3)
+    assert is_temporally_valid_sample(candles, "daily", 700, 3)
+
+
+def test_feature_history_gap_does_not_invalidate_unrelated_target_logic() -> None:
+    candles = _candles(800)
+    for i, row in enumerate(candles):
+        row["timestamp"] = float(i * 86_400)
+    candles[500]["timestamp"] += 86_400
+    assert not has_valid_feature_history(candles, "daily", 700)
+    assert has_valid_forecast_target(candles, "daily", 700, 3)
+    assert not is_temporally_valid_sample(candles, "daily", 700, 3)
