@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 
 import pytest
-
 from scripts.multitimeframe_features_v3 import feature_names, feature_vector
 
 
