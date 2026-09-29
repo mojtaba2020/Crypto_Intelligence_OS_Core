@@ -6,7 +6,8 @@ import pytest
 
 pytest.importorskip("numpy")
 
-from scripts.multitimeframe_features_v3 import feature_vector\nfrom scripts.multitimeframe_tournament_v1 import HORIZONS, _known_training_origins, evaluate
+from scripts.multitimeframe_features_v3 import feature_vector
+from scripts.multitimeframe_tournament_v1 import HORIZONS, _known_training_origins, evaluate
 
 
 def _candles(n: int) -> list[dict[str, float]]:
