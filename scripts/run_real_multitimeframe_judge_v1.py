@@ -33,16 +33,28 @@ def main() -> None:
     family_p_values: dict[str, dict[str, float]] = {}
     dataset_ids: dict[str, str] = {}
 
+    skipped: dict[str, dict[str, object]] = {}
     for spec in SPECS:
         if spec.family not in SUPPORTED_FAMILIES:
             continue
         candles = _load(args.data_dir / f"{args.exchange}_{spec.source_timeframe}.json")
         dataset_ids[spec.source_timeframe] = source_data_identity(candles)
-        split = chronological_split(
-            len(candles),
-            spec.minimum_history_bars,
-            spec.horizon_bars,
-        )
+        try:
+            split = chronological_split(
+                len(candles),
+                spec.minimum_history_bars,
+                spec.horizon_bars,
+            )
+        except ValueError as exc:
+            skipped[spec.label] = {
+                "family": spec.family,
+                "source_timeframe": spec.source_timeframe,
+                "bars": len(candles),
+                "minimum_history_bars": spec.minimum_history_bars,
+                "reason": str(exc),
+                "status": "NOT_EVALUATED_INSUFFICIENT_HISTORY",
+            }
+            continue
         validation_origins = origins_for_phase(
             split,
             "validation",
@@ -81,7 +93,7 @@ def main() -> None:
         }
         family_p_values.setdefault(spec.family, {})[spec.label] = float(locked["p_value"])
 
-    for family, p_values in family_p_values.items():
+    for _family, p_values in family_p_values.items():
         decisions = holm_rejections(p_values)
         for label, reject in decisions.items():
             locked = results[label]["locked"]
@@ -101,6 +113,7 @@ def main() -> None:
         "locked_test": "single_use_evaluation",
         "multiple_comparisons": "holm_within_daily_weekly_monthly_family",
         "results": results,
+        "skipped": skipped,
         "automatic_model_promotion": False,
         "independent_replication_required": True,
         "prospective_confirmation_required": True,

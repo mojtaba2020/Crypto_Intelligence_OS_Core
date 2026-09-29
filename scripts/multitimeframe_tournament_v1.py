@@ -50,7 +50,7 @@ def _fit_candidate(name: str, x: list[list[float]], y: list[float]):
         raise RuntimeError("scikit-learn is required for tree candidates") from exc
     if name == "extra_trees":
         model = ExtraTreesRegressor(
-            n_estimators=200, min_samples_leaf=5, random_state=20260929, n_jobs=1
+            n_estimators=200, min_samples_leaf=5, random_state=20260929, n_jobs=-1
         )
     elif name == "boosting":
         model = GradientBoostingRegressor(
