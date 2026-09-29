@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import math
+from itertools import pairwise
 from calendar import monthrange
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -44,7 +45,7 @@ def audit_source_rows(
     ordered = sorted(timestamps)
     gaps = [
         (left, right)
-        for left, right in zip(ordered, ordered[1:], strict=False)
+        for left, right in pairwise(ordered)
         if right - left != source_interval_seconds
     ]
     return {
