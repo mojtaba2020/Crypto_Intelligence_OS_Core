@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from scripts.multitimeframe_model_registry_v1 import RegistryEvidence, register
 
 

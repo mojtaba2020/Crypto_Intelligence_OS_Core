@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from scripts.multitimeframe_prospective_audit_v1 import (
     ProspectiveSpec,
     audit_observations,

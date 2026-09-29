@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 
 import pytest
-
 from scripts.multitimeframe_regime_gate_v1 import classify_regimes, regime_gate
 
 

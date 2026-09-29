@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from scripts.multitimeframe_exchange_replication_v1 import (
     ReplicationSpec,
     replication_decision,
