@@ -9,6 +9,7 @@ import statistics
 from scripts.multitimeframe_features_v3 import WINDOWS, feature_vector
 
 HORIZONS = {"daily": (1, 2, 3), "weekly": (1, 2, 3), "monthly": (1, 3)}
+CANDIDATES = ("ridge", "extra_trees", "boosting")
 
 
 def _fit_ridge(x: list[list[float]], y: list[float], alpha: float = 1.0) -> list[float]:
@@ -39,44 +40,77 @@ def _predict_ridge(state: list[float], row: list[float]) -> float:
     return float(beta[0] + ((np.asarray(row) - means) / scales) @ beta[1:])
 
 
+def _fit_candidate(name: str, x: list[list[float]], y: list[float]):
+    if name == "ridge":
+        state = _fit_ridge(x, y)
+        return lambda row: _predict_ridge(state, row)
+    try:
+        from sklearn.ensemble import ExtraTreesRegressor, GradientBoostingRegressor
+    except ImportError as exc:
+        raise RuntimeError("scikit-learn is required for tree candidates") from exc
+    if name == "extra_trees":
+        model = ExtraTreesRegressor(
+            n_estimators=200, min_samples_leaf=5, random_state=20260929, n_jobs=1
+        )
+    elif name == "boosting":
+        model = GradientBoostingRegressor(
+            n_estimators=100, learning_rate=0.05, max_depth=2, random_state=20260929
+        )
+    else:
+        raise ValueError(f"Unknown candidate: {name}")
+    model.fit(x, y)
+    return model.predict
+
+
 def evaluate(
     candles: list[dict[str, float]],
     family: str,
     horizon: int,
     min_train: int,
     step: int,
-) -> dict[str, float | int]:
+) -> dict[str, object]:
     longest = max(WINDOWS[family])
     last_origin = len(candles) - horizon - 1
     origins = list(range(longest + min_train, last_origin + 1, step))
     if len(origins) < 20:
         raise ValueError("Insufficient out-of-sample origins")
 
-    model_errors, persistence_errors, directions = [], [], []
+    candidate_errors = {name: [] for name in CANDIDATES}
+    candidate_directions = {name: [] for name in CANDIDATES}
+    persistence_errors = []
     for origin in origins:
         train_origins = range(longest, origin)
         x = [feature_vector(candles, i, family) for i in train_origins]
         y = [
             math.log(float(candles[i + horizon]["close"]) / float(candles[i]["close"]))
             for i in train_origins
-            if i + horizon < len(candles)
+            if i + horizon < origin
         ]
         x = x[: len(y)]
-        state = _fit_ridge(x, y)
-        predicted_return = _predict_ridge(state, feature_vector(candles, origin, family))
         current = float(candles[origin]["close"])
         actual = float(candles[origin + horizon]["close"])
-        predicted = current * math.exp(predicted_return)
-        model_errors.append(abs(predicted - actual) / actual)
         persistence_errors.append(abs(current - actual) / actual)
-        directions.append((predicted_return >= 0) == (actual >= current))
+        row = feature_vector(candles, origin, family)
+        for name in CANDIDATES:
+            predictor = _fit_candidate(name, x, y)
+            predicted_return = float(predictor([row])[0]) if name != "ridge" else float(predictor(row))
+            predicted = current * math.exp(predicted_return)
+            candidate_errors[name].append(abs(predicted - actual) / actual)
+            candidate_directions[name].append((predicted_return >= 0) == (actual >= current))
 
+    results = {}
+    for name in CANDIDATES:
+        errors = candidate_errors[name]
+        results[name] = {
+            "mape": statistics.mean(errors),
+            "mean_loss_improvement": statistics.mean(
+                base - model
+                for base, model in zip(persistence_errors, errors, strict=True)
+            ),
+            "direction_accuracy": statistics.mean(candidate_directions[name]),
+        }
     return {
         "samples": len(origins),
-        "ridge_mape": statistics.mean(model_errors),
         "persistence_mape": statistics.mean(persistence_errors),
-        "mean_loss_improvement": statistics.mean(
-            base - model for base, model in zip(persistence_errors, model_errors, strict=True)
-        ),
-        "direction_accuracy": statistics.mean(directions),
+        "candidates": results,
     }
