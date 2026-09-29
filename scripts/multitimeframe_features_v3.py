@@ -15,7 +15,6 @@ WINDOWS = {
 }
 
 
-
 def _next_period_timestamp(timestamp: int, family: str) -> int:
     if family == "daily":
         return timestamp + 86_400
@@ -44,8 +43,7 @@ def is_temporally_valid_sample(
         return True  # Synthetic/unit-test fixtures without time metadata.
     timestamps = [int(row["timestamp"]) for row in needed]
     return all(
-        right == _next_period_timestamp(left, family)
-        for left, right in pairwise(timestamps)
+        right == _next_period_timestamp(left, family) for left, right in pairwise(timestamps)
     )
 
 
