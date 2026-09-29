@@ -62,6 +62,11 @@ def _fit_candidate(name: str, x: list[list[float]], y: list[float]):
     return model.predict
 
 
+def _known_training_origins(longest: int, origin: int, horizon: int) -> list[int]:
+    """Only labels whose target candle is closed by the forecast origin are knowable."""
+    return [i for i in range(longest, origin) if i + horizon <= origin]
+
+
 def evaluate(
     candles: list[dict[str, float]],
     family: str,
@@ -79,14 +84,14 @@ def evaluate(
     candidate_directions = {name: [] for name in CANDIDATES}
     persistence_errors = []
     for origin in origins:
-        train_origins = range(longest, origin)
+        train_origins = _known_training_origins(longest, origin, horizon)
         x = [feature_vector(candles, i, family) for i in train_origins]
         y = [
             math.log(float(candles[i + horizon]["close"]) / float(candles[i]["close"]))
             for i in train_origins
-            if i + horizon < origin
         ]
-        x = x[: len(y)]
+        if len(x) != len(y):
+            raise RuntimeError("Feature/label alignment invariant violated")
         current = float(candles[origin]["close"])
         actual = float(candles[origin + horizon]["close"])
         persistence_errors.append(abs(current - actual) / actual)
