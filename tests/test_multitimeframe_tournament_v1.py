@@ -34,7 +34,7 @@ def test_declared_horizons_match_contract() -> None:
 
 
 def test_daily_tournament_is_out_of_sample_and_reports_baseline() -> None:
-    result = evaluate(_candles(520), "daily", horizon=1, min_train=80, step=10)
+    result = evaluate(_candles(700), "daily", horizon=1, min_train=80, step=10)
     assert result["samples"] >= 20
     assert result["ridge_mape"] >= 0.0
     assert result["persistence_mape"] >= 0.0
