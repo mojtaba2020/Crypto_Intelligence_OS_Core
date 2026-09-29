@@ -3,7 +3,11 @@ from __future__ import annotations
 import math
 
 import pytest
-from scripts.multitimeframe_features_v3 import feature_names, feature_vector
+from scripts.multitimeframe_features_v3 import (
+    feature_names,
+    feature_vector,
+    is_temporally_valid_sample,
+)
 
 
 def _candles(n: int) -> list[dict[str, float]]:
@@ -48,3 +52,20 @@ def test_feature_vector_is_point_in_time_safe() -> None:
 def test_unknown_family_fails_closed() -> None:
     with pytest.raises(KeyError):
         feature_names("hourly")
+
+
+def test_gap_safe_sample_rejects_missing_daily_period() -> None:
+    candles = _candles(370)
+    for i, row in enumerate(candles):
+        row["timestamp"] = float(i * 86_400)
+    assert is_temporally_valid_sample(candles, "daily", 365, 1)
+    candles[200]["timestamp"] += 86_400
+    assert not is_temporally_valid_sample(candles, "daily", 365, 1)
+
+
+def test_gap_safe_sample_rejects_target_crossing_gap() -> None:
+    candles = _candles(370)
+    for i, row in enumerate(candles):
+        row["timestamp"] = float(i * 86_400)
+    candles[366]["timestamp"] += 86_400
+    assert not is_temporally_valid_sample(candles, "daily", 365, 1)

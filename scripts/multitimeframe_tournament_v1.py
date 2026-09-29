@@ -6,7 +6,11 @@ from __future__ import annotations
 import math
 import statistics
 
-from scripts.multitimeframe_features_v3 import WINDOWS, feature_vector
+from scripts.multitimeframe_features_v3 import (
+    WINDOWS,
+    feature_vector,
+    is_temporally_valid_sample,
+)
 
 HORIZONS = {"daily": (1, 2, 3), "weekly": (1, 2, 3), "monthly": (1, 3)}
 CANDIDATES = ("ridge", "extra_trees", "boosting")
@@ -76,7 +80,11 @@ def evaluate(
 ) -> dict[str, object]:
     longest = max(WINDOWS[family])
     last_origin = len(candles) - horizon - 1
-    origins = list(range(longest + min_train, last_origin + 1, step))
+    origins = [
+        origin
+        for origin in range(longest + min_train, last_origin + 1, step)
+        if is_temporally_valid_sample(candles, family, origin, horizon)
+    ]
     if len(origins) < 20:
         raise ValueError("Insufficient out-of-sample origins")
 
@@ -84,7 +92,11 @@ def evaluate(
     candidate_directions = {name: [] for name in CANDIDATES}
     persistence_errors = []
     for origin in origins:
-        train_origins = _known_training_origins(longest, origin, horizon)
+        train_origins = [
+            i
+            for i in _known_training_origins(longest, origin, horizon)
+            if is_temporally_valid_sample(candles, family, i, horizon)
+        ]
         x = [feature_vector(candles, i, family) for i in train_origins]
         y = [
             math.log(float(candles[i + horizon]["close"]) / float(candles[i]["close"]))

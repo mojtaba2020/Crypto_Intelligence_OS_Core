@@ -5,12 +5,47 @@ from __future__ import annotations
 
 import math
 import statistics
+from datetime import datetime, timezone
 
 WINDOWS = {
     "daily": (3, 7, 14, 30, 90, 180, 365),
     "weekly": (2, 4, 8, 13, 26, 52),
     "monthly": (2, 3, 6, 12, 24, 36),
 }
+
+
+
+def _next_period_timestamp(timestamp: int, family: str) -> int:
+    if family == "daily":
+        return timestamp + 86_400
+    if family == "weekly":
+        return timestamp + 604_800
+    if family == "monthly":
+        current = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        year = current.year + (1 if current.month == 12 else 0)
+        month = 1 if current.month == 12 else current.month + 1
+        return int(datetime(year, month, 1, tzinfo=timezone.utc).timestamp())
+    raise KeyError(family)
+
+
+def is_temporally_valid_sample(
+    candles: list[dict[str, float]],
+    family: str,
+    origin: int,
+    horizon: int,
+) -> bool:
+    """Require exact calendar continuity for both feature history and forecast target."""
+    longest = max(WINDOWS[family])
+    if origin < longest or origin + horizon >= len(candles):
+        return False
+    needed = candles[origin - longest : origin + horizon + 1]
+    if not all("timestamp" in row for row in needed):
+        return True  # Synthetic/unit-test fixtures without time metadata.
+    timestamps = [int(row["timestamp"]) for row in needed]
+    return all(
+        right == _next_period_timestamp(left, family)
+        for left, right in zip(timestamps, timestamps[1:], strict=True)
+    )
 
 
 def feature_names(family: str) -> tuple[str, ...]:

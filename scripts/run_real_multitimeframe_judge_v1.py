@@ -7,6 +7,7 @@ import argparse
 import json
 from pathlib import Path
 
+from multitimeframe_features_v3 import is_temporally_valid_sample
 from multitimeframe_judge_v1 import holm_rejections, judge_locked, select_on_validation
 from multitimeframe_lab_v1 import SPECS
 from multitimeframe_split_v1 import chronological_split, origins_for_phase
@@ -55,16 +56,39 @@ def main() -> None:
                 "status": "NOT_EVALUATED_INSUFFICIENT_HISTORY",
             }
             continue
-        validation_origins = origins_for_phase(
+        raw_validation_origins = origins_for_phase(
             split,
             "validation",
             spec.evaluation_step_bars,
         )
-        locked_origins = origins_for_phase(
+        raw_locked_origins = origins_for_phase(
             split,
             "locked_test",
             spec.evaluation_step_bars,
         )
+        validation_origins = [
+            origin
+            for origin in raw_validation_origins
+            if is_temporally_valid_sample(candles, spec.family, origin, spec.horizon_bars)
+        ]
+        locked_origins = [
+            origin
+            for origin in raw_locked_origins
+            if is_temporally_valid_sample(candles, spec.family, origin, spec.horizon_bars)
+        ]
+        if len(validation_origins) < 8 or len(locked_origins) < 8:
+            skipped[spec.label] = {
+                "family": spec.family,
+                "source_timeframe": spec.source_timeframe,
+                "bars": len(candles),
+                "minimum_history_bars": spec.minimum_history_bars,
+                "raw_validation_origins": len(raw_validation_origins),
+                "gap_safe_validation_origins": len(validation_origins),
+                "raw_locked_origins": len(raw_locked_origins),
+                "gap_safe_locked_origins": len(locked_origins),
+                "status": "NOT_EVALUATED_GAP_SAFE_INSUFFICIENT_ORIGINS",
+            }
+            continue
         selected, validation_scores = select_on_validation(
             candles,
             spec.family,
@@ -87,6 +111,8 @@ def main() -> None:
             "split": split.as_dict(),
             "validation_origins": len(validation_origins),
             "locked_origins": len(locked_origins),
+            "gap_filtered_validation_origins": len(raw_validation_origins) - len(validation_origins),
+            "gap_filtered_locked_origins": len(raw_locked_origins) - len(locked_origins),
             "validation_selected_candidate": selected,
             "validation_scores": validation_scores,
             "locked": locked,

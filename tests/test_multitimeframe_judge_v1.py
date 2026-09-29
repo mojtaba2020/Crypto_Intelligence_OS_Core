@@ -59,3 +59,12 @@ def test_validation_selection_then_locked_judge_uses_disjoint_origins() -> None:
 def test_empty_validation_fails_closed() -> None:
     with pytest.raises(ValueError, match="Validation origins"):
         select_on_validation(_candles(700), "daily", 1, [])
+
+
+def test_locked_judge_fails_closed_on_gap_crossing_evaluation_origin() -> None:
+    candles = _candles(700)
+    for i, row in enumerate(candles):
+        row["timestamp"] = float(i * 86_400)
+    candles[601]["timestamp"] += 86_400
+    with pytest.raises(ValueError, match="crosses a missing target period"):
+        judge_locked(candles, "daily", 1, [600] * 8, "ridge", block_size=4)
