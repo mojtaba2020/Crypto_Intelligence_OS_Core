@@ -29,7 +29,7 @@ def _candles(n: int) -> list[dict[str, float]]:
 
 
 def test_holm_is_step_down_and_fail_closed_after_first_non_rejection() -> None:
-    decisions = holm_rejections({"a": 0.001, "b": 0.02, "c": 0.04})
+    decisions = holm_rejections({"a": 0.001, "b": 0.02, "c": 0.06})
     assert decisions == {"a": True, "b": True, "c": False}
 
 

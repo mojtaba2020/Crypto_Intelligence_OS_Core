@@ -62,10 +62,7 @@ def test_future_bars_do_not_change_prediction_inputs() -> None:
     origin = 500
     horizon = 3
     train = _known_training_origins(365, origin, horizon)
-    baseline_x = [
-        tuple(feature_vector(candles, i, "daily"))
-        for i in train
-    ]
+    baseline_x = [tuple(feature_vector(candles, i, "daily")) for i in train]
     baseline_y = [
         math.log(candles[i + horizon]["close"] / candles[i]["close"]) for i in train
     ]
@@ -76,10 +73,7 @@ def test_future_bars_do_not_change_prediction_inputs() -> None:
         mutated[i]["low"] *= 50.0
         mutated[i]["open"] *= 50.0
         mutated[i]["volume"] *= 50.0
-    mutated_x = [
-        tuple(feature_vector(mutated, i, "daily"))
-        for i in train
-    ]
+    mutated_x = [tuple(feature_vector(mutated, i, "daily")) for i in train]
     mutated_y = [
         math.log(mutated[i + horizon]["close"] / mutated[i]["close"]) for i in train
     ]

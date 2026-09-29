@@ -25,8 +25,7 @@ class CandidateResult:
     @property
     def mean_improvement(self) -> float:
         return statistics.mean(
-            base - model
-            for base, model in zip(self.baseline_losses, self.losses, strict=True)
+            base - model for base, model in zip(self.baseline_losses, self.losses, strict=True)
         )
 
 
@@ -52,9 +51,7 @@ def _evaluate_candidate(
         predictor = _fit_candidate(candidate, x, y)
         row = feature_vector(candles, origin, family)
         predicted_return = (
-            float(predictor(row))
-            if candidate == "ridge"
-            else float(predictor([row])[0])
+            float(predictor(row)) if candidate == "ridge" else float(predictor([row])[0])
         )
         current = float(candles[origin]["close"])
         actual = float(candles[origin + horizon]["close"])
@@ -146,12 +143,9 @@ def judge_locked(
         raise ValueError("Selected candidate is not declared")
     if not locked_origins:
         raise ValueError("Locked origins cannot be empty")
-    result = _evaluate_candidate(
-        candles, family, horizon, locked_origins, selected_candidate
-    )
+    result = _evaluate_candidate(candles, family, horizon, locked_origins, selected_candidate)
     improvements = [
-        base - model
-        for base, model in zip(result.baseline_losses, result.losses, strict=True)
+        base - model for base, model in zip(result.baseline_losses, result.losses, strict=True)
     ]
     stats = null_centered_moving_block_bootstrap(improvements, block_size)
     return {
