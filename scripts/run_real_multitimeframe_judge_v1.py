@@ -111,7 +111,9 @@ def main() -> None:
             "split": split.as_dict(),
             "validation_origins": len(validation_origins),
             "locked_origins": len(locked_origins),
-            "gap_filtered_validation_origins": len(raw_validation_origins) - len(validation_origins),
+            "gap_filtered_validation_origins": (
+                len(raw_validation_origins) - len(validation_origins)
+            ),
             "gap_filtered_locked_origins": len(raw_locked_origins) - len(locked_origins),
             "validation_selected_candidate": selected,
             "validation_scores": validation_scores,

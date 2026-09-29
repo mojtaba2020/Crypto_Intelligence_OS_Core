@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import math
 import statistics
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from itertools import pairwise
 
 WINDOWS = {
     "daily": (3, 7, 14, 30, 90, 180, 365),
@@ -21,10 +22,10 @@ def _next_period_timestamp(timestamp: int, family: str) -> int:
     if family == "weekly":
         return timestamp + 604_800
     if family == "monthly":
-        current = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        current = datetime.fromtimestamp(timestamp, tz=UTC)
         year = current.year + (1 if current.month == 12 else 0)
         month = 1 if current.month == 12 else current.month + 1
-        return int(datetime(year, month, 1, tzinfo=timezone.utc).timestamp())
+        return int(datetime(year, month, 1, tzinfo=UTC).timestamp())
     raise KeyError(family)
 
 
@@ -44,7 +45,7 @@ def is_temporally_valid_sample(
     timestamps = [int(row["timestamp"]) for row in needed]
     return all(
         right == _next_period_timestamp(left, family)
-        for left, right in zip(timestamps, timestamps[1:], strict=True)
+        for left, right in pairwise(timestamps)
     )
 
 
