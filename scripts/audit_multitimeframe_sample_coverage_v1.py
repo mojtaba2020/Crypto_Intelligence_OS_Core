@@ -73,9 +73,7 @@ def main() -> None:
         candles = _load(args.data_dir / f"{args.exchange}_{spec.source_timeframe}.json")
         incomplete = [int(row["timestamp"]) for row in candles if row.get("is_complete") is False]
         try:
-            split = chronological_split(
-                len(candles), spec.minimum_history_bars, spec.horizon_bars
-            )
+            split = chronological_split(len(candles), spec.minimum_history_bars, spec.horizon_bars)
         except ValueError as exc:
             horizons[spec.label] = {
                 "status": "INSUFFICIENT_HISTORY",
