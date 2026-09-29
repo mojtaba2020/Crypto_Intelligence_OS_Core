@@ -12,7 +12,7 @@ on:
       - "scripts/multitimeframe_features_v3.py"
       - "tests/test_multitimeframe_features_v3.py"
       - "scripts/multitimeframe_tournament_v1.py"
-      - "tests/test_multitimeframe_tournament_v1.py"
+      - "tests/test_multitimeframe_tournament_v1.py"\n      - "scripts/multitimeframe_split_v1.py"\n      - "tests/test_multitimeframe_split_v1.py"
       - ".github/workflows/btc-multitimeframe-lab.yml"
 
 permissions:
@@ -43,7 +43,7 @@ jobs:
       - name: Verify Feature V3 and tournament core
         run: |
           python -m pytest -q tests/test_multitimeframe_features_v3.py
-          python -m pytest -q tests/test_multitimeframe_tournament_v1.py
+          python -m pytest -q tests/test_multitimeframe_tournament_v1.py\n          python -m pytest -q tests/test_multitimeframe_split_v1.py
 
       - name: Generate multi-timeframe manifest
         run: |
