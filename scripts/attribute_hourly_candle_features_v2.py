@@ -8,9 +8,14 @@ import json
 import math
 from pathlib import Path
 
-from ablate_hourly_features_v2 import _select, _standardize_train_test
-from hourly_features_v2 import feature_names, feature_vector
-from train_hourly_ridge_tournament import HORIZONS, _ridge_fit
+try:
+    from .ablate_hourly_features_v2 import _select, _standardize_train_test
+    from .hourly_features_v2 import feature_names, feature_vector
+    from .train_hourly_ridge_tournament import HORIZONS, _ridge_fit
+except ImportError:  # pragma: no cover - direct script execution
+    from ablate_hourly_features_v2 import _select, _standardize_train_test
+    from hourly_features_v2 import feature_names, feature_vector
+    from train_hourly_ridge_tournament import HORIZONS, _ridge_fit
 
 CANDLE_INDICES = tuple(range(13, 18))
 
