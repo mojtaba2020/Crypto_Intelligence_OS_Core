@@ -5,11 +5,26 @@ from scripts.multitimeframe_lab_v1 import SPECS, manifest, validate_contract
 
 def test_all_requested_horizons_are_locked_in_contract() -> None:
     required = {
-        "1h", "2h", "3h", "4h", "12h",
-        "1d", "2d", "3d",
-        "1w", "2w", "3w",
-        "1mo", "3mo",
-        "2y", "3y", "4y", "5y", "6y", "7y", "8y",
+        "1h",
+        "2h",
+        "3h",
+        "4h",
+        "12h",
+        "1d",
+        "2d",
+        "3d",
+        "1w",
+        "2w",
+        "3w",
+        "1mo",
+        "3mo",
+        "2y",
+        "3y",
+        "4y",
+        "5y",
+        "6y",
+        "7y",
+        "8y",
     }
     assert {spec.label for spec in SPECS} == required
 

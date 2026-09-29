@@ -41,10 +41,7 @@ def feature_vector(
     if current <= 0:
         raise ValueError("Close must be positive")
 
-    values = [
-        math.log(current / float(candles[origin - window]["close"]))
-        for window in windows
-    ]
+    values = [math.log(current / float(candles[origin - window]["close"])) for window in windows]
     returns = [
         math.log(float(candles[i]["close"]) / float(candles[i - 1]["close"]))
         for i in range(origin - longest + 1, origin + 1)

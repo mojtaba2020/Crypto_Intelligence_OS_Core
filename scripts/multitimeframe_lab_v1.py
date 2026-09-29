@@ -50,12 +50,15 @@ def validate_contract(specs: tuple[HorizonSpec, ...] = SPECS) -> None:
     if len(labels) != len(set(labels)):
         raise ValueError("Duplicate horizon labels")
     for spec in specs:
-        if min(
-            spec.horizon_bars,
-            spec.minimum_history_bars,
-            spec.evaluation_step_bars,
-            spec.bootstrap_block_bars,
-        ) <= 0:
+        if (
+            min(
+                spec.horizon_bars,
+                spec.minimum_history_bars,
+                spec.evaluation_step_bars,
+                spec.bootstrap_block_bars,
+            )
+            <= 0
+        ):
             raise ValueError(f"Non-positive research parameter for {spec.label}")
         if spec.family == "macro_cycle" and spec.promotion_eligible:
             raise ValueError("Sparse multi-year cycle horizons cannot auto-promote")

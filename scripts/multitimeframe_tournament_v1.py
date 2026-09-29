@@ -57,9 +57,7 @@ def evaluate(
         train_origins = range(longest, origin)
         x = [feature_vector(candles, i, family) for i in train_origins]
         y = [
-            math.log(
-                float(candles[i + horizon]["close"]) / float(candles[i]["close"])
-            )
+            math.log(float(candles[i + horizon]["close"]) / float(candles[i]["close"]))
             for i in train_origins
             if i + horizon < len(candles)
         ]
