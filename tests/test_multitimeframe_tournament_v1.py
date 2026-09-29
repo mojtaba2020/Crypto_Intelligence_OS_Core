@@ -6,7 +6,7 @@ import pytest
 
 pytest.importorskip("numpy")
 
-from scripts.multitimeframe_tournament_v1 import HORIZONS, _known_training_origins, evaluate
+from scripts.multitimeframe_features_v3 import feature_vector\nfrom scripts.multitimeframe_tournament_v1 import HORIZONS, _known_training_origins, evaluate
 
 
 def _candles(n: int) -> list[dict[str, float]]:
@@ -62,7 +62,7 @@ def test_future_bars_do_not_change_prediction_inputs() -> None:
     horizon = 3
     train = _known_training_origins(365, origin, horizon)
     baseline_x = [
-        tuple(__import__("scripts.multitimeframe_features_v3", fromlist=["feature_vector"]).feature_vector(candles, i, "daily"))
+        tuple(feature_vector(candles, i, "daily"))
         for i in train
     ]
     baseline_y = [
@@ -76,7 +76,7 @@ def test_future_bars_do_not_change_prediction_inputs() -> None:
         mutated[i]["open"] *= 50.0
         mutated[i]["volume"] *= 50.0
     mutated_x = [
-        tuple(__import__("scripts.multitimeframe_features_v3", fromlist=["feature_vector"]).feature_vector(mutated, i, "daily"))
+        tuple(feature_vector(mutated, i, "daily"))
         for i in train
     ]
     mutated_y = [
