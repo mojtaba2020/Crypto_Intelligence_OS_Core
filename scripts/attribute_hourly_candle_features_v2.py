@@ -91,8 +91,7 @@ def _evaluate(
 def tournament(candles: list[dict[str, float]], train_min: int = 360, step: int = 24) -> dict:
     closes = [float(c["close"]) for c in candles]
     feature_cache: list[list[float] | None] = [
-        feature_vector(candles, origin) if origin >= 168 else None
-        for origin in range(len(candles))
+        feature_vector(candles, origin) if origin >= 168 else None for origin in range(len(candles))
     ]
     rows = []
     for horizon in HORIZONS:
