@@ -6,12 +6,12 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Callable
 
 from crypto_intelligence_os.adapters.market_data import bitfinex, bitstamp
-from scripts.resample_multitimeframe_ohlcv import audit_source_rows, source_data_identity
+from resample_multitimeframe_ohlcv import audit_source_rows, source_data_identity
 
 SOURCE_INTERVAL_SECONDS = 3600
 DEFAULT_START = datetime(2011, 8, 18, tzinfo=UTC)

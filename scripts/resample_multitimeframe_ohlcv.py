@@ -8,8 +8,8 @@ import hashlib
 import json
 import math
 from calendar import monthrange
-from itertools import pairwise
 from datetime import UTC, datetime, timedelta
+from itertools import pairwise
 from pathlib import Path
 
 SUPPORTED = {"1d", "1w", "1mo"}
