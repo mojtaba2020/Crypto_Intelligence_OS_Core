@@ -9,11 +9,10 @@ import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from scripts.archive_btc_90d import validate_daily_bars
-
 from crypto_intelligence_os.adapters.market_data import CoinbasePublicCandleSource
 from crypto_intelligence_os.adapters.market_data.btc_archive import BTCArchive
 from crypto_intelligence_os.market_data import Timeframe
+from scripts.archive_btc_90d import validate_daily_bars
 
 DB_PATH = Path("data/btc_usd_daily.sqlite")
 REPORT_PATH = Path("data/btc_ingestion_report.json")
@@ -50,7 +49,12 @@ def main() -> int:
         archived = store.all_bars()
         if not archived:
             raise ValueError("Archive contains no rows")
-        validate_daily_bars(archived, start=archived[0].open_time, end=end, cutoff=completed_at)
+        validate_daily_bars(
+            archived,
+            start=archived[0].open_time,
+            end=end,
+            cutoff=completed_at,
+        )
         count = store.count()
     checksum = hashlib.sha256(DB_PATH.read_bytes()).hexdigest()
     report: dict[str, str | int] = {

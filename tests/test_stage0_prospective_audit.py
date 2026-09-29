@@ -32,6 +32,8 @@ class ProspectiveAuditTests(unittest.TestCase):
     def test_recomputes_scores(self):
         result = audit([self.forecast], [self.score], min_resolved=2)
         self.assertEqual(result["results"][0]["improvement_pct"], 50.0)
+        self.assertEqual(result["status"], "PROSPECTIVE_STATISTICAL_AUDIT_V2_RESEARCH_ONLY")
+        self.assertFalse(result["automatic_promotion"])
         self.assertFalse(result["results"][0]["sample_threshold_met"])
         self.assertEqual(result["results"][0]["forecasts_different_from_persistence"], 1)
         self.assertTrue(result["results"][0]["model_differentiation_observed"])

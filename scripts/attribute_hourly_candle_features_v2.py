@@ -8,9 +8,14 @@ import json
 import math
 from pathlib import Path
 
-from ablate_hourly_features_v2 import _select, _standardize_train_test
-from hourly_features_v2 import feature_names, feature_vector
-from train_hourly_ridge_tournament import HORIZONS, _ridge_fit
+try:
+    from .ablate_hourly_features_v2 import _select, _standardize_train_test
+    from .hourly_features_v2 import feature_names, feature_vector
+    from .train_hourly_ridge_tournament import HORIZONS, _ridge_fit
+except ImportError:  # pragma: no cover - direct script execution
+    from ablate_hourly_features_v2 import _select, _standardize_train_test
+    from hourly_features_v2 import feature_names, feature_vector
+    from train_hourly_ridge_tournament import HORIZONS, _ridge_fit
 
 CANDLE_INDICES = tuple(range(13, 18))
 
@@ -21,8 +26,24 @@ def _evaluate(
     train_min: int,
     step: int,
     horizon: int,
+    *,
+    feature_cache: list[list[float] | None] | None = None,
+    closes: list[float] | None = None,
 ) -> dict:
-    closes = [float(c["close"]) for c in candles]
+    if closes is None:
+        closes = [float(c["close"]) for c in candles]
+    if feature_cache is None:
+        feature_cache = [
+            feature_vector(candles, origin) if origin >= 168 else None
+            for origin in range(len(candles))
+        ]
+
+    def cached_feature(origin: int) -> list[float]:
+        row = feature_cache[origin]
+        if row is None:
+            raise ValueError(f"Feature cache missing origin {origin}")
+        return row
+
     test_origins: list[int] = []
     errors: list[float] = []
     base_errors: list[float] = []
@@ -31,8 +52,8 @@ def _evaluate(
     for test_origin in range(train_min, len(candles) - horizon, step):
         origins = list(range(168, test_origin - horizon + 1))
         ys = [math.log(closes[o + horizon] / closes[o]) for o in origins]
-        full_train = [feature_vector(candles, o) for o in origins]
-        full_test = feature_vector(candles, test_origin)
+        full_train = [cached_feature(o) for o in origins]
+        full_test = cached_feature(test_origin)
         raw_train = [_select(row, indices) for row in full_train]
         raw_test = _select(full_test, indices)
         train_x, test_x = _standardize_train_test(raw_train, raw_test)
@@ -43,9 +64,7 @@ def _evaluate(
         current = closes[test_origin]
         actual = closes[test_origin + horizon]
         actual_return = math.log(actual / current)
-        predicted_return = sum(
-            weight * value for weight, value in zip(beta, test_x, strict=True)
-        )
+        predicted_return = sum(weight * value for weight, value in zip(beta, test_x, strict=True))
         predicted = current * math.exp(predicted_return)
         test_origins.append(test_origin)
         errors.append(abs(predicted - actual) / actual)
@@ -76,18 +95,44 @@ def _evaluate(
 
 
 def tournament(candles: list[dict[str, float]], train_min: int = 360, step: int = 24) -> dict:
+    closes = [float(c["close"]) for c in candles]
+    feature_cache: list[list[float] | None] = [
+        feature_vector(candles, origin) if origin >= 168 else None for origin in range(len(candles))
+    ]
     rows = []
     for horizon in HORIZONS:
         single = {}
         leave_one_out = {}
         for index in CANDLE_INDICES:
             name = feature_names()[index]
-            single[name] = _evaluate(candles, (index,), train_min, step, horizon)
+            single[name] = _evaluate(
+                candles,
+                (index,),
+                train_min,
+                step,
+                horizon,
+                feature_cache=feature_cache,
+                closes=closes,
+            )
             remaining = tuple(i for i in CANDLE_INDICES if i != index)
             leave_one_out[f"without_{name}"] = _evaluate(
-                candles, remaining, train_min, step, horizon
+                candles,
+                remaining,
+                train_min,
+                step,
+                horizon,
+                feature_cache=feature_cache,
+                closes=closes,
             )
-        full = _evaluate(candles, CANDLE_INDICES, train_min, step, horizon)
+        full = _evaluate(
+            candles,
+            CANDLE_INDICES,
+            train_min,
+            step,
+            horizon,
+            feature_cache=feature_cache,
+            closes=closes,
+        )
         rows.append(
             {
                 "horizon_hours": horizon,

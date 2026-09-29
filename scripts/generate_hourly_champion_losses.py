@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
+import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 from hourly_champion_challenger import BENCHMARK, CANDIDATES, HORIZONS
@@ -77,15 +80,21 @@ def generate(closes: list[float]) -> dict:
                 {
                     "horizon_hours": horizon,
                     "origin": origin,
-                    "split": (
-                        "validation" if origin in validation_origins else "locked_test"
-                    ),
+                    "split": ("validation" if origin in validation_origins else "locked_test"),
                     "losses": losses,
                 }
             )
 
+    source_bytes = json.dumps(closes, separators=(",", ":")).encode("utf-8")
     return {
-        "status": "HOURLY_POINT_IN_TIME_LOSSES_V1",
+        "status": "HOURLY_POINT_IN_TIME_LOSSES_V2",
+        "provenance": {
+            "generated_at_utc": datetime.now(UTC).isoformat(),
+            "source": "closed_coinbase_btc_usd_hourly_closes",
+            "source_sha256": hashlib.sha256(source_bytes).hexdigest(),
+            "git_sha": os.environ.get("GITHUB_SHA"),
+            "github_run_id": os.environ.get("GITHUB_RUN_ID"),
+        },
         "horizons_hours": list(HORIZONS),
         "candidates": list(CANDIDATES),
         "benchmark": BENCHMARK,

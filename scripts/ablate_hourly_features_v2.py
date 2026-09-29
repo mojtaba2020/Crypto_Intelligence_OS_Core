@@ -9,8 +9,12 @@ import math
 import statistics
 from pathlib import Path
 
-from hourly_features_v2 import feature_names, feature_vector
-from train_hourly_ridge_tournament import HORIZONS, _ridge_fit
+try:
+    from .hourly_features_v2 import feature_names, feature_vector
+    from .train_hourly_ridge_tournament import HORIZONS, _ridge_fit
+except ImportError:  # pragma: no cover - direct script execution
+    from hourly_features_v2 import feature_names, feature_vector
+    from train_hourly_ridge_tournament import HORIZONS, _ridge_fit
 
 FAMILIES = {
     "returns": tuple(range(0, 9)),

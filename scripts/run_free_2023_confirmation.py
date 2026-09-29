@@ -9,8 +9,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-import backfill_bitstamp_hourly as backfill
-import confirm_hourly_regime_hypothesis as confirm
+try:
+    from . import backfill_bitstamp_hourly as backfill
+    from . import confirm_hourly_regime_hypothesis as confirm
+except ImportError:  # pragma: no cover - direct script execution
+    import backfill_bitstamp_hourly as backfill
+    import confirm_hourly_regime_hypothesis as confirm
 
 START = backfill.utc_date("2023-01-01T00:00:00+00:00")
 END = backfill.utc_date("2024-01-01T00:00:00+00:00")
@@ -46,9 +50,7 @@ def run(output_dir: Path) -> dict:
         report_path=ingestion_report,
     )
     if ingestion["stored_count"] != EXPECTED_BARS:
-        raise RuntimeError(
-            f"Locked 2023 archive must contain exactly {EXPECTED_BARS} bars"
-        )
+        raise RuntimeError(f"Locked 2023 archive must contain exactly {EXPECTED_BARS} bars")
 
     result = confirm.run(
         database,

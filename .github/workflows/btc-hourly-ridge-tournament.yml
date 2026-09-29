@@ -16,6 +16,10 @@ on:
       - "scripts/compare_hourly_features_v2.py"
       - "scripts/ablate_hourly_features_v2.py"
       - "scripts/attribute_hourly_candle_features_v2.py"
+      - "tests/test_hourly_candle_feature_attribution.py"
+      - "scripts/gate_hourly_feature_candidate.py"
+      - "scripts/calendar_regime_block_bootstrap.py"
+      - "scripts/gate_hourly_regimes.py"
       - ".github/workflows/btc-hourly-ridge-tournament.yml"
 
 jobs:
@@ -91,9 +95,17 @@ jobs:
       - name: Ablate standardized Feature V2 families
         run: |
           python scripts/ablate_hourly_features_v2.py --input research/hourly_ohlcv_training.json --output research/hourly_features_v2_ablation.json
+      - name: Verify cached candle attribution equivalence
+        run: |
+          python -m pip install pytest
+          python -m pytest -q tests/test_hourly_candle_feature_attribution.py
       - name: Attribute standardized candle features
+        timeout-minutes: 20
         run: |
           python scripts/attribute_hourly_candle_features_v2.py --input research/hourly_ohlcv_training.json --output research/hourly_candle_feature_attribution.json
+      - name: Gate strongest attributed feature with V3 statistics
+        run: |
+          python scripts/gate_hourly_feature_candidate.py --attribution research/hourly_candle_feature_attribution.json --output research/hourly_feature_gate_v3.json --feature range_mean_6h --horizon 12
       - name: Print tournament reports
         run: |
           cat research/hourly_ridge_tournament.json
@@ -113,3 +125,4 @@ jobs:
             research/hourly_candle_feature_attribution.json
             research/hourly_champion_losses.json
             research/hourly_champion_challenger.json
+            research/hourly_feature_gate_v3.json

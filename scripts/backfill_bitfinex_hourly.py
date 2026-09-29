@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Backfill validated Bitstamp BTC/USD hourly history into the research archive."""
+"""Backfill validated Bitfinex BTC/USD hourly history into the immutable research archive."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from crypto_intelligence_os.adapters.market_data.bitstamp import (
+from crypto_intelligence_os.adapters.market_data.bitfinex import (
     INSTRUMENT_ID,
     SOURCE_ID,
-    fetch_hourly_range,
+    fetch_hourly,
 )
 from crypto_intelligence_os.adapters.market_data.historical_archive import (
     HistoricalOHLCVArchive,
@@ -22,31 +22,30 @@ from crypto_intelligence_os.adapters.market_data.historical_archive import (
 
 def utc_date(value: str) -> datetime:
     parsed = datetime.fromisoformat(value)
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC)
+    aware = parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed
+    return aware.astimezone(UTC)
 
 
 def run(*, start: datetime, end: datetime, database: Path, report_path: Path) -> dict:
-    bars = fetch_hourly_range(start=start, end=end)
-    expected_count = int((end - start).total_seconds() // 3600)
-    actual_times = {bar.open_time for bar in bars}
-    missing_times = []
+    if start >= end:
+        raise ValueError("start must be earlier than end")
+    collected = {}
     cursor = start
     while cursor < end:
-        if cursor not in actual_times:
-            missing_times.append(cursor.isoformat())
-        cursor += timedelta(hours=1)
+        page_end = min(end, cursor + timedelta(hours=9999))
+        for bar in fetch_hourly(start=cursor, end=page_end):
+            if cursor <= bar.open_time < page_end:
+                collected[bar.open_time] = bar
+        cursor = page_end
+    bars = tuple(collected[key] for key in sorted(collected))
     validate_hourly_continuity(bars)
-    if len(bars) != expected_count or missing_times:
-        raise ValueError(
-            "Bitstamp backfill is incomplete: "
-            f"expected={expected_count} fetched={len(bars)} "
-            f"missing={len(missing_times)}"
-        )
-    if bars[0].open_time != start or bars[-1].open_time != end - timedelta(hours=1):
-        raise ValueError("Bitstamp backfill boundaries do not exactly match requested period")
-
+    expected = int((end - start).total_seconds() // 3600)
+    if (
+        len(bars) != expected
+        or bars[0].open_time != start
+        or bars[-1].open_time != end - timedelta(hours=1)
+    ):
+        raise ValueError(f"Bitfinex backfill incomplete: expected={expected} fetched={len(bars)}")
     with HistoricalOHLCVArchive(database) as archive:
         inserted = archive.persist(bars)
         stored = archive.read(
@@ -55,18 +54,13 @@ def run(*, start: datetime, end: datetime, database: Path, report_path: Path) ->
             source_id=SOURCE_ID,
         )
         archive.integrity_check()
-
-    report = {
-        "status": "BITSTAMP_LONG_HISTORY_INGESTED",
+    result = {
+        "status": "BITFINEX_LONG_HISTORY_INGESTED",
         "source_id": SOURCE_ID,
         "instrument_id": INSTRUMENT_ID,
-        "timeframe": "1h",
         "requested_start_utc": start.isoformat(),
         "requested_end_utc": end.isoformat(),
-        "expected_count": expected_count,
         "fetched_count": len(bars),
-        "missing_count": len(missing_times),
-        "missing_open_times_utc": missing_times[:100],
         "inserted_count": inserted,
         "stored_count": len(stored),
         "first_open_utc": bars[0].open_time.isoformat(),
@@ -76,8 +70,8 @@ def run(*, start: datetime, end: datetime, database: Path, report_path: Path) ->
         "canonical_data_sha256": canonical_bar_fingerprint(stored),
     }
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    return report
+    report_path.write_text(json.dumps(result, indent=2) + "\n")
+    return result
 
 
 def main() -> None:
@@ -87,19 +81,13 @@ def main() -> None:
     parser.add_argument("--database", required=True, type=Path)
     parser.add_argument("--report", required=True, type=Path)
     args = parser.parse_args()
-    if args.start >= args.end:
-        raise ValueError("--start must be earlier than --end")
-    print(
-        json.dumps(
-            run(
-                start=args.start,
-                end=args.end,
-                database=args.database,
-                report_path=args.report,
-            ),
-            indent=2,
-        )
+    result = run(
+        start=args.start,
+        end=args.end,
+        database=args.database,
+        report_path=args.report,
     )
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

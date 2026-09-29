@@ -47,29 +47,42 @@ def main() -> None:
         # Primary confirmation starts clean so stale observations cannot mix in.
         for stale in (DATABASE, INGESTION_REPORT, CONFIRMATION):
             stale.unlink(missing_ok=True)
-        _run([
-            sys.executable,
-            "scripts/backfill_bitstamp_hourly.py",
-            "--start", "2023-01-01T00:00:00+00:00",
-            "--end", "2024-01-01T00:00:00+00:00",
-            "--database", str(DATABASE),
-            "--report", str(INGESTION_REPORT),
-        ])
+        _run(
+            [
+                sys.executable,
+                "scripts/backfill_bitstamp_hourly.py",
+                "--start",
+                "2023-01-01T00:00:00+00:00",
+                "--end",
+                "2024-01-01T00:00:00+00:00",
+                "--database",
+                str(DATABASE),
+                "--report",
+                str(INGESTION_REPORT),
+            ]
+        )
 
     if not DATABASE.exists() or not INGESTION_REPORT.exists():
         raise FileNotFoundError(
             "Validated 2023 archive/report missing; run without --reuse-validated-archive."
         )
 
-    _run([
-        sys.executable,
-        "scripts/confirm_hourly_regime_hypothesis.py",
-        "--database", str(DATABASE),
-        "--preregistration", str(PREREG),
-        "--ingestion-report", str(INGESTION_REPORT),
-        "--runner-git-sha", _git_sha(),
-        "--output", str(CONFIRMATION),
-    ])
+    _run(
+        [
+            sys.executable,
+            "scripts/confirm_hourly_regime_hypothesis.py",
+            "--database",
+            str(DATABASE),
+            "--preregistration",
+            str(PREREG),
+            "--ingestion-report",
+            str(INGESTION_REPORT),
+            "--runner-git-sha",
+            _git_sha(),
+            "--output",
+            str(CONFIRMATION),
+        ]
+    )
 
     result = json.loads(CONFIRMATION.read_text(encoding="utf-8"))
     summary = {

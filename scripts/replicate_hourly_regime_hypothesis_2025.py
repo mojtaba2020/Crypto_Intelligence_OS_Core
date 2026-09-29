@@ -124,26 +124,13 @@ def run(
         for b in bars
     ]
     paired = _evaluate_preregistered_feature(candles)
-    regimes = [
-        classify_regime(candles, int(origin))
-        for origin in paired["origins"]
-    ]
+    regimes = [classify_regime(candles, int(origin)) for origin in paired["origins"]]
     selected = [regime == TARGET_REGIME for regime in regimes]
-    model = [
-        float(x)
-        for x, keep in zip(paired["model_losses"], selected, strict=True)
-        if keep
-    ]
+    model = [float(x) for x, keep in zip(paired["model_losses"], selected, strict=True) if keep]
     baseline = [
-        float(x)
-        for x, keep in zip(paired["baseline_losses"], selected, strict=True)
-        if keep
+        float(x) for x, keep in zip(paired["baseline_losses"], selected, strict=True) if keep
     ]
-    hits = [
-        int(x)
-        for x, keep in zip(paired["direction_hits"], selected, strict=True)
-        if keep
-    ]
+    hits = [int(x) for x, keep in zip(paired["direction_hits"], selected, strict=True) if keep]
     n = len(model)
 
     result = {
@@ -190,22 +177,22 @@ def run(
             seed=BOOTSTRAP_SEED,
         )
         supports = gate["gate"] == "PASS" and model_mape < baseline_mape
-        result.update({
-            "model_mape_pct": model_mape,
-            "persistence_mape_pct": baseline_mape,
-            "mape_improvement_vs_persistence_pct": (
-                100 * (baseline_mape - model_mape) / baseline_mape
-                if baseline_mape
-                else 0.0
-            ),
-            "direction_accuracy_pct": 100 * sum(hits) / n,
-            "statistical_gate": gate,
-            "decision": (
-                "REPLICATION_SUPPORTS_HYPOTHESIS"
-                if supports
-                else "REPLICATION_DOES_NOT_SUPPORT_HYPOTHESIS"
-            ),
-        })
+        result.update(
+            {
+                "model_mape_pct": model_mape,
+                "persistence_mape_pct": baseline_mape,
+                "mape_improvement_vs_persistence_pct": (
+                    100 * (baseline_mape - model_mape) / baseline_mape if baseline_mape else 0.0
+                ),
+                "direction_accuracy_pct": 100 * sum(hits) / n,
+                "statistical_gate": gate,
+                "decision": (
+                    "REPLICATION_SUPPORTS_HYPOTHESIS"
+                    if supports
+                    else "REPLICATION_DOES_NOT_SUPPORT_HYPOTHESIS"
+                ),
+            }
+        )
 
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")

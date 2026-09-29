@@ -27,12 +27,9 @@ def calendar_regime_block_bootstrap(
         raise ValueError("Invalid block length")
 
     diffs = [
-        baseline - model
-        for model, baseline in zip(model_losses, baseline_losses, strict=True)
+        baseline - model for model, baseline in zip(model_losses, baseline_losses, strict=True)
     ]
-    observed = statistics.mean(
-        diff for diff, keep in zip(diffs, selected, strict=True) if keep
-    )
+    observed = statistics.mean(diff for diff, keep in zip(diffs, selected, strict=True) if keep)
 
     # Deterministic PRNG is required for reproducible statistical bootstrap.
     rng = random.Random(seed)  # noqa: S311
@@ -49,11 +46,7 @@ def calendar_regime_block_bootstrap(
             start = rng.choice(starts)
             sampled_indices.extend(range(start, start + block_length))
         sampled_indices = sampled_indices[:n]
-        selected_diffs = [
-            diffs[index]
-            for index in sampled_indices
-            if selected[index]
-        ]
+        selected_diffs = [diffs[index] for index in sampled_indices if selected[index]]
         if selected_diffs:
             means.append(statistics.mean(selected_diffs))
 
@@ -64,12 +57,34 @@ def calendar_regime_block_bootstrap(
     lower = means[int(0.025 * repetitions)]
     upper = means[min(repetitions - 1, int(0.975 * repetitions))]
     probability_positive = sum(value > 0 for value in means) / repetitions
+    # Null-centered resampling for H0: conditional mean improvement <= 0.
+    null_diffs = [
+        value - observed if keep else value for value, keep in zip(diffs, selected, strict=True)
+    ]
+    null_means: list[float] = []
+    attempts = 0
+    while len(null_means) < repetitions and attempts < max_attempts:
+        attempts += 1
+        sampled_indices: list[int] = []
+        for _ in range(blocks_needed):
+            start = rng.choice(starts)
+            sampled_indices.extend(range(start, start + block_length))
+        sampled_indices = sampled_indices[:n]
+        sample = [null_diffs[index] for index in sampled_indices if selected[index]]
+        if sample:
+            null_means.append(statistics.mean(sample))
+    if len(null_means) != repetitions:
+        raise ValueError("Unable to draw enough null-centered regime bootstrap samples")
+    extreme = sum(value >= observed for value in null_means)
+    one_sided_null_p_value = (extreme + 1) / (repetitions + 1)
     return {
         "calendar_samples": n,
         "selected_regime_samples": selected_count,
         "mean_loss_improvement": observed,
         "ci_95": [lower, upper],
         "bootstrap_probability_improvement_positive": probability_positive,
+        "one_sided_null_centered_p_value": one_sided_null_p_value,
+        "null_hypothesis": "conditional_mean_loss_improvement_lte_zero",
         "block_length": block_length,
         "repetitions": repetitions,
         "bootstrap": "calendar_preserving_moving_block",

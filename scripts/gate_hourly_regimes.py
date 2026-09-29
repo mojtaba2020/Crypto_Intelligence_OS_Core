@@ -34,12 +34,8 @@ def main() -> None:
     rows = []
     for regime in sorted(set(regimes)):
         selected = [value == regime for value in regimes]
-        selected_model = [
-            loss for loss, keep in zip(model, selected, strict=True) if keep
-        ]
-        selected_baseline = [
-            loss for loss, keep in zip(baseline, selected, strict=True) if keep
-        ]
+        selected_model = [loss for loss, keep in zip(model, selected, strict=True) if keep]
+        selected_baseline = [loss for loss, keep in zip(baseline, selected, strict=True) if keep]
         n = len(selected_model)
         model_mape = 100 * statistics.mean(selected_model)
         baseline_mape = 100 * statistics.mean(selected_baseline)
@@ -49,9 +45,7 @@ def main() -> None:
             "model_mape_pct": model_mape,
             "persistence_mape_pct": baseline_mape,
             "mape_improvement_vs_persistence_pct": (
-                100 * (baseline_mape - model_mape) / baseline_mape
-                if baseline_mape
-                else 0.0
+                100 * (baseline_mape - model_mape) / baseline_mape if baseline_mape else 0.0
             ),
         }
         if n >= args.min_samples:
@@ -64,21 +58,47 @@ def main() -> None:
             raw_gate = row["statistical_gate"]["gate"]
             row["raw_gate"] = raw_gate
             row["decision"] = (
-                "EXPLORATORY_PASS_REQUIRES_CONFIRMATION"
-                if raw_gate == "PASS"
-                else "FAIL"
+                "EXPLORATORY_PASS_REQUIRES_CONFIRMATION" if raw_gate == "PASS" else "FAIL"
             )
         else:
             row["decision"] = "INSUFFICIENT_SAMPLES"
         rows.append(row)
 
+    eligible = [row for row in rows if row.get("statistical_gate")]
+    ordered = sorted(
+        eligible,
+        key=lambda row: (
+            row["statistical_gate"]["one_sided_null_centered_p_value"],
+            row["regime"],
+        ),
+    )
+    holm_open = True
+    for rank, row in enumerate(ordered, start=1):
+        gate = row["statistical_gate"]
+        p_value = gate["one_sided_null_centered_p_value"]
+        threshold = 0.05 / (len(ordered) - rank + 1)
+        reject = holm_open and p_value <= threshold
+        if not reject:
+            holm_open = False
+        gate["holm_rank"] = rank
+        gate["holm_threshold"] = threshold
+        gate["holm_reject"] = reject
+        row["decision"] = (
+            "EXPLORATORY_PASS_REQUIRES_INDEPENDENT_CONFIRMATION"
+            if reject and gate["gate"] == "PASS"
+            else "FAIL"
+        )
+
     result = {
-        "status": "HOURLY_REGIME_GATE_V2",
-        "regime_definition": "24h trend band x trailing point-in-time 24h volatility median",
+        "status": "HOURLY_REGIME_GATE_V3",
+        "regime_definition": ("24h trend band x trailing point-in-time 24h volatility median"),
         "research_status": "EXPLORATORY",
-        "bootstrap": "calendar_preserving_moving_block",
+        "bootstrap": "null_centered_calendar_preserving_moving_block",
+        "multiple_comparison_method": "holm_bonferroni_over_observed_regimes",
+        "familywise_alpha": 0.05,
+        "automatic_promotion": False,
         "confirmation_requirements": [
-            "multiplicity control across tested regimes",
+            "independent confirmation after Holm-controlled exploratory discovery",
             "independent time period or independent exchange",
             "predeclared confirmatory hypothesis",
         ],
