@@ -116,7 +116,8 @@ def test_source_audit_and_identity_are_order_independent() -> None:
 
 
 def test_aggregate_preserves_incomplete_bucket_with_validity_metadata() -> None:
-    rows = _hourly_rows(48)
+    start = _ts(2026, 9, 28)
+    rows = [_row(start + hour * 3600, 100.0 + hour) for hour in range(48)]
     rows.pop(5)
     result = aggregate(rows, "1d")
     assert len(result) == 2
