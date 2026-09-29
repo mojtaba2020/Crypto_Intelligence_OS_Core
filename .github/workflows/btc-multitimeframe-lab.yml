@@ -1,0 +1,45 @@
+name: BTC Multi-Timeframe Research Lab
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/multitimeframe_lab_v1.py"
+      - "tests/test_multitimeframe_lab_v1.py"
+      - "docs/multitimeframe_research_contract_v1.md"
+      - ".github/workflows/btc-multitimeframe-lab.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install project test dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Verify locked multi-timeframe contract
+        run: python -m pytest -q tests/test_multitimeframe_lab_v1.py
+
+      - name: Generate multi-timeframe manifest
+        run: |
+          mkdir -p artifacts/multitimeframe
+          python scripts/multitimeframe_lab_v1.py             --output artifacts/multitimeframe/contract-v1.json
+
+      - name: Upload research contract artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-multitimeframe-research-contract-v1
+          path: artifacts/multitimeframe/contract-v1.json
+          if-no-files-found: error
+          retention-days: 30
