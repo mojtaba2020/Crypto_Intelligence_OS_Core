@@ -47,6 +47,7 @@ def test_incomplete_provenance_fails_closed() -> None:
 
 
 def test_registry_fingerprint_is_deterministic() -> None:
-    assert register(_evidence())["registry_fingerprint"] == register(_evidence())[
-        "registry_fingerprint"
-    ]
+    assert (
+        register(_evidence())["registry_fingerprint"]
+        == register(_evidence())["registry_fingerprint"]
+    )

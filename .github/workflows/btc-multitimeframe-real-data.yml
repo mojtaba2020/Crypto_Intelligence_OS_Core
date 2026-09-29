@@ -6,6 +6,8 @@ on:
     paths:
       - "scripts/fetch_multitimeframe_exchange_audit_v1.py"
       - "scripts/resample_multitimeframe_ohlcv.py"
+      - "scripts/prepare_multitimeframe_real_data_v1.py"
+      - "scripts/run_real_multitimeframe_judge_v1.py"
       - ".github/workflows/btc-multitimeframe-real-data.yml"
 
 permissions:
@@ -14,7 +16,7 @@ permissions:
 jobs:
   real-data-audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,10 +36,26 @@ jobs:
             --end "2026-09-29T00:00:00+00:00" \
             --output-dir artifacts/real-data
 
-      - name: Upload evidence-grade raw data and audit manifest
+      - name: Build gap-safe daily weekly monthly datasets
+        run: |
+          PYTHONPATH=. python scripts/prepare_multitimeframe_real_data_v1.py \
+            --input-dir artifacts/real-data \
+            --output-dir artifacts/prepared
+
+      - name: Run real Bitstamp validation and locked OOS judge
+        run: |
+          PYTHONPATH=. python scripts/run_real_multitimeframe_judge_v1.py \
+            --data-dir artifacts/prepared \
+            --exchange bitstamp \
+            --output artifacts/real-judge/bitstamp_locked_judge_v1.json
+
+      - name: Upload real-data evidence bundle
         uses: actions/upload-artifact@v4
         with:
-          name: btc-real-exchange-audit-v1
-          path: artifacts/real-data/
+          name: btc-real-multitimeframe-evidence-v1
+          path: |
+            artifacts/real-data/
+            artifacts/prepared/
+            artifacts/real-judge/
           if-no-files-found: error
           retention-days: 30

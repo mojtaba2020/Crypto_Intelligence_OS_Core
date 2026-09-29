@@ -103,10 +103,13 @@ def aggregate(
     as_of_timestamp: int | None = None,
     source_interval_seconds: int = 3600,
     require_complete_buckets: bool = False,
+    incomplete_policy: str = "raise",
 ) -> list[dict[str, float]]:
     """Aggregate source-open timestamps into canonical closed UTC target bars."""
     if timeframe not in SUPPORTED:
         raise ValueError(f"Unsupported timeframe: {timeframe}")
+    if incomplete_policy not in {"raise", "drop"}:
+        raise ValueError("incomplete_policy must be raise or drop")
     if source_interval_seconds <= 0:
         raise ValueError("source_interval_seconds must be positive")
     if not rows:
@@ -141,6 +144,8 @@ def aggregate(
             if actual_timestamps != expected_timestamps:
                 missing = len(expected_timestamps - actual_timestamps)
                 extra = len(actual_timestamps - expected_timestamps)
+                if incomplete_policy == "drop":
+                    continue
                 raise ValueError(
                     f"Incomplete {timeframe} bucket at {key}: "
                     f"expected={expected} actual={len(group)} missing={missing} extra={extra}"

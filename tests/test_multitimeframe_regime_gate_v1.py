@@ -39,9 +39,7 @@ def test_regime_gate_is_pre_specified_and_never_promotes() -> None:
     origins = list(range(500, 800, 10))
     challenger = [0.01 + 0.001 * math.sin(i) for i in range(len(origins))]
     baseline = [value + 0.002 for value in challenger]
-    report = regime_gate(
-        candles, origins, challenger, baseline, "daily", minimum_samples=2
-    )
+    report = regime_gate(candles, origins, challenger, baseline, "daily", minimum_samples=2)
     assert set(report["regimes"]) == {
         "uptrend",
         "downtrend",

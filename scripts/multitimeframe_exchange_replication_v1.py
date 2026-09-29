@@ -53,12 +53,7 @@ def replication_decision(
 ) -> dict[str, object]:
     """Apply the locked replication gate without automatic production promotion."""
     validate_replication_spec(spec)
-    replicated = (
-        prospective_confirmed
-        and holm_reject
-        and mean_improvement > 0.0
-        and ci95_low > 0.0
-    )
+    replicated = prospective_confirmed and holm_reject and mean_improvement > 0.0 and ci95_low > 0.0
     return {
         "spec_fingerprint": spec.fingerprint(),
         "discovery_exchange": spec.discovery_exchange,
@@ -67,9 +62,7 @@ def replication_decision(
         "holm_reject": holm_reject,
         "ci95_low": ci95_low,
         "mean_improvement": mean_improvement,
-        "replication_status": (
-            "REPLICATED_RESEARCH_EDGE" if replicated else "NOT_REPLICATED"
-        ),
+        "replication_status": ("REPLICATED_RESEARCH_EDGE" if replicated else "NOT_REPLICATED"),
         "model_registry_eligible": replicated,
         "production_promotion": False,
     }
