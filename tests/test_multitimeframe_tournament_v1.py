@@ -39,7 +39,8 @@ def test_daily_tournament_is_out_of_sample_and_reports_baseline() -> None:
     assert result["candidates"]["ridge"]["mape"] >= 0.0
     assert set(result["candidates"]) == {"ridge", "extra_trees", "boosting"}
     assert result["persistence_mape"] >= 0.0
-    assert 0.0 <= result["direction_accuracy"] <= 1.0
+    for candidate in result["candidates"].values():
+        assert 0.0 <= candidate["direction_accuracy"] <= 1.0
 
 
 def test_insufficient_oos_origins_fail_closed() -> None:

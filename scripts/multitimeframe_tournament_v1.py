@@ -94,9 +94,7 @@ def evaluate(
         for name in CANDIDATES:
             predictor = _fit_candidate(name, x, y)
             predicted_return = (
-                float(predictor([row])[0])
-                if name != "ridge"
-                else float(predictor(row))
+                float(predictor([row])[0]) if name != "ridge" else float(predictor(row))
             )
             predicted = current * math.exp(predicted_return)
             candidate_errors[name].append(abs(predicted - actual) / actual)
@@ -108,8 +106,7 @@ def evaluate(
         results[name] = {
             "mape": statistics.mean(errors),
             "mean_loss_improvement": statistics.mean(
-                base - model
-                for base, model in zip(persistence_errors, errors, strict=True)
+                base - model for base, model in zip(persistence_errors, errors, strict=True)
             ),
             "direction_accuracy": statistics.mean(candidate_directions[name]),
         }
