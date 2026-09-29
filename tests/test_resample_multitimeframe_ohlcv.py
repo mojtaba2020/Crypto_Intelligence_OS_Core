@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from scripts.resample_multitimeframe_ohlcv import aggregate
+import pytest
+from scripts.resample_multitimeframe_ohlcv import aggregate, audit_source_rows, source_data_identity
 
 
 def _ts(year: int, month: int, day: int, hour: int = 0) -> int:
@@ -76,3 +77,39 @@ def test_unknown_timeframe_fails_closed() -> None:
         assert "Unsupported timeframe" in str(exc)
     else:
         raise AssertionError("Unsupported timeframe must fail closed")
+
+
+def test_duplicate_source_timestamp_fails_closed() -> None:
+    ts = _ts(2026, 9, 28)
+    with pytest.raises(ValueError, match="Duplicate"):
+        aggregate([_row(ts, 100.0), _row(ts, 101.0)], "1d")
+
+
+def test_invalid_ohlc_fails_closed() -> None:
+    row = _row(_ts(2026, 9, 28), 100.0)
+    row["high"] = 90.0
+    with pytest.raises(ValueError, match="High is inconsistent"):
+        aggregate([row], "1d")
+
+
+def test_strict_daily_bucket_rejects_missing_hour() -> None:
+    start = _ts(2026, 9, 28)
+    rows = [_row(start + hour * 3600, 100.0 + hour) for hour in range(24) if hour != 7]
+    with pytest.raises(ValueError, match="Incomplete 1d bucket"):
+        aggregate(rows, "1d", require_complete_buckets=True)
+
+
+def test_strict_daily_bucket_accepts_exact_complete_source_grid() -> None:
+    start = _ts(2026, 9, 28)
+    rows = [_row(start + hour * 3600, 100.0 + hour) for hour in range(24)]
+    daily = aggregate(rows, "1d", require_complete_buckets=True)
+    assert daily[0]["source_bars"] == 24
+
+
+def test_source_audit_and_identity_are_order_independent() -> None:
+    start = _ts(2026, 9, 28)
+    rows = [_row(start + hour * 3600, 100.0 + hour) for hour in range(3)]
+    audit = audit_source_rows(rows)
+    assert audit["continuous"] is True
+    assert audit["gap_count"] == 0
+    assert source_data_identity(rows) == source_data_identity(list(reversed(rows)))
