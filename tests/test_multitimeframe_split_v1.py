@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from scripts.multitimeframe_split_v1 import chronological_split, origins_for_phase
 
 
