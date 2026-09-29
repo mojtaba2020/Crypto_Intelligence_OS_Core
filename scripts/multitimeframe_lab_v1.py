@@ -35,6 +35,8 @@ SPECS: tuple[HorizonSpec, ...] = (
     HorizonSpec("3w", "1w", 3, "weekly", True, 260, 1, 8),
     HorizonSpec("1mo", "1mo", 1, "monthly", True, 120, 1, 4),
     HorizonSpec("3mo", "1mo", 3, "monthly", True, 120, 1, 4),
+    HorizonSpec("6mo", "1mo", 6, "macro_cycle", False, 120, 1, 12),
+    HorizonSpec("1y", "1mo", 12, "macro_cycle", False, 120, 1, 12),
     HorizonSpec("2y", "1mo", 24, "macro_cycle", False, 120, 1, 12),
     HorizonSpec("3y", "1mo", 36, "macro_cycle", False, 120, 1, 12),
     HorizonSpec("4y", "1mo", 48, "macro_cycle", False, 120, 1, 12),

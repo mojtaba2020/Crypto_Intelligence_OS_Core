@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 
 import pytest
-
 from scripts.multitimeframe_judge_v1 import (
     holm_rejections,
     judge_locked,

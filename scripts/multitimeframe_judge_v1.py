@@ -94,7 +94,7 @@ def null_centered_moving_block_bootstrap(
         raise ValueError("Invalid bootstrap block size")
     observed = statistics.mean(improvements)
     centered = [value - observed for value in improvements]
-    rng = random.Random(seed)
+    rng = random.Random(seed)  # noqa: S311 -- deterministic statistical bootstrap
     n = len(centered)
     starts = list(range(0, n - block_size + 1))
     boot_means: list[float] = []

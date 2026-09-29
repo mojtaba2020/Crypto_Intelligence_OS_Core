@@ -18,6 +18,8 @@ def test_all_requested_horizons_are_locked_in_contract() -> None:
         "3w",
         "1mo",
         "3mo",
+        "6mo",
+        "1y",
         "2y",
         "3y",
         "4y",
