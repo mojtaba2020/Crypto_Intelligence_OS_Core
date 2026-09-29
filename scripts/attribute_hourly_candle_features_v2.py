@@ -38,6 +38,7 @@ def _evaluate(
         if row is None:
             raise ValueError(f"Feature cache missing origin {origin}")
         return row
+
     test_origins: list[int] = []
     errors: list[float] = []
     base_errors: list[float] = []
