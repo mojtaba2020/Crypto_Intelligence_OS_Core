@@ -28,25 +28,21 @@ def prepare_exchange(
     report: dict[str, object] = {"exchange": exchange, "timeframes": {}}
     for timeframe in TIMEFRAMES:
         all_closed = aggregate(rows, timeframe)
-        complete = aggregate(
-            rows,
-            timeframe,
-            require_complete_buckets=True,
-            incomplete_policy="drop",
-        )
-        dropped = len(all_closed) - len(complete)
-        if not complete:
-            raise ValueError(f"No complete {timeframe} bars for {exchange}")
+        complete_count = sum(bool(row["is_complete"]) for row in all_closed)
+        incomplete_count = len(all_closed) - complete_count
+        if not all_closed:
+            raise ValueError(f"No closed {timeframe} bars for {exchange}")
         path = output_dir / f"{exchange}_{timeframe}.json"
-        path.write_text(json.dumps(complete, separators=(",", ":")) + "\n", encoding="utf-8")
+        path.write_text(json.dumps(all_closed, separators=(",", ":")) + "\n", encoding="utf-8")
         report["timeframes"][timeframe] = {
             "closed_buckets_seen": len(all_closed),
-            "complete_buckets": len(complete),
-            "dropped_incomplete_buckets": dropped,
-            "data_sha256": source_data_identity(complete),
-            "first_timestamp": int(complete[0]["timestamp"]),
-            "last_timestamp": int(complete[-1]["timestamp"]),
-            "gap_policy": "drop_incomplete_target_bucket_no_imputation",
+            "complete_buckets": complete_count,
+            "incomplete_buckets": incomplete_count,
+            "dropped_incomplete_buckets": 0,
+            "data_sha256": source_data_identity(all_closed),
+            "first_timestamp": int(all_closed[0]["timestamp"]),
+            "last_timestamp": int(all_closed[-1]["timestamp"]),
+            "gap_policy": "preserve_calendar_grid_mark_incomplete_no_imputation",
         }
     return report
 
@@ -63,7 +59,7 @@ def main() -> None:
         exchanges[exchange] = prepare_exchange(rows, exchange, args.output_dir)
     manifest = {
         "status": "REAL_MULTITIMEFRAME_DATASET_V1",
-        "policy": "complete_target_buckets_only_no_imputation",
+        "policy": "calendar_grid_with_completeness_mask_no_imputation",
         "exchanges": exchanges,
         "automatic_model_promotion": False,
     }

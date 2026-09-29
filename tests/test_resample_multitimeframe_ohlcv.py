@@ -113,3 +113,14 @@ def test_source_audit_and_identity_are_order_independent() -> None:
     assert audit["continuous"] is True
     assert audit["gap_count"] == 0
     assert source_data_identity(rows) == source_data_identity(list(reversed(rows)))
+
+
+def test_aggregate_preserves_incomplete_bucket_with_validity_metadata() -> None:
+    rows = _hourly_rows(48)
+    rows.pop(5)
+    result = aggregate(rows, "1d")
+    assert len(result) == 2
+    assert result[0]["is_complete"] is False
+    assert result[0]["source_bars"] == 23
+    assert result[0]["expected_source_bars"] == 24
+    assert result[1]["is_complete"] is True

@@ -35,6 +35,8 @@ def _is_contiguous(candles: list[dict[str, float]], family: str, start: int, end
     needed = candles[start : end + 1]
     if not all("timestamp" in row for row in needed):
         return True
+    if any(row.get("is_complete") is False for row in needed):
+        return False
     timestamps = [int(row["timestamp"]) for row in needed]
     return all(
         right == _next_period_timestamp(left, family) for left, right in pairwise(timestamps)

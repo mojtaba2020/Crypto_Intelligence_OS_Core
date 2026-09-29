@@ -92,3 +92,14 @@ def test_feature_history_gap_does_not_invalidate_unrelated_target_logic() -> Non
     assert not has_valid_feature_history(candles, "daily", 700)
     assert has_valid_forecast_target(candles, "daily", 700, 3)
     assert not is_temporally_valid_sample(candles, "daily", 700, 3)
+
+
+def test_incomplete_bucket_mask_invalidates_only_windows_that_touch_it() -> None:
+    candles = _candles(800)
+    for i, row in enumerate(candles):
+        row["timestamp"] = float(i * 86_400)
+        row["is_complete"] = True
+    candles[100]["is_complete"] = False
+    assert is_temporally_valid_sample(candles, "daily", 700, 3)
+    candles[500]["is_complete"] = False
+    assert not is_temporally_valid_sample(candles, "daily", 700, 3)

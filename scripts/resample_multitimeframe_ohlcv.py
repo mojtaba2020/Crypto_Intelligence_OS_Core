@@ -151,6 +151,8 @@ def aggregate(
                     f"expected={expected} actual={len(group)} missing={missing} extra={extra}"
                 )
         first, last = group[0], group[-1]
+        end = _bucket_end(start, timeframe)
+        expected_source_bars = int((end - start).total_seconds()) // source_interval_seconds
         output.append(
             {
                 "timestamp": key,
@@ -160,6 +162,8 @@ def aggregate(
                 "close": float(last["close"]),
                 "volume": sum(float(row["volume"]) for row in group),
                 "source_bars": len(group),
+                "expected_source_bars": expected_source_bars,
+                "is_complete": len(group) == expected_source_bars,
             }
         )
     return output
