@@ -76,7 +76,7 @@ def manifest() -> dict[str, object]:
         },
         "macro_cycle_policy": {
             "mode": "descriptive_and_hypothesis_generation_only",
-            "reason": "BTC history contains too few independent multi-year cycles for reliable promotion-grade inference",
+            "reason": (\n                "BTC history contains too few independent multi-year cycles for reliable "\n                "promotion-grade inference"\n            ),
         },
         "horizons": [asdict(spec) for spec in SPECS],
     }
