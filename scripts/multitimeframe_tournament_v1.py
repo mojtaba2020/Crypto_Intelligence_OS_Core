@@ -78,7 +78,7 @@ def evaluate(
         "ridge_mape": statistics.mean(model_errors),
         "persistence_mape": statistics.mean(persistence_errors),
         "mean_loss_improvement": statistics.mean(
-            base - model for base, model in zip(persistence_errors, model_errors)
+            base - model for base, model in zip(persistence_errors, model_errors, strict=True)
         ),
         "direction_accuracy": statistics.mean(directions),
     }
