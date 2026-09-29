@@ -1,0 +1,43 @@
+name: BTC Multi-Timeframe Real Data Audit
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/fetch_multitimeframe_exchange_audit_v1.py"
+      - "scripts/resample_multitimeframe_ohlcv.py"
+      - ".github/workflows/btc-multitimeframe-real-data.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  real-data-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install research dependencies
+        run: python -m pip install -e ".[research]"
+
+      - name: Fetch and audit real Bitstamp and Bitfinex hourly BTC/USD history
+        run: |
+          python scripts/fetch_multitimeframe_exchange_audit_v1.py \
+            --start "2011-08-18T00:00:00+00:00" \
+            --end "2026-09-29T00:00:00+00:00" \
+            --output-dir artifacts/real-data
+
+      - name: Upload evidence-grade raw data and audit manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-real-exchange-audit-v1
+          path: artifacts/real-data/
+          if-no-files-found: error
+          retention-days: 30
