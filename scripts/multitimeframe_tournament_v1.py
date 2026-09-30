@@ -13,7 +13,14 @@ from scripts.multitimeframe_features_v3 import (
 )
 
 HORIZONS = {"daily": (1, 2, 3), "weekly": (1, 2, 3), "monthly": (1, 3)}
-CANDIDATES = ("ridge", "extra_trees", "boosting")
+CANDIDATES = (
+    "ridge",
+    "elastic_net",
+    "extra_trees",
+    "random_forest",
+    "hist_gradient_boosting",
+    "boosting",
+)
 
 
 def _fit_ridge(x: list[list[float]], y: list[float], alpha: float = 1.0) -> list[float]:
@@ -49,12 +56,41 @@ def _fit_candidate(name: str, x: list[list[float]], y: list[float]):
         state = _fit_ridge(x, y)
         return lambda row: _predict_ridge(state, row)
     try:
-        from sklearn.ensemble import ExtraTreesRegressor, GradientBoostingRegressor
+        from sklearn.ensemble import (
+            ExtraTreesRegressor,
+            GradientBoostingRegressor,
+            HistGradientBoostingRegressor,
+            RandomForestRegressor,
+        )
+        from sklearn.linear_model import ElasticNet
+        from sklearn.pipeline import make_pipeline
+        from sklearn.preprocessing import StandardScaler
     except ImportError as exc:
         raise RuntimeError("scikit-learn is required for tree candidates") from exc
-    if name == "extra_trees":
+    if name == "elastic_net":
+        model = make_pipeline(
+            StandardScaler(),
+            ElasticNet(alpha=0.0001, l1_ratio=0.25, max_iter=5000, random_state=20260929),
+        )
+    elif name == "extra_trees":
         model = ExtraTreesRegressor(
             n_estimators=200, min_samples_leaf=5, random_state=20260929, n_jobs=-1
+        )
+    elif name == "random_forest":
+        model = RandomForestRegressor(
+            n_estimators=200,
+            min_samples_leaf=5,
+            max_features=0.75,
+            random_state=20260929,
+            n_jobs=-1,
+        )
+    elif name == "hist_gradient_boosting":
+        model = HistGradientBoostingRegressor(
+            learning_rate=0.05,
+            max_iter=150,
+            max_leaf_nodes=15,
+            l2_regularization=1.0,
+            random_state=20260929,
         )
     elif name == "boosting":
         model = GradientBoostingRegressor(
