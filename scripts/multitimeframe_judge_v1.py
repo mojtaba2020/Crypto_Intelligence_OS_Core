@@ -21,6 +21,7 @@ from scripts.multitimeframe_tournament_v1 import CANDIDATES, _fit_candidate, _kn
 @dataclass(frozen=True)
 class CandidateResult:
     name: str
+    origins: tuple[int, ...]
     losses: tuple[float, ...]
     baseline_losses: tuple[float, ...]
 
@@ -71,7 +72,7 @@ def _evaluate_candidate(
         predicted = current * math.exp(predicted_return)
         losses.append(abs(predicted - actual) / actual)
         baseline_losses.append(abs(current - actual) / actual)
-    return CandidateResult(candidate, tuple(losses), tuple(baseline_losses))
+    return CandidateResult(candidate, tuple(origins), tuple(losses), tuple(baseline_losses))
 
 
 def select_on_validation(
@@ -87,7 +88,7 @@ def select_on_validation(
         name: _evaluate_candidate(candles, family, horizon, validation_origins, name)
         for name in CANDIDATES
     }
-    selected = min(results, key=lambda name: results[name].mean_loss)
+    # Predeclared deterministic tie-break: lower mean loss, then declared CANDIDATES order.\n    rank = {name: index for index, name in enumerate(CANDIDATES)}\n    selected = min(results, key=lambda name: (results[name].mean_loss, rank[name]))
     return selected, {name: result.mean_loss for name, result in results.items()}
 
 
@@ -161,11 +162,8 @@ def judge_locked(
         base - model for base, model in zip(result.baseline_losses, result.losses, strict=True)
     ]
     stats = null_centered_moving_block_bootstrap(improvements, block_size)
-    return {
-        "selected_candidate": selected_candidate,
-        "samples": len(locked_origins),
+    paired_losses = [\n        {\n            "origin": origin,\n            "challenger_loss": model,\n            "persistence_loss": base,\n            "improvement": base - model,\n        }\n        for origin, model, base in zip(\n            result.origins, result.losses, result.baseline_losses, strict=True\n        )\n    ]\n    return {\n        "selected_candidate": selected_candidate,\n        "samples": len(locked_origins),
         "challenger_mape": result.mean_loss,
         "persistence_mape": statistics.mean(result.baseline_losses),
-        **stats,
-        "production_promotion": False,
+        **stats,\n        "paired_losses": paired_losses,\n        "production_promotion": False,
     }
