@@ -89,9 +89,7 @@ def main() -> None:
                 ),
                 "history_shortfall_bars": max(
                     0,
-                    minimum_total_bars_required(
-                        spec.minimum_history_bars, spec.horizon_bars
-                    )
+                    minimum_total_bars_required(spec.minimum_history_bars, spec.horizon_bars)
                     - len(candles),
                 ),
                 "longest_feature_window": max(WINDOWS[spec.family]),
