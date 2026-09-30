@@ -13,7 +13,11 @@ from multitimeframe_features_v3 import (
     has_valid_forecast_target,
 )
 from multitimeframe_lab_v1 import SPECS
-from multitimeframe_split_v1 import (\n    chronological_split,\n    minimum_total_bars_required,\n    origins_for_phase,\n)
+from multitimeframe_split_v1 import (
+    chronological_split,
+    minimum_total_bars_required,
+    origins_for_phase,
+)
 
 SUPPORTED_FAMILIES = {"daily", "weekly", "monthly"}
 
@@ -108,7 +112,8 @@ def main() -> None:
         }
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "
+", encoding="utf-8")
     print(json.dumps(report, indent=2, sort_keys=True))
 
 
