@@ -127,13 +127,17 @@ def aggregate(
         buckets.setdefault(key, []).append(row)
 
     output: list[dict[str, float]] = []
-    for key in sorted(buckets):
+    first_bucket = _bucket_start(int(ordered[0]["timestamp"]), timeframe)
+    last_bucket = _bucket_start(int(ordered[-1]["timestamp"]), timeframe)
+    key = int(first_bucket.timestamp())
+    final_key = int(last_bucket.timestamp())
+    while key <= final_key:
         start = datetime.fromtimestamp(key, UTC)
         if as_of_timestamp is not None:
             end_ts = int(_bucket_end(start, timeframe).timestamp())
             if end_ts > as_of_timestamp:
                 continue
-        group = buckets[key]
+        group = buckets.get(key, [])
         if require_complete_buckets:
             end = _bucket_end(start, timeframe)
             expected = int((end - start).total_seconds()) // source_interval_seconds
@@ -150,22 +154,38 @@ def aggregate(
                     f"Incomplete {timeframe} bucket at {key}: "
                     f"expected={expected} actual={len(group)} missing={missing} extra={extra}"
                 )
-        first, last = group[0], group[-1]
         end = _bucket_end(start, timeframe)
         expected_source_bars = int((end - start).total_seconds()) // source_interval_seconds
-        output.append(
-            {
-                "timestamp": key,
-                "open": float(first["open"]),
-                "high": max(float(row["high"]) for row in group),
-                "low": min(float(row["low"]) for row in group),
-                "close": float(last["close"]),
-                "volume": sum(float(row["volume"]) for row in group),
-                "source_bars": len(group),
-                "expected_source_bars": expected_source_bars,
-                "is_complete": len(group) == expected_source_bars,
-            }
-        )
+        if group:
+            first, last = group[0], group[-1]
+            output.append(
+                {
+                    "timestamp": key,
+                    "open": float(first["open"]),
+                    "high": max(float(row["high"]) for row in group),
+                    "low": min(float(row["low"]) for row in group),
+                    "close": float(last["close"]),
+                    "volume": sum(float(row["volume"]) for row in group),
+                    "source_bars": len(group),
+                    "expected_source_bars": expected_source_bars,
+                    "is_complete": len(group) == expected_source_bars,
+                }
+            )
+        else:
+            output.append(
+                {
+                    "timestamp": key,
+                    "open": 0.0,
+                    "high": 0.0,
+                    "low": 0.0,
+                    "close": 0.0,
+                    "volume": 0.0,
+                    "source_bars": 0,
+                    "expected_source_bars": expected_source_bars,
+                    "is_complete": False,
+                }
+            )
+        key = int(end.timestamp())
     return output
 
 
