@@ -14,6 +14,7 @@ from crypto_intelligence_os.adapters.market_data import bitfinex, bitstamp
 from resample_multitimeframe_ohlcv import audit_source_rows, source_data_identity
 
 SOURCE_INTERVAL_SECONDS = 3600
+DAILY_INTERVAL_SECONDS = 86400
 DEFAULT_START = datetime(2011, 8, 18, tzinfo=UTC)
 DEFAULT_END = datetime(2026, 9, 29, tzinfo=UTC)
 
@@ -78,22 +79,22 @@ def _fetch_range(
     return [collected[key] for key in sorted(collected)]
 
 
-def _coverage(rows: list[dict[str, float]]) -> dict[str, object]:
+def _coverage(rows: list[dict[str, float]], interval_seconds: int) -> dict[str, object]:
     if not rows:
         return {
             "observed_first_timestamp": None,
             "observed_last_timestamp": None,
-            "expected_hours_within_observed_span": 0,
-            "missing_hours_within_observed_span": 0,
+            "expected_intervals_within_observed_span": 0,
+            "missing_intervals_within_observed_span": 0,
         }
     first = int(rows[0]["timestamp"])
     last = int(rows[-1]["timestamp"])
-    expected = (last - first) // SOURCE_INTERVAL_SECONDS + 1
+    expected = (last - first) // interval_seconds + 1
     return {
         "observed_first_timestamp": first,
         "observed_last_timestamp": last,
-        "expected_hours_within_observed_span": expected,
-        "missing_hours_within_observed_span": expected - len(rows),
+        "expected_intervals_within_observed_span": expected,
+        "missing_intervals_within_observed_span": expected - len(rows),
     }
 
 
@@ -104,9 +105,11 @@ def _write_exchange(
     *,
     requested_start: datetime,
     requested_end: datetime,
+    interval_seconds: int = SOURCE_INTERVAL_SECONDS,
+    suffix: str = "hourly",
 ) -> dict[str, object]:
-    audit = audit_source_rows(rows, source_interval_seconds=SOURCE_INTERVAL_SECONDS)
-    audit.update(_coverage(rows))
+    audit = audit_source_rows(rows, source_interval_seconds=interval_seconds)
+    audit.update(_coverage(rows, interval_seconds))
     audit.update(
         {
             "exchange": name,
@@ -115,10 +118,10 @@ def _write_exchange(
             "data_sha256": source_data_identity(rows),
         }
     )
-    (output_dir / f"{name}_hourly.json").write_text(
+    (output_dir / f"{name}_{suffix}.json").write_text(
         json.dumps(rows, separators=(",", ":")) + "\n", encoding="utf-8"
     )
-    (output_dir / f"{name}_audit.json").write_text(
+    (output_dir / f"{name}_{suffix}_audit.json").write_text(
         json.dumps(audit, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     return audit
@@ -148,7 +151,7 @@ def main() -> None:
         page_hours=9000,
         limit=9000,
     )
-    audits = {
+    hourly_audits = {
         "bitstamp": _write_exchange(
             "bitstamp", bitstamp_rows, args.output_dir, requested_start=start, requested_end=end
         ),
@@ -156,21 +159,64 @@ def main() -> None:
             "bitfinex", bitfinex_rows, args.output_dir, requested_start=start, requested_end=end
         ),
     }
+    bitstamp_daily_rows = _fetch_range(
+        bitstamp.fetch_daily,
+        start=start,
+        end=end,
+        page_hours=1000 * 24,
+        limit=1000,
+    )
+    bitfinex_daily_rows = _fetch_range(
+        bitfinex.fetch_daily,
+        start=start,
+        end=end,
+        page_hours=9000 * 24,
+        limit=9000,
+    )
+    native_daily_audits = {
+        "bitstamp": _write_exchange(
+            "bitstamp",
+            bitstamp_daily_rows,
+            args.output_dir,
+            requested_start=start,
+            requested_end=end,
+            interval_seconds=DAILY_INTERVAL_SECONDS,
+            suffix="daily_native",
+        ),
+        "bitfinex": _write_exchange(
+            "bitfinex",
+            bitfinex_daily_rows,
+            args.output_dir,
+            requested_start=start,
+            requested_end=end,
+            interval_seconds=DAILY_INTERVAL_SECONDS,
+            suffix="daily_native",
+        ),
+    }
+    for name, audit in native_daily_audits.items():
+        if not audit["continuous"]:
+            raise ValueError(
+                f"Native daily {name} source has {audit['gap_count']} calendar gaps; "
+                "refusing compressed-time research"
+            )
+
     firsts = [
         int(audit["observed_first_timestamp"])
-        for audit in audits.values()
+        for audit in hourly_audits.values()
         if audit["observed_first_timestamp"] is not None
     ]
     lasts = [
         int(audit["observed_last_timestamp"])
-        for audit in audits.values()
+        for audit in hourly_audits.values()
         if audit["observed_last_timestamp"] is not None
     ]
     manifest = {
         "status": "REAL_EXCHANGE_DATA_AUDIT_V1",
         "requested_start": start.isoformat(),
         "requested_end": end.isoformat(),
-        "exchanges": audits,
+        "exchanges": hourly_audits,
+        "native_daily_exchanges": native_daily_audits,
+        "research_source_policy": "native_daily_per_exchange_then_calendar_aggregate",
         "common_overlap_start": max(firsts) if len(firsts) == 2 else None,
         "common_overlap_end": min(lasts) if len(lasts) == 2 else None,
         "automatic_model_promotion": False,

@@ -7,7 +7,7 @@ import argparse
 import json
 from pathlib import Path
 
-from resample_multitimeframe_ohlcv import aggregate, source_data_identity
+from resample_multitimeframe_ohlcv import aggregate, audit_source_rows, source_data_identity
 
 TIMEFRAMES = ("1d", "1w", "1mo")
 EXCHANGES = ("bitstamp", "bitfinex")
@@ -25,9 +25,20 @@ def prepare_exchange(
     exchange: str,
     output_dir: Path,
 ) -> dict[str, object]:
-    report: dict[str, object] = {"exchange": exchange, "timeframes": {}}
+    source_audit = audit_source_rows(rows, source_interval_seconds=86400)
+    if not source_audit["continuous"]:
+        raise ValueError(
+            f"Native daily source for {exchange} contains {source_audit['gap_count']} gaps"
+        )
+    report: dict[str, object] = {
+        "exchange": exchange,
+        "source_granularity": "native_1d",
+        "source_sha256": source_data_identity(rows),
+        "source_audit": source_audit,
+        "timeframes": {},
+    }
     for timeframe in TIMEFRAMES:
-        all_closed = aggregate(rows, timeframe)
+        all_closed = aggregate(rows, timeframe, source_interval_seconds=86400)
         complete_count = sum(bool(row["is_complete"]) for row in all_closed)
         incomplete_count = len(all_closed) - complete_count
         if not all_closed:
@@ -55,11 +66,11 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     exchanges: dict[str, object] = {}
     for exchange in EXCHANGES:
-        rows = _load(args.input_dir / f"{exchange}_hourly.json")
+        rows = _load(args.input_dir / f"{exchange}_daily_native.json")
         exchanges[exchange] = prepare_exchange(rows, exchange, args.output_dir)
     manifest = {
         "status": "REAL_MULTITIMEFRAME_DATASET_V1",
-        "policy": "calendar_grid_with_completeness_mask_no_imputation",
+        "policy": "native_daily_exchange_bars_then_calendar_aggregate_no_imputation",
         "exchanges": exchanges,
         "automatic_model_promotion": False,
     }
