@@ -37,7 +37,9 @@ def main() -> None:
         candles = _load(args.data_dir / f"{args.exchange}_{spec.source_timeframe}.json")
         dataset_sha = prepared_data_identity(candles)
         try:
-            split = chronological_split(\n                len(candles), spec.minimum_history_bars, spec.horizon_bars\n            )
+            split = chronological_split(
+                len(candles), spec.minimum_history_bars, spec.horizon_bars
+            )
         except ValueError as exc:
             skipped[spec.label] = {
                 "status": "NOT_EVALUATED_INSUFFICIENT_HISTORY",
