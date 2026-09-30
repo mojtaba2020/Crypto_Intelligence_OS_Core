@@ -13,7 +13,7 @@ from multitimeframe_features_v3 import (
     has_valid_forecast_target,
 )
 from multitimeframe_lab_v1 import SPECS
-from multitimeframe_split_v1 import chronological_split, origins_for_phase
+from multitimeframe_split_v1 import (\n    chronological_split,\n    minimum_total_bars_required,\n    origins_for_phase,\n)
 
 SUPPORTED_FAMILIES = {"daily", "weekly", "monthly"}
 
@@ -79,6 +79,17 @@ def main() -> None:
                 "status": "INSUFFICIENT_HISTORY",
                 "reason": str(exc),
                 "bars": len(candles),
+                "minimum_history_bars": spec.minimum_history_bars,
+                "minimum_total_bars_required": minimum_total_bars_required(
+                    spec.minimum_history_bars, spec.horizon_bars
+                ),
+                "history_shortfall_bars": max(
+                    0,
+                    minimum_total_bars_required(
+                        spec.minimum_history_bars, spec.horizon_bars
+                    )
+                    - len(candles),
+                ),
                 "longest_feature_window": max(WINDOWS[spec.family]),
                 "incomplete_buckets": len(incomplete),
             }
