@@ -48,6 +48,31 @@ def chronological_split(
     )
 
 
+
+def minimum_total_bars_required(
+    minimum_history_bars: int,
+    horizon_bars: int,
+    validation_fraction: float = 0.20,
+    locked_fraction: float = 0.20,
+) -> int:
+    """Return the smallest series length that satisfies the declared split contract."""
+    if minimum_history_bars <= 0 or horizon_bars <= 0:
+        raise ValueError("Split parameters must be positive")
+    n_bars = minimum_history_bars + horizon_bars + 2
+    while True:
+        try:
+            chronological_split(
+                n_bars,
+                minimum_history_bars,
+                horizon_bars,
+                validation_fraction,
+                locked_fraction,
+            )
+            return n_bars
+        except ValueError:
+            n_bars += 1
+
+
 def origins_for_phase(split: Split, phase: str, step: int) -> list[int]:
     if step <= 0:
         raise ValueError("Step must be positive")
