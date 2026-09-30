@@ -56,9 +56,7 @@ def test_validation_selection_then_locked_judge_uses_disjoint_origins() -> None:
     assert len(report["paired_losses"]) == len(locked)
     assert [row["origin"] for row in report["paired_losses"]] == locked
     for row in report["paired_losses"]:
-        assert row["improvement"] == pytest.approx(
-            row["persistence_loss"] - row["challenger_loss"]
-        )
+        assert row["improvement"] == pytest.approx(row["persistence_loss"] - row["challenger_loss"])
     assert report["production_promotion"] is False
 
 
