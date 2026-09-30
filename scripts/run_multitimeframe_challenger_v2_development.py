@@ -7,7 +7,6 @@ import argparse
 import json
 from pathlib import Path
 
-from multitimeframe_features_v3 import is_temporally_valid_sample
 from multitimeframe_lab_v1 import SPECS
 from multitimeframe_split_v1 import chronological_split
 from multitimeframe_tournament_v2 import CANDIDATES, evaluate
