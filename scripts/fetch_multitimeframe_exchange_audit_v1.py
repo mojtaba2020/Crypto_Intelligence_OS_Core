@@ -193,13 +193,6 @@ def main() -> None:
             suffix="daily_native",
         ),
     }
-    for name, audit in native_daily_audits.items():
-        if not audit["continuous"]:
-            raise ValueError(
-                f"Native daily {name} source has {audit['gap_count']} calendar gaps; "
-                "refusing compressed-time research"
-            )
-
     firsts = [
         int(audit["observed_first_timestamp"])
         for audit in hourly_audits.values()
@@ -216,7 +209,7 @@ def main() -> None:
         "requested_end": end.isoformat(),
         "exchanges": hourly_audits,
         "native_daily_exchanges": native_daily_audits,
-        "research_source_policy": "native_daily_per_exchange_then_calendar_aggregate",
+        "research_source_policy": "native_daily_per_exchange_preserve_calendar_gaps_no_imputation",
         "common_overlap_start": max(firsts) if len(firsts) == 2 else None,
         "common_overlap_end": min(lasts) if len(lasts) == 2 else None,
         "automatic_model_promotion": False,
