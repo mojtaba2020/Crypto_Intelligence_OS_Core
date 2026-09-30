@@ -4,7 +4,11 @@ from datetime import UTC, datetime
 
 import pytest
 
-from crypto_intelligence_os.adapters.market_data.bitfinex import SOURCE_ID, parse_daily, parse_hourly
+from crypto_intelligence_os.adapters.market_data.bitfinex import (
+    SOURCE_ID,
+    parse_daily,
+    parse_hourly,
+)
 from crypto_intelligence_os.market_data import Timeframe
 
 
