@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import pytest
-from scripts.multitimeframe_split_v1 import (\n    chronological_split,\n    minimum_total_bars_required,\n    origins_for_phase,\n)
+from scripts.multitimeframe_split_v1 import (
+    chronological_split,
+    minimum_total_bars_required,
+    origins_for_phase,
+)
 
 
 def test_validation_and_locked_test_are_disjoint_and_ordered() -> None:
