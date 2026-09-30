@@ -36,3 +36,21 @@ def test_unknown_phase_fails_closed(phase: str) -> None:
 def test_insufficient_history_fails_closed() -> None:
     with pytest.raises(ValueError, match="Insufficient"):
         chronological_split(400, 365, 3)
+
+
+def test_calendar_grid_length_drives_identical_split_boundaries() -> None:
+    """Missing-market buckets must stay represented instead of compressing evaluation time."""
+    canonical_grid_bars = 2000
+    first = chronological_split(canonical_grid_bars, 365, 3)
+    second = chronological_split(canonical_grid_bars, 365, 3)
+    assert first.as_dict() == second.as_dict()
+    assert first.locked_test_end == canonical_grid_bars - 3
+
+
+@pytest.mark.parametrize("horizon", [1, 3, 12, 96])
+def test_reserved_horizon_never_enters_evaluation_grid(horizon: int) -> None:
+    split = chronological_split(2200, 365, horizon)
+    validation = origins_for_phase(split, "validation", 1)
+    locked = origins_for_phase(split, "locked_test", 1)
+    assert max(validation) < min(locked)
+    assert max(locked) + horizon < 2200
