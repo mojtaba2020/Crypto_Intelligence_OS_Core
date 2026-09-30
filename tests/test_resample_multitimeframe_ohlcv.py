@@ -138,3 +138,21 @@ def test_aggregate_preserves_fully_missing_calendar_bucket_as_invalid_marker() -
     assert result[1]["source_bars"] == 0
     assert result[1]["is_complete"] is False
     assert result[2]["is_complete"] is True
+
+
+def test_prepared_identity_includes_completeness_metadata() -> None:
+    rows = [
+        {
+            "timestamp": 0,
+            "open": 100.0,
+            "high": 101.0,
+            "low": 99.0,
+            "close": 100.5,
+            "volume": 10.0,
+            "source_bars": 1,
+            "expected_source_bars": 1,
+            "is_complete": True,
+        }
+    ]
+    changed = [dict(rows[0], is_complete=False)]
+    assert prepared_data_identity(rows) != prepared_data_identity(changed)
