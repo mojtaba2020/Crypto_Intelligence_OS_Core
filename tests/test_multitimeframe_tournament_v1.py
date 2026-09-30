@@ -75,3 +75,17 @@ def test_future_bars_do_not_change_prediction_inputs() -> None:
     mutated_y = [math.log(mutated[i + horizon]["close"] / mutated[i]["close"]) for i in train]
     assert mutated_x == baseline_x
     assert mutated_y == baseline_y
+
+
+def test_challenger_v2_declares_small_high_value_classical_lane() -> None:
+    from scripts.multitimeframe_tournament_v1 import CANDIDATES
+
+    assert CANDIDATES == (
+        "ridge",
+        "elastic_net",
+        "extra_trees",
+        "random_forest",
+        "hist_gradient_boosting",
+        "boosting",
+    )
+    assert len(CANDIDATES) == len(set(CANDIDATES))
