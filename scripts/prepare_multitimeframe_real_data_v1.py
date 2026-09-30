@@ -26,15 +26,12 @@ def prepare_exchange(
     output_dir: Path,
 ) -> dict[str, object]:
     source_audit = audit_source_rows(rows, source_interval_seconds=86400)
-    if not source_audit["continuous"]:
-        raise ValueError(
-            f"Native daily source for {exchange} contains {source_audit['gap_count']} gaps"
-        )
     report: dict[str, object] = {
         "exchange": exchange,
         "source_granularity": "native_1d",
         "source_sha256": source_data_identity(rows),
         "source_audit": source_audit,
+        "source_gap_policy": "preserve_missing_calendar_days_as_invalid_markers_no_imputation",
         "timeframes": {},
     }
     for timeframe in TIMEFRAMES:
