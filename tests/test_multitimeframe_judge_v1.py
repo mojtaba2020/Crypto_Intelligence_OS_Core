@@ -84,7 +84,12 @@ def test_validation_tie_break_follows_predeclared_candidate_order(monkeypatch) -
     validation = origins_for_phase(split, "validation", 10)
 
     def tied_result(candles, family, horizon, origins, candidate):
-        return judge.CandidateResult(candidate, tuple(origins), (0.1,) * len(origins), (0.2,) * len(origins))
+        return judge.CandidateResult(
+            candidate,
+            tuple(origins),
+            (0.1,) * len(origins),
+            (0.2,) * len(origins),
+        )
 
     monkeypatch.setattr(judge, "_evaluate_candidate", tied_result)
     selected, _ = judge.select_on_validation(candles, "daily", 1, validation)
