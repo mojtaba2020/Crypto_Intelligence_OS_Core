@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from scripts import multitimeframe_tournament_v2 as tournament_v2
 from scripts.multitimeframe_tournament_v1 import CANDIDATES as V1_CANDIDATES
 from scripts.multitimeframe_tournament_v2 import CANDIDATES as V2_CANDIDATES
 
