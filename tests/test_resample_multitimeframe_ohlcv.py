@@ -3,7 +3,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from scripts.resample_multitimeframe_ohlcv import aggregate, audit_source_rows, source_data_identity
+from scripts.resample_multitimeframe_ohlcv import (
+    aggregate,
+    audit_source_rows,
+    prepared_data_identity,
+    source_data_identity,
+)
 
 
 def _ts(year: int, month: int, day: int, hour: int = 0) -> int:
