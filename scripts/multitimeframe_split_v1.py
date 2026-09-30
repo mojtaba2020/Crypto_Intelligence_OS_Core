@@ -47,8 +47,6 @@ def chronological_split(
         locked_test_end=usable_end,
     )
 
-
-
 def minimum_total_bars_required(
     minimum_history_bars: int,
     horizon_bars: int,
