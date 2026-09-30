@@ -125,3 +125,16 @@ def test_aggregate_preserves_incomplete_bucket_with_validity_metadata() -> None:
     assert result[0]["source_bars"] == 23
     assert result[0]["expected_source_bars"] == 24
     assert result[1]["is_complete"] is True
+
+
+def test_aggregate_preserves_fully_missing_calendar_bucket_as_invalid_marker() -> None:
+    start = _ts(2026, 9, 27)
+    rows = [_row(start + hour * 3600, 100.0 + hour) for hour in range(72)]
+    rows = [row for row in rows if not (start + 86_400 <= int(row["timestamp"]) < start + 172_800)]
+    result = aggregate(rows, "1d")
+    assert len(result) == 3
+    assert result[0]["is_complete"] is True
+    assert result[1]["timestamp"] == start + 86_400
+    assert result[1]["source_bars"] == 0
+    assert result[1]["is_complete"] is False
+    assert result[2]["is_complete"] is True
