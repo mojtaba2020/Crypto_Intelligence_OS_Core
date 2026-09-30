@@ -18,3 +18,11 @@ def test_v2_classical_lane_is_separate_and_deterministic() -> None:
         "boosting",
     )
     assert len(V2_CANDIDATES) == len(set(V2_CANDIDATES))
+
+
+def test_v2_ridge_fit_does_not_recurse_into_mutated_v1_state() -> None:
+    x = [[float(i), float(i % 3)] for i in range(1, 25)]
+    y = [0.001 * float(i) for i in range(1, 25)]
+    predictor = tournament_v2._fit_candidate("ridge", x, y)
+    prediction = predictor([25.0, 1.0])
+    assert isinstance(float(prediction), float)
