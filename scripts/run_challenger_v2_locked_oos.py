@@ -18,7 +18,7 @@ from scripts.multitimeframe_split_v1 import chronological_split
 from scripts.multitimeframe_tournament_v1 import _known_training_origins
 from scripts.multitimeframe_tournament_v2 import _fit_candidate, _predict_candidate
 
-FROZEN = {"1d": "boosting", "2d": "boosting", "3d": "boosting", "1w": "extra_trees", "2w": "ridge", "3w": "ridge"}
+FROZEN = {\n    "1d": "boosting",\n    "2d": "boosting",\n    "3d": "boosting",\n    "1w": "extra_trees",\n    "2w": "ridge",\n    "3w": "ridge",\n}
 ALPHA = 0.05
 BOOTSTRAP_REPS = 10000
 SEED = 20260930
@@ -34,7 +34,7 @@ def _mbb_pvalue_and_ci(diffs: list[float], block: int) -> tuple[float, list[floa
     if n < 2:
         raise ValueError("Need at least two locked-OOS origins")
     b = max(1, min(block, n))
-    rng = random.Random(SEED)
+    rng = random.Random(SEED)  # noqa: S311 -- deterministic scientific resampling, not crypto
     starts = list(range(0, n - b + 1))
     observed = statistics.mean(diffs)
     centered = [x - observed for x in diffs]
@@ -99,7 +99,7 @@ def main() -> None:
                 if is_temporally_valid_sample(candles, spec.family, i, spec.horizon_bars)
             ]
             x = [feature_vector(candles, i, spec.family) for i in train_origins]
-            y = [math.log(float(candles[i + spec.horizon_bars]["close"]) / float(candles[i]["close"])) for i in train_origins]
+            y = [\n                math.log(\n                    float(candles[i + spec.horizon_bars]["close"])\n                    / float(candles[i]["close"])\n                )\n                for i in train_origins\n            ]
             predictor = _fit_candidate(candidate, x, y)
             row = feature_vector(candles, origin, spec.family)
             predicted_return = _predict_candidate(candidate, predictor, row)
