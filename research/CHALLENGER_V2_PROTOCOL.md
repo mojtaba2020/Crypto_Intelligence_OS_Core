@@ -60,3 +60,32 @@ Before a new confirmatory evaluation:
 
 Evidence V1 is now read-only evidence. Challenger V2 development must not tune against its
 locked outcomes.
+
+
+## Classical lane V2 freeze
+
+Before any fresh locked-OOS evaluation, the classical development lane is frozen to the
+following deterministic candidate order and configurations. The order is also the
+validation tie-break order; it is not a performance ranking.
+
+1. ridge: frozen V1 ridge implementation, alpha=1.0.
+2. elastic_net: StandardScaler + ElasticNet(alpha=0.0001, l1_ratio=0.25,
+   max_iter=5000, random_state=20260929).
+3. extra_trees: frozen V1 ExtraTreesRegressor(n_estimators=200,
+   min_samples_leaf=5, random_state=20260929, n_jobs=-1).
+4. random_forest: RandomForestRegressor(n_estimators=200, min_samples_leaf=5,
+   max_features=0.75, random_state=20260929, n_jobs=-1).
+5. hist_gradient_boosting: HistGradientBoostingRegressor(learning_rate=0.05,
+   max_iter=150, max_leaf_nodes=15, l2_regularization=1.0,
+   random_state=20260929).
+6. boosting: frozen V1 GradientBoostingRegressor(n_estimators=100,
+   learning_rate=0.05, max_depth=2, random_state=20260929).
+
+These are deliberately compact representatives of regularized linear, bagged-tree, and
+boosted-tree families. No hyperparameter search against Evidence V1 locked outcomes is
+permitted. Any future configuration change creates a new protocol version and must occur
+before that version sees fresh locked OOS.
+
+V2 development and validation may compare these candidates. Fresh locked OOS remains
+single-use and must not be consumed until candidate selection, feature definitions,
+split rules, statistical family, and provenance fingerprint are frozen.
