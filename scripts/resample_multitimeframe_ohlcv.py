@@ -58,7 +58,7 @@ def audit_source_rows(
 
 
 def source_data_identity(rows: list[dict[str, float]]) -> str:
-    """Stable SHA-256 identity for normalized source rows."""
+    """Stable SHA-256 identity for raw OHLCV source rows."""
     normalized = [
         {
             "timestamp": int(row["timestamp"]),
@@ -70,6 +70,27 @@ def source_data_identity(rows: list[dict[str, float]]) -> str:
         }
         for row in sorted(rows, key=lambda item: int(item["timestamp"]))
     ]
+    payload = json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
+def prepared_data_identity(rows: list[dict[str, object]]) -> str:
+    """Hash the full prepared record, including completeness/provenance metadata."""
+    normalized: list[dict[str, object]] = []
+    for row in sorted(rows, key=lambda item: int(item["timestamp"])):
+        normalized.append(
+            {
+                "timestamp": int(row["timestamp"]),
+                "open": float(row["open"]),
+                "high": float(row["high"]),
+                "low": float(row["low"]),
+                "close": float(row["close"]),
+                "volume": float(row["volume"]),
+                "source_bars": int(row["source_bars"]),
+                "expected_source_bars": int(row["expected_source_bars"]),
+                "is_complete": bool(row["is_complete"]),
+            }
+        )
     payload = json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(payload).hexdigest()
 
