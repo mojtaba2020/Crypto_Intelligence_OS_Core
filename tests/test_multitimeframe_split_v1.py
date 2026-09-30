@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from scripts.multitimeframe_split_v1 import chronological_split, origins_for_phase
+from scripts.multitimeframe_split_v1 import (\n    chronological_split,\n    minimum_total_bars_required,\n    origins_for_phase,\n)
 
 
 def test_validation_and_locked_test_are_disjoint_and_ordered() -> None:
@@ -54,3 +54,10 @@ def test_reserved_horizon_never_enters_evaluation_grid(horizon: int) -> None:
     locked = origins_for_phase(split, "locked_test", 1)
     assert max(validation) < min(locked)
     assert max(locked) + horizon < 2200
+
+
+def test_minimum_total_bars_required_is_exact_boundary() -> None:
+    required = minimum_total_bars_required(120, 1)
+    chronological_split(required, 120, 1)
+    with pytest.raises(ValueError, match="Insufficient"):
+        chronological_split(required - 1, 120, 1)
