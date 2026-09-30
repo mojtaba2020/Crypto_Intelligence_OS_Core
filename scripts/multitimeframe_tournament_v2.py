@@ -8,6 +8,9 @@ locked-OOS reuse, champion selection, or production promotion.
 
 from __future__ import annotations
 
+import math
+import statistics
+
 from scripts import multitimeframe_tournament_v1 as v1
 
 HORIZONS = v1.HORIZONS
@@ -61,6 +64,12 @@ def _fit_candidate(name: str, x: list[list[float]], y: list[float]):
     return model.predict
 
 
+def _predict_candidate(name: str, predictor, row: list[float]) -> float:
+    if name == "ridge":
+        return float(predictor(row))
+    return float(predictor([row])[0])
+
+
 def evaluate(
     candles: list[dict[str, float]],
     family: str,
@@ -68,13 +77,65 @@ def evaluate(
     min_train: int,
     step: int,
 ) -> dict[str, object]:
-    """Run the V2 candidate set with V1 leakage-resistant walk-forward semantics."""
-    original = v1.CANDIDATES
-    original_fit = v1._fit_candidate
-    try:
-        v1.CANDIDATES = CANDIDATES
-        v1._fit_candidate = _fit_candidate
-        return v1.evaluate(candles, family, horizon, min_train, step)
-    finally:
-        v1.CANDIDATES = original
-        v1._fit_candidate = original_fit
+    """Run V2 locally without mutating the frozen V1 module."""
+    from scripts.multitimeframe_features_v3 import (
+        WINDOWS,
+        feature_vector,
+        is_temporally_valid_sample,
+    )
+
+    longest = max(WINDOWS[family])
+    last_origin = len(candles) - horizon - 1
+    origins = [
+        origin
+        for origin in range(longest + min_train, last_origin + 1, step)
+        if is_temporally_valid_sample(candles, family, origin, horizon)
+    ]
+    if len(origins) < 20:
+        raise ValueError("Insufficient out-of-sample origins")
+
+    candidate_errors = {name: [] for name in CANDIDATES}
+    candidate_directions = {name: [] for name in CANDIDATES}
+    persistence_errors: list[float] = []
+
+    for origin in origins:
+        train_origins = [
+            i
+            for i in v1._known_training_origins(longest, origin, horizon)
+            if is_temporally_valid_sample(candles, family, i, horizon)
+        ]
+        x = [feature_vector(candles, i, family) for i in train_origins]
+        y = [
+            math.log(float(candles[i + horizon]["close"]) / float(candles[i]["close"]))
+            for i in train_origins
+        ]
+        if len(x) != len(y):
+            raise RuntimeError("Feature/label alignment invariant violated")
+
+        current = float(candles[origin]["close"])
+        actual = float(candles[origin + horizon]["close"])
+        persistence_errors.append(abs(current - actual) / actual)
+        row = feature_vector(candles, origin, family)
+
+        for name in CANDIDATES:
+            predictor = _fit_candidate(name, x, y)
+            predicted_return = _predict_candidate(name, predictor, row)
+            predicted = current * math.exp(predicted_return)
+            candidate_errors[name].append(abs(predicted - actual) / actual)
+            candidate_directions[name].append((predicted_return >= 0) == (actual >= current))
+
+    results: dict[str, dict[str, float]] = {}
+    for name in CANDIDATES:
+        errors = candidate_errors[name]
+        results[name] = {
+            "mape": statistics.mean(errors),
+            "mean_loss_improvement": statistics.mean(
+                base - model for base, model in zip(persistence_errors, errors, strict=True)
+            ),
+            "direction_accuracy": statistics.mean(candidate_directions[name]),
+        }
+    return {
+        "samples": len(origins),
+        "persistence_mape": statistics.mean(persistence_errors),
+        "candidates": results,
+    }
