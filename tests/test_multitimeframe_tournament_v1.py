@@ -75,4 +75,3 @@ def test_future_bars_do_not_change_prediction_inputs() -> None:
     mutated_y = [math.log(mutated[i + horizon]["close"] / mutated[i]["close"]) for i in train]
     assert mutated_x == baseline_x
     assert mutated_y == baseline_y
-
