@@ -52,7 +52,14 @@ def test_validation_selection_then_locked_judge_uses_disjoint_origins() -> None:
     assert selected in scores
     report = judge_locked(candles, "daily", 1, locked, selected, block_size=4)
     assert report["selected_candidate"] == selected
-    assert report["samples"] == len(locked)\n    assert len(report["paired_losses"]) == len(locked)\n    assert [row["origin"] for row in report["paired_losses"]] == locked\n    for row in report["paired_losses"]:\n        assert row["improvement"] == pytest.approx(\n            row["persistence_loss"] - row["challenger_loss"]\n        )\n    assert report["production_promotion"] is False
+    assert report["samples"] == len(locked)
+    assert len(report["paired_losses"]) == len(locked)
+    assert [row["origin"] for row in report["paired_losses"]] == locked
+    for row in report["paired_losses"]:
+        assert row["improvement"] == pytest.approx(
+            row["persistence_loss"] - row["challenger_loss"]
+        )
+    assert report["production_promotion"] is False
 
 
 def test_empty_validation_fails_closed() -> None:
@@ -67,4 +74,18 @@ def test_locked_judge_fails_closed_on_gap_crossing_evaluation_origin() -> None:
     candles[601]["timestamp"] += 86_400
     with pytest.raises(ValueError, match="crosses a missing target period"):
         judge_locked(candles, "daily", 1, [600] * 8, "ridge", block_size=4)
-\n\ndef test_validation_tie_break_follows_predeclared_candidate_order(monkeypatch) -> None:\n    from scripts import multitimeframe_judge_v1 as judge\n\n    candles = _candles(700)\n    split = chronological_split(len(candles), 365, 1)\n    validation = origins_for_phase(split, "validation", 10)\n\n    def tied_result(candles, family, horizon, origins, candidate):\n        return judge.CandidateResult(candidate, tuple(origins), (0.1,) * len(origins), (0.2,) * len(origins))\n\n    monkeypatch.setattr(judge, "_evaluate_candidate", tied_result)\n    selected, _ = judge.select_on_validation(candles, "daily", 1, validation)\n    assert selected == judge.CANDIDATES[0]\n
+
+
+def test_validation_tie_break_follows_predeclared_candidate_order(monkeypatch) -> None:
+    from scripts import multitimeframe_judge_v1 as judge
+
+    candles = _candles(700)
+    split = chronological_split(len(candles), 365, 1)
+    validation = origins_for_phase(split, "validation", 10)
+
+    def tied_result(candles, family, horizon, origins, candidate):
+        return judge.CandidateResult(candidate, tuple(origins), (0.1,) * len(origins), (0.2,) * len(origins))
+
+    monkeypatch.setattr(judge, "_evaluate_candidate", tied_result)
+    selected, _ = judge.select_on_validation(candles, "daily", 1, validation)
+    assert selected == judge.CANDIDATES[0]
