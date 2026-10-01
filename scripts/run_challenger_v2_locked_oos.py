@@ -126,19 +126,21 @@ def main() -> None:
             raise ValueError(f"No locked-OOS origins for {spec.label}")
         diffs = [b - m for b, m in zip(base_errors, model_errors, strict=True)]
         p, ci = _mbb_pvalue_and_ci(diffs, spec.bootstrap_block_bars)
-        rows.append({
-            "horizon": spec.label,
-            "candidate": candidate,
-            "dataset_sha256": _sha(path),
-            "locked_boundary": {"start": split.validation_end, "end": split.locked_test_end},
-            "samples": len(origins),
-            "model_mape": statistics.mean(model_errors),
-            "persistence_mape": statistics.mean(base_errors),
-            "mean_loss_improvement": statistics.mean(diffs),
-            "improvement_ci95": ci,
-            "p_value": p,
-            "direction_accuracy": statistics.mean(directions),
-        })
+        rows.append(
+            {
+                "horizon": spec.label,
+                "candidate": candidate,
+                "dataset_sha256": _sha(path),
+                "locked_boundary": {"start": split.validation_end, "end": split.locked_test_end},
+                "samples": len(origins),
+                "model_mape": statistics.mean(model_errors),
+                "persistence_mape": statistics.mean(base_errors),
+                "mean_loss_improvement": statistics.mean(diffs),
+                "improvement_ci95": ci,
+                "p_value": p,
+                "direction_accuracy": statistics.mean(directions),
+            }
+        )
 
     _holm(rows)
     for row in rows:
