@@ -102,14 +102,14 @@ def main() -> None:
         candidate = FROZEN[spec.label]
         for origin in origins:
             train_origins = [
-                i for i in _known_training_origins(longest, origin, spec.horizon_bars)
+                i
+                for i in _known_training_origins(longest, origin, spec.horizon_bars)
                 if is_temporally_valid_sample(candles, spec.family, i, spec.horizon_bars)
             ]
             x = [feature_vector(candles, i, spec.family) for i in train_origins]
             y = [
                 math.log(
-                    float(candles[i + spec.horizon_bars]["close"])
-                    / float(candles[i]["close"])
+                    float(candles[i + spec.horizon_bars]["close"]) / float(candles[i]["close"])
                 )
                 for i in train_origins
             ]
