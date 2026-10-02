@@ -9,6 +9,7 @@ permissions:
 jobs:
   locked-oos:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - name: Checkout frozen Challenger V2 branch
         uses: actions/checkout@v7
@@ -17,16 +18,23 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - name: Install project
-        run: python -m pip install -e .
-      - name: Fetch immutable Bitstamp multitimeframe data
+      - name: Install research dependencies
+        run: python -m pip install -e ".[research]"
+      - name: Fetch immutable Bitstamp and Bitfinex hourly history
         run: |
-          mkdir -p artifacts/multitimeframe_data
-          python scripts/fetch_real_multitimeframe_data_v1.py --output-dir artifacts/multitimeframe_data
+          python scripts/fetch_multitimeframe_exchange_audit_v1.py \
+            --start "2011-08-18T00:00:00+00:00" \
+            --end "2026-09-29T00:00:00+00:00" \
+            --output-dir artifacts/real-data
+      - name: Build gap-safe multitimeframe datasets
+        run: |
+          PYTHONPATH=. python scripts/prepare_multitimeframe_real_data_v1.py \
+            --input-dir artifacts/real-data \
+            --output-dir artifacts/prepared
       - name: Run single-use frozen locked OOS judge
         run: |
-          python scripts/run_challenger_v2_locked_oos.py \
-            --data-dir artifacts/multitimeframe_data \
+          PYTHONPATH=. python scripts/run_challenger_v2_locked_oos.py \
+            --data-dir artifacts/prepared \
             --exchange bitstamp \
             --output artifacts/challenger_v2_locked_oos.json
       - name: Upload locked OOS evidence
