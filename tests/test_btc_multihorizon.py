@@ -1,6 +1,6 @@
 """Tests for multi-horizon benchmark planning."""
 
-from scripts.evaluate_btc_multihorizon import HORIZONS, plan
+from scripts.evaluate_btc_multihorizon import HORIZONS, holm_adjust, plan, significance_gate
 
 
 def test_supported_horizons_are_ordered_and_complete():
@@ -14,3 +14,38 @@ def test_plan_uses_longer_windows_for_longer_horizons():
     assert holdouts == sorted(holdouts)
     assert all(step >= 1 for step in steps)
     assert plan(365)[1] >= plan(30)[1]
+
+
+def _losses(model_error: float, persistence_error: float, count: int = 60):
+    return [
+        {
+            "hybrid_abs_error": model_error + (index % 3) * 0.01,
+            "linear_abs_error": model_error + (index % 3) * 0.01,
+            "persistence_abs_error": persistence_error + (index % 3) * 0.01,
+        }
+        for index in range(count)
+    ]
+
+
+def test_significance_gate_passes_clear_paired_improvement():
+    result = significance_gate(_losses(1.0, 2.0), "hybrid", horizon=7, step=7)
+    assert result["status"] == "PASS"
+    assert result["mean_absolute_error_difference_usd"] < 0
+
+
+def test_significance_gate_rejects_worse_model():
+    result = significance_gate(_losses(2.0, 1.0), "linear", horizon=7, step=7)
+    assert result["status"] == "FAIL"
+
+
+def test_significance_gate_requires_minimum_examples():
+    result = significance_gate(_losses(1.0, 2.0, count=20), "hybrid", horizon=7, step=7)
+    assert result["status"] == "FAIL"
+    assert result["examples"] == 20
+
+
+def test_holm_adjust_controls_family_wise_error_and_preserves_order():
+    adjusted = holm_adjust([0.001, 0.02, 0.04, 0.8])
+    assert adjusted == [0.004, 0.06, 0.08, 0.8]
+    assert adjusted[0] < 0.05
+    assert all(value >= raw for value, raw in zip(adjusted, [0.001, 0.02, 0.04, 0.8], strict=True))

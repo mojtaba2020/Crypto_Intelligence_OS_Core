@@ -5,11 +5,24 @@ from __future__ import annotations
 
 import argparse
 import json
+from math import erf, sqrt
 from pathlib import Path
 
 from scripts.evaluate_btc_hybrid import evaluate
 
 HORIZONS = (1, 3, 7, 14, 21, 30, 90, 180, 365)
+
+
+def holm_adjust(p_values: list[float]) -> list[float]:
+    """Holm-Bonferroni adjusted p-values controlling family-wise error."""
+    total = len(p_values)
+    adjusted = [1.0] * total
+    running = 0.0
+    for rank, index in enumerate(sorted(range(total), key=p_values.__getitem__)):
+        candidate = min(1.0, (total - rank) * p_values[index])
+        running = max(running, candidate)
+        adjusted[index] = running
+    return adjusted
 
 
 def plan(horizon: int) -> tuple[int, int]:
@@ -26,6 +39,41 @@ def plan(horizon: int) -> tuple[int, int]:
     if horizon <= 180:
         return 2555, 60
     return 2920, 90
+
+
+def significance_gate(losses: list[dict[str, object]], model: str, horizon: int, step: int) -> dict:
+    """One-sided HAC test that a model has lower mean absolute error than persistence."""
+    differences = [
+        float(row[f"{model}_abs_error"]) - float(row["persistence_abs_error"]) for row in losses
+    ]
+    n = len(differences)
+    minimum_examples = 40
+    if n < 2:
+        return {"status": "INSUFFICIENT_DATA", "examples": n}
+    mean = sum(differences) / n
+    centered = [value - mean for value in differences]
+    max_lag = min(n - 1, max(1, (horizon + step - 1) // step))
+    gamma0 = sum(value * value for value in centered) / n
+    long_run_variance = gamma0
+    for lag in range(1, max_lag + 1):
+        covariance = sum(centered[index] * centered[index - lag] for index in range(lag, n)) / n
+        weight = 1 - lag / (max_lag + 1)
+        long_run_variance += 2 * weight * covariance
+    standard_error = sqrt(max(long_run_variance, 0.0) / n)
+    z_score = mean / standard_error if standard_error > 0 else 0.0
+    # One-sided normal approximation: negative loss differential favors the model.
+    p_value = 0.5 * (1 + erf(z_score / sqrt(2)))
+    passed = n >= minimum_examples and mean < 0 and p_value < 0.05
+    return {
+        "status": "PASS" if passed else "FAIL",
+        "examples": n,
+        "mean_absolute_error_difference_usd": mean,
+        "hac_max_lag": max_lag,
+        "z_score": z_score,
+        "one_sided_p_value": p_value,
+        "alpha": 0.05,
+        "minimum_examples": minimum_examples,
+    }
 
 
 def run(database: Path) -> dict:
@@ -50,6 +98,22 @@ def run(database: Path) -> dict:
         )
         persistence = metrics["persistence"]["mae_usd"]
         best_mae = metrics[best]["mae_usd"]
+        significance = {
+            model: significance_gate(result["paired_losses"], model, horizon, step)
+            for model in ("hybrid", "linear")
+        }
+        regime_significance = {
+            regime: {
+                model: significance_gate(
+                    [row for row in result["paired_losses"] if row["regime"] == regime],
+                    model,
+                    horizon,
+                    step,
+                )
+                for model in ("hybrid", "linear")
+            }
+            for regime in ("up_90d", "flat_90d", "down_90d")
+        }
         rows.append(
             {
                 "horizon_days": horizon,
@@ -59,6 +123,9 @@ def run(database: Path) -> dict:
                 "first_test_origin": result["first_test_origin"],
                 "last_test_origin": result["last_test_origin"],
                 "metrics": metrics,
+                "regimes": result["regimes"],
+                "significance_vs_persistence": significance,
+                "regime_significance_vs_persistence": regime_significance,
                 "lowest_mae_model_on_this_backtest": best,
                 "mae_improvement_vs_persistence_pct": (
                     100 * (persistence - best_mae) / persistence if persistence else None
@@ -66,7 +133,33 @@ def run(database: Path) -> dict:
                 "research_only": True,
             }
         )
+    tests = []
+    for row in rows:
+        for scope, gates in [("overall", row["significance_vs_persistence"])]:
+            for model, gate in gates.items():
+                if "one_sided_p_value" in gate:
+                    tests.append((row, scope, None, model, gate))
+        for regime, gates in row["regime_significance_vs_persistence"].items():
+            for model, gate in gates.items():
+                if "one_sided_p_value" in gate:
+                    tests.append((row, "regime", regime, model, gate))
+    adjusted = holm_adjust([float(item[4]["one_sided_p_value"]) for item in tests])
+    for (_row, _scope, _regime, _model, gate), adjusted_p in zip(tests, adjusted, strict=True):
+        gate["holm_adjusted_p_value"] = adjusted_p
+        gate["holm_status"] = (
+            "PASS"
+            if gate["examples"] >= gate["minimum_examples"]
+            and gate["mean_absolute_error_difference_usd"] < 0
+            and adjusted_p < gate["alpha"]
+            else "FAIL"
+        )
+
     return {
+        "multiple_comparison_control": {
+            "method": "Holm-Bonferroni",
+            "family_tests": len(tests),
+            "family_wise_alpha": 0.05,
+        },
         "status": "MULTIHORIZON_WALK_FORWARD_RESEARCH",
         "horizons_days": list(HORIZONS),
         "results": rows,
