@@ -4,15 +4,14 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import math
 import random
 import statistics
 from pathlib import Path
 
-from scripts.multitimeframe_data_v1 import load_candles
 from scripts.multitimeframe_features_v3 import WINDOWS, feature_vector, is_temporally_valid_sample
+from scripts.resample_multitimeframe_ohlcv import prepared_data_identity
 from scripts.multitimeframe_lab_v1 import SPECS
 from scripts.multitimeframe_split_v1 import chronological_split
 from scripts.multitimeframe_tournament_v1 import _known_training_origins
@@ -31,8 +30,11 @@ BOOTSTRAP_REPS = 10000
 SEED = 20260930
 
 
-def _sha(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def _load(path: Path) -> list[dict[str, float]]:
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(rows, list):
+        raise ValueError(f"Expected candle list in {path}")
+    return rows
 
 
 def _mbb_pvalue_and_ci(diffs: list[float], block: int) -> tuple[float, list[float]]:
@@ -88,7 +90,7 @@ def main() -> None:
         if spec.label not in FROZEN:
             continue
         path = args.data_dir / f"{args.exchange}_{spec.source_timeframe}.json"
-        candles = load_candles(path)
+        candles = _load(path)
         split = chronological_split(len(candles), spec.minimum_history_bars, spec.horizon_bars)
         origins = [
             o
@@ -130,7 +132,7 @@ def main() -> None:
             {
                 "horizon": spec.label,
                 "candidate": candidate,
-                "dataset_sha256": _sha(path),
+                "dataset_sha256": prepared_data_identity(candles),
                 "locked_boundary": {"start": split.validation_end, "end": split.locked_test_end},
                 "samples": len(origins),
                 "model_mape": statistics.mean(model_errors),
