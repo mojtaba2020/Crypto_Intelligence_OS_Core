@@ -1,0 +1,38 @@
+name: Challenger V2 Fresh Locked OOS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  locked-oos:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout frozen Challenger V2 branch
+        uses: actions/checkout@v7
+        with:
+          ref: research/challenger-v2
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Install project
+        run: python -m pip install -e .
+      - name: Fetch immutable Bitstamp multitimeframe data
+        run: |
+          mkdir -p artifacts/multitimeframe_data
+          python scripts/fetch_real_multitimeframe_data_v1.py --output-dir artifacts/multitimeframe_data
+      - name: Run single-use frozen locked OOS judge
+        run: |
+          python scripts/run_challenger_v2_locked_oos.py \
+            --data-dir artifacts/multitimeframe_data \
+            --exchange bitstamp \
+            --output artifacts/challenger_v2_locked_oos.json
+      - name: Upload locked OOS evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: challenger-v2-fresh-locked-oos
+          path: artifacts/challenger_v2_locked_oos.json
+          if-no-files-found: error
+          retention-days: 90
