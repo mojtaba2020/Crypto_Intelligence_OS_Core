@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Development/validation-only runner for the frozen Challenger V3 classical lane."""
+"""Development/validation-only runner for Challenger V3 classical models."""
 
 from __future__ import annotations
 
@@ -31,13 +31,20 @@ def main() -> None:
 
     results: dict[str, dict[str, object]] = {}
     skipped: dict[str, dict[str, object]] = {}
+
     for spec in SPECS:
         if spec.family not in SUPPORTED_FAMILIES:
             continue
+
         candles = _load(args.data_dir / f"{args.exchange}_{spec.source_timeframe}.json")
         dataset_sha = prepared_data_identity(candles)
+
         try:
-            split = chronological_split(len(candles), spec.minimum_history_bars, spec.horizon_bars)
+            split = chronological_split(
+                len(candles),
+                spec.minimum_history_bars,
+                spec.horizon_bars,
+            )
         except ValueError as exc:
             skipped[spec.label] = {
                 "status": "NOT_EVALUATED_INSUFFICIENT_HISTORY",
@@ -46,8 +53,9 @@ def main() -> None:
             }
             continue
 
-        # Locked-test candles are physically excluded. V3 development cannot inspect them.
+        # Locked-test candles are physically excluded.
         validation_view = candles[: split.validation_end]
+
         try:
             metrics = evaluate(
                 validation_view,
@@ -68,8 +76,12 @@ def main() -> None:
         rank = {name: index for index, name in enumerate(CANDIDATES)}
         selected = min(
             CANDIDATES,
-            key=lambda name: (float(candidate_metrics[name]["mape"]), rank[name]),
+            key=lambda name: (
+                float(candidate_metrics[name]["mape"]),
+                rank[name],
+            ),
         )
+
         results[spec.label] = {
             "family": spec.family,
             "source_timeframe": spec.source_timeframe,
@@ -88,11 +100,16 @@ def main() -> None:
         "candidate_order": list(CANDIDATES),
         "results": results,
         "skipped": skipped,
-        "fresh_locked_oos_access": False,\n        "v2_locked_oos_used_for_tuning": False,
+        "fresh_locked_oos_access": False,
+        "v2_locked_oos_used_for_tuning": False,
         "production_promotion": False,
     }
+
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    args.output.write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     print(json.dumps(report, indent=2, sort_keys=True))
 
 
