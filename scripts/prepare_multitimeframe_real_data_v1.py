@@ -7,7 +7,12 @@ import argparse
 import json
 from pathlib import Path
 
-from resample_multitimeframe_ohlcv import aggregate, audit_source_rows, source_data_identity
+from resample_multitimeframe_ohlcv import (
+    aggregate,
+    audit_source_rows,
+    prepared_data_identity,
+    source_data_identity,
+)
 
 TIMEFRAMES = ("1d", "1w", "1mo")
 EXCHANGES = ("bitstamp", "bitfinex")
@@ -26,16 +31,31 @@ def prepare_exchange(
     output_dir: Path,
 ) -> dict[str, object]:
     source_audit = audit_source_rows(rows, source_interval_seconds=86400)
+    if not rows:
+        raise ValueError(f"No native daily rows for {exchange}")
+    as_of_timestamp = int(source_audit["last_timestamp"]) + 86_400
     report: dict[str, object] = {
         "exchange": exchange,
         "source_granularity": "native_1d",
         "source_sha256": source_data_identity(rows),
         "source_audit": source_audit,
+        "source_id": f"{exchange}:BTCUSD:native_1d",
+        "instrument": "BTCUSD",
+        "requested_range": {
+            "first_timestamp": int(source_audit["first_timestamp"]),
+            "last_timestamp": int(source_audit["last_timestamp"]),
+        },
+        "as_of_timestamp": as_of_timestamp,
         "source_gap_policy": "preserve_missing_calendar_days_as_invalid_markers_no_imputation",
         "timeframes": {},
     }
     for timeframe in TIMEFRAMES:
-        all_closed = aggregate(rows, timeframe, source_interval_seconds=86400)
+        all_closed = aggregate(
+            rows,
+            timeframe,
+            as_of_timestamp=as_of_timestamp,
+            source_interval_seconds=86400,
+        )
         complete_count = sum(bool(row["is_complete"]) for row in all_closed)
         incomplete_count = len(all_closed) - complete_count
         if not all_closed:
@@ -47,7 +67,7 @@ def prepare_exchange(
             "complete_buckets": complete_count,
             "incomplete_buckets": incomplete_count,
             "dropped_incomplete_buckets": 0,
-            "data_sha256": source_data_identity(all_closed),
+            "data_sha256": prepared_data_identity(all_closed),
             "first_timestamp": int(all_closed[0]["timestamp"]),
             "last_timestamp": int(all_closed[-1]["timestamp"]),
             "gap_policy": "preserve_calendar_grid_mark_incomplete_no_imputation",

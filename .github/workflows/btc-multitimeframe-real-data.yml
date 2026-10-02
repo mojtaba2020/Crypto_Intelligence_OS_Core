@@ -8,6 +8,7 @@ on:
       - "scripts/resample_multitimeframe_ohlcv.py"
       - "scripts/prepare_multitimeframe_real_data_v1.py"
       - "scripts/run_real_multitimeframe_judge_v1.py"
+      - "scripts/run_multitimeframe_challenger_v2_development.py"
       - "scripts/audit_multitimeframe_sample_coverage_v1.py"
       - ".github/workflows/btc-multitimeframe-real-data.yml"
 
@@ -57,6 +58,13 @@ jobs:
             --exchange bitstamp \
             --output artifacts/real-judge/bitstamp_locked_judge_v1.json
 
+      - name: Run Challenger V2 development-validation only
+        run: |
+          PYTHONPATH=. python scripts/run_multitimeframe_challenger_v2_development.py \
+            --data-dir artifacts/prepared \
+            --exchange bitstamp \
+            --output artifacts/challenger-v2/bitstamp_development_validation.json
+
       - name: Upload real-data evidence bundle
         uses: actions/upload-artifact@v4
         with:
@@ -66,5 +74,6 @@ jobs:
             artifacts/prepared/
             artifacts/coverage/
             artifacts/real-judge/
+            artifacts/challenger-v2/
           if-no-files-found: error
           retention-days: 30

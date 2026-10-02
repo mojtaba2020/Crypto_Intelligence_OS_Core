@@ -11,7 +11,7 @@ from multitimeframe_features_v3 import is_temporally_valid_sample
 from multitimeframe_judge_v1 import holm_rejections, judge_locked, select_on_validation
 from multitimeframe_lab_v1 import SPECS
 from multitimeframe_split_v1 import chronological_split, origins_for_phase
-from resample_multitimeframe_ohlcv import source_data_identity
+from resample_multitimeframe_ohlcv import prepared_data_identity
 
 SUPPORTED_FAMILIES = {"daily", "weekly", "monthly"}
 
@@ -39,7 +39,7 @@ def main() -> None:
         if spec.family not in SUPPORTED_FAMILIES:
             continue
         candles = _load(args.data_dir / f"{args.exchange}_{spec.source_timeframe}.json")
-        dataset_ids[spec.source_timeframe] = source_data_identity(candles)
+        dataset_ids[spec.source_timeframe] = prepared_data_identity(candles)
         try:
             split = chronological_split(
                 len(candles),

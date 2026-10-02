@@ -58,7 +58,7 @@ def audit_source_rows(
 
 
 def source_data_identity(rows: list[dict[str, float]]) -> str:
-    """Stable SHA-256 identity for normalized source rows."""
+    """Stable SHA-256 identity for raw OHLCV source rows."""
     normalized = [
         {
             "timestamp": int(row["timestamp"]),
@@ -70,6 +70,27 @@ def source_data_identity(rows: list[dict[str, float]]) -> str:
         }
         for row in sorted(rows, key=lambda item: int(item["timestamp"]))
     ]
+    payload = json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
+def prepared_data_identity(rows: list[dict[str, object]]) -> str:
+    """Hash the full prepared record, including completeness/provenance metadata."""
+    normalized: list[dict[str, object]] = []
+    for row in sorted(rows, key=lambda item: int(item["timestamp"])):
+        normalized.append(
+            {
+                "timestamp": int(row["timestamp"]),
+                "open": float(row["open"]),
+                "high": float(row["high"]),
+                "low": float(row["low"]),
+                "close": float(row["close"]),
+                "volume": float(row["volume"]),
+                "source_bars": int(row["source_bars"]),
+                "expected_source_bars": int(row["expected_source_bars"]),
+                "is_complete": bool(row["is_complete"]),
+            }
+        )
     payload = json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(payload).hexdigest()
 
@@ -133,10 +154,11 @@ def aggregate(
     final_key = int(last_bucket.timestamp())
     while key <= final_key:
         start = datetime.fromtimestamp(key, UTC)
-        if as_of_timestamp is not None:
-            end_ts = int(_bucket_end(start, timeframe).timestamp())
-            if end_ts > as_of_timestamp:
-                continue
+        end = _bucket_end(start, timeframe)
+        next_key = int(end.timestamp())
+        if as_of_timestamp is not None and next_key > as_of_timestamp:
+            key = next_key
+            continue
         group = buckets.get(key, [])
         if require_complete_buckets:
             end = _bucket_end(start, timeframe)
@@ -154,7 +176,6 @@ def aggregate(
                     f"Incomplete {timeframe} bucket at {key}: "
                     f"expected={expected} actual={len(group)} missing={missing} extra={extra}"
                 )
-        end = _bucket_end(start, timeframe)
         expected_source_bars = int((end - start).total_seconds()) // source_interval_seconds
         if group:
             first, last = group[0], group[-1]
@@ -185,7 +206,7 @@ def aggregate(
                     "is_complete": False,
                 }
             )
-        key = int(end.timestamp())
+        key = next_key
     return output
 
 
