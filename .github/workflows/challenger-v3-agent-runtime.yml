@@ -10,11 +10,14 @@ jobs:
   v3-runtime:
     runs-on: ubuntu-slim
     steps:
-      - name: Checkout exact V3 branch
+      - name: Checkout V3 research branch
         uses: actions/checkout@v7
         with:
           ref: research/challenger-v3-agents
           fetch-depth: 0
+
+      - name: Record exact research commit
+        run: git rev-parse HEAD | tee v3-research-commit.txt
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -29,17 +32,27 @@ jobs:
 
       - name: Test V3 orchestrator and workers
         run: |
-          python -m pytest -q             tests/test_challenger_v3_orchestrator.py             tests/test_challenger_v3_workers.py
+          python -m pytest -q \
+            tests/test_challenger_v3_orchestrator.py \
+            tests/test_challenger_v3_workers.py
 
       - name: Build audited development data
         run: |
           mkdir -p artifacts/real-data artifacts/prepared
-          python scripts/fetch_multitimeframe_exchange_audit_v1.py             --start "2011-08-18T00:00:00+00:00"             --end "2026-09-29T00:00:00+00:00"             --output-dir artifacts/real-data
-          python scripts/prepare_multitimeframe_real_data_v1.py             --input-dir artifacts/real-data             --output-dir artifacts/prepared
+          python scripts/fetch_multitimeframe_exchange_audit_v1.py \
+            --start "2011-08-18T00:00:00+00:00" \
+            --end "2026-09-29T00:00:00+00:00" \
+            --output-dir artifacts/real-data
+          python scripts/prepare_multitimeframe_real_data_v1.py \
+            --input-dir artifacts/real-data \
+            --output-dir artifacts/prepared
 
       - name: Plan V3 agent waves
         run: |
-          python -m scripts.challenger_v3_orchestrator             --output artifacts/v3-agent-evidence/orchestrator-plan.json
+          mkdir -p artifacts/v3-agent-evidence
+          cp v3-research-commit.txt artifacts/v3-agent-evidence/
+          python -m scripts.challenger_v3_orchestrator \
+            --output artifacts/v3-agent-evidence/orchestrator-plan.json
 
       - name: Run first bounded V3 worker wave
         run: |
