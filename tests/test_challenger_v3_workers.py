@@ -35,4 +35,23 @@ def test_nonfirst_worker_requires_upstream_evidence(tmp_path: Path) -> None:
     task = build_plan()["waves"][1][0]
     packet = execute_task(task, repo_root=tmp_path)
     assert packet["result"]["status"] == "blocked"
-    assert "upstream task evidence packet" in packet["missing_data"]
+    assert "completed data_manifest_audit evidence packet" in packet["missing_data"]
+
+
+def test_feature_and_stats_workers_complete_after_data_packet(tmp_path: Path) -> None:
+    manifest = tmp_path / "artifacts" / "prepared" / "prepared_manifest.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text('{"schema_version":1}\n', encoding="utf-8")
+    evidence_dir = tmp_path / "artifacts" / "v3-agent-evidence"
+    evidence_dir.mkdir(parents=True)
+    data_packet = execute_task(_first_task(), repo_root=tmp_path)
+    import json
+    (evidence_dir / "data_manifest_audit.json").write_text(
+        json.dumps(data_packet), encoding="utf-8"
+    )
+    for task in build_plan()["waves"][1]:
+        packet = execute_task(task, repo_root=tmp_path)
+        assert packet["result"]["status"] == "completed"
+        assert packet["evidence"][0]["upstream_task"] == "data_manifest_audit"
+        assert packet["production_eligible"] is False
+        assert packet["leakage_checks"]["fresh_oos_access"] is False
