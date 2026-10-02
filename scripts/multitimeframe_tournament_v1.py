@@ -6,7 +6,7 @@ from __future__ import annotations
 import math
 import statistics
 
-from scripts.multitimeframe_features_v3 import (
+from multitimeframe_features_v3 import (
     WINDOWS,
     feature_vector,
     is_temporally_valid_sample,
