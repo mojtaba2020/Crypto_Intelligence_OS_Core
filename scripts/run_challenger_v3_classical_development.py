@@ -46,7 +46,7 @@ def main() -> None:
             }
             continue
 
-        # Locked-test candles are physically excluded. V2 development cannot inspect them.
+        # Locked-test candles are physically excluded. V3 development cannot inspect them.
         validation_view = candles[: split.validation_end]
         try:
             metrics = evaluate(
