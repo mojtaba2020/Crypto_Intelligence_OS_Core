@@ -53,6 +53,13 @@ jobs:
           print("\n".join(str(path) for path in paths))
           PY
 
+      - name: Run V3 classical development tournament
+        run: |
+          python scripts/run_challenger_v3_classical_development.py \
+            --data-dir artifacts/prepared \
+            --exchange bitstamp \
+            --output artifacts/v3-agent-evidence/classical-development-tournament.json
+
       - name: Upload V3 evidence
         uses: actions/upload-artifact@v6
         with:
