@@ -22,6 +22,54 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _packet_path(repo_root: Path, task_id: str) -> Path:
+    return repo_root / "artifacts" / "v3-agent-evidence" / f"{task_id}.json"
+
+
+def _completed_upstream(repo_root: Path, task_id: str) -> bool:
+    path = _packet_path(repo_root, task_id)
+    if not path.is_file():
+        return False
+    packet = json.loads(path.read_text(encoding="utf-8"))
+    return packet.get("result", {}).get("status") == "completed"
+
+
+def _feature_spec() -> dict:
+    return {
+        "version": "v3-pit-features-1",
+        "availability_rule": "feature_at_t_uses_information_available_at_or_before_t",
+        "families": {
+            "returns": ["log_return_1", "log_return_3", "log_return_7", "log_return_14", "log_return_30"],
+            "trend": ["close_vs_sma_7", "close_vs_sma_30", "close_vs_sma_90", "sma_7_vs_30"],
+            "volatility": ["realized_vol_7", "realized_vol_30", "true_range_14"],
+            "range": ["distance_from_30d_high", "distance_from_30d_low", "range_position_30"],
+            "volume": ["volume_z_30", "volume_change_7"],
+            "calendar": ["day_of_week", "month_of_year"],
+        },
+        "forbidden": ["centered_windows", "future_fills", "future_normalization", "future_labels", "locked_oos_derived_features"],
+        "fit_policy": "fit_scalers_and_encoders_on_each_training_fold_only",
+    }
+
+
+def _statistical_gate_spec() -> dict:
+    return {
+        "version": "v3-stat-gate-1",
+        "champion": "persistence",
+        "primary_loss": "absolute_percentage_error",
+        "paired_unit": "forecast_origin",
+        "alpha": 0.05,
+        "confidence_interval": "95_percent_dependence_aware_moving_block_bootstrap",
+        "multiplicity": "Holm_across_predeclared_horizon_family",
+        "pass_rule": [
+            "mean_loss_improvement_gt_0",
+            "confidence_interval_lower_bound_gt_0",
+            "holm_adjusted_null_rejected_true",
+        ],
+        "required_reporting": ["MAPE", "direction_accuracy", "sample_count", "origin_level_paired_losses"],
+        "locked_oos_policy": "future_V3_locked_OOS_evaluated_once_after_freeze_and_never_used_for_tuning",
+    }
+
+
 def execute_task(task: dict, *, repo_root: Path) -> dict:
     """Execute one bounded local task and return a contract-shaped packet."""
     evidence: list[dict] = []
@@ -39,6 +87,12 @@ def execute_task(task: dict, *, repo_root: Path) -> dict:
             )
         else:
             missing.append("artifacts/prepared/prepared_manifest.json")
+    elif task["id"] in {"point_in_time_feature_spec", "statistical_gate_spec"}:
+        if not _completed_upstream(repo_root, "data_manifest_audit"):
+            missing.append("completed data_manifest_audit evidence packet")
+        else:
+            spec = _feature_spec() if task["id"] == "point_in_time_feature_spec" else _statistical_gate_spec()
+            evidence.append({"upstream_task": "data_manifest_audit", "spec": spec})
     else:
         missing.append("upstream task evidence packet")
 
@@ -67,14 +121,14 @@ def execute_task(task: dict, *, repo_root: Path) -> dict:
 
 
 def run_ready_tasks(*, repo_root: Path, output_dir: Path) -> list[Path]:
-    """Run only first-wave tasks; later waves require persisted upstream evidence."""
+    """Run data audit, then the bounded feature/statistics wave."""
     plan = build_plan()
-    first_wave = plan["waves"][0]
     output_dir.mkdir(parents=True, exist_ok=True)
     written = []
-    for task in first_wave:
-        packet = execute_task(task, repo_root=repo_root)
-        path = output_dir / f'{task["id"]}.json'
-        path.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        written.append(path)
+    for wave in plan["waves"][:2]:
+        for task in wave:
+            packet = execute_task(task, repo_root=repo_root)
+            path = output_dir / f'{task["id"]}.json'
+            path.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            written.append(path)
     return written
