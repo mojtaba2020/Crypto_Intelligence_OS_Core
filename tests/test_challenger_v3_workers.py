@@ -55,3 +55,27 @@ def test_feature_and_stats_workers_complete_after_data_packet(tmp_path: Path) ->
         assert packet["evidence"][0]["upstream_task"] == "data_manifest_audit"
         assert packet["production_eligible"] is False
         assert packet["leakage_checks"]["fresh_oos_access"] is False
+
+
+def test_model_agents_require_feature_packet(tmp_path: Path) -> None:
+    for task in build_plan()["waves"][2]:
+        packet = execute_task(task, repo_root=tmp_path)
+        assert packet["result"]["status"] == "blocked"
+        assert "completed point_in_time_feature_spec evidence packet" in packet["missing_data"]
+
+
+def test_model_agents_complete_after_feature_packet(tmp_path: Path) -> None:
+    import json
+    evidence_dir = tmp_path / "artifacts" / "v3-agent-evidence"
+    evidence_dir.mkdir(parents=True)
+    (evidence_dir / "point_in_time_feature_spec.json").write_text(
+        json.dumps({"result": {"status": "completed"}}), encoding="utf-8"
+    )
+    model_tasks = [t for t in build_plan()["waves"][2] if t["id"] in {"classical_candidate_spec", "neural_adapter_spec"}]
+    assert len(model_tasks) == 2
+    for task in model_tasks:
+        packet = execute_task(task, repo_root=tmp_path)
+        assert packet["result"]["status"] == "completed"
+        assert packet["production_eligible"] is False
+        assert packet["leakage_checks"]["fresh_oos_access"] is False
+        assert packet["evidence"][0]["upstream_task"] == "point_in_time_feature_spec"
