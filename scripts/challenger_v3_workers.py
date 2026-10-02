@@ -70,6 +70,42 @@ def _statistical_gate_spec() -> dict:
     }
 
 
+def _classical_spec() -> dict:
+    return {
+        "version": "v3-classical-candidates-1",
+        "target": "future_close_by_predeclared_horizon",
+        "candidates": [
+            {"name": "ridge", "config": {"alpha": 1.0, "scaler": "train_fold_only"}},
+            {"name": "elastic_net", "config": {"alpha": 0.0001, "l1_ratio": 0.25, "max_iter": 5000, "random_state": 20261002}},
+            {"name": "extra_trees", "config": {"n_estimators": 300, "min_samples_leaf": 5, "random_state": 20261002}},
+            {"name": "random_forest", "config": {"n_estimators": 300, "min_samples_leaf": 5, "max_features": 0.75, "random_state": 20261002}},
+            {"name": "hist_gradient_boosting", "config": {"learning_rate": 0.05, "max_iter": 200, "max_leaf_nodes": 15, "l2_regularization": 1.0, "random_state": 20261002}},
+        ],
+        "selection": "development_validation_only_then_deterministic_tie_break",
+        "forbidden": ["fresh_locked_oos", "V2_locked_oos_tuning", "production_promotion"],
+    }
+
+
+def _neural_spec() -> dict:
+    return {
+        "version": "v3-neural-adapters-1",
+        "status": "adapter_spec_only",
+        "families": [
+            {"name": "tcn", "input": "point_in_time_sequence", "seed": 20261002},
+            {"name": "lstm", "input": "point_in_time_sequence", "seed": 20261002},
+            {"name": "transformer_encoder", "input": "point_in_time_sequence", "seed": 20261002},
+        ],
+        "requirements": [
+            "training_fold_only_normalization",
+            "walk_forward_validation",
+            "early_stopping_on_validation_only",
+            "deterministic_seed_recorded",
+            "parameter_count_reported",
+        ],
+        "forbidden": ["fresh_locked_oos", "V2_locked_oos_tuning", "production_promotion"],
+    }
+
+
 def execute_task(task: dict, *, repo_root: Path) -> dict:
     """Execute one bounded local task and return a contract-shaped packet."""
     evidence: list[dict] = []
@@ -93,6 +129,12 @@ def execute_task(task: dict, *, repo_root: Path) -> dict:
         else:
             spec = _feature_spec() if task["id"] == "point_in_time_feature_spec" else _statistical_gate_spec()
             evidence.append({"upstream_task": "data_manifest_audit", "spec": spec})
+    elif task["id"] in {"classical_candidate_spec", "neural_adapter_spec"}:
+        if not _completed_upstream(repo_root, "point_in_time_feature_spec"):
+            missing.append("completed point_in_time_feature_spec evidence packet")
+        else:
+            spec = _classical_spec() if task["id"] == "classical_candidate_spec" else _neural_spec()
+            evidence.append({"upstream_task": "point_in_time_feature_spec", "spec": spec})
     else:
         missing.append("upstream task evidence packet")
 
@@ -121,11 +163,11 @@ def execute_task(task: dict, *, repo_root: Path) -> dict:
 
 
 def run_ready_tasks(*, repo_root: Path, output_dir: Path) -> list[Path]:
-    """Run data audit, then the bounded feature/statistics wave."""
+    """Run bounded V3 waves through classical/neural candidate specification."""
     plan = build_plan()
     output_dir.mkdir(parents=True, exist_ok=True)
     written = []
-    for wave in plan["waves"][:2]:
+    for wave in plan["waves"][:3]:
         for task in wave:
             packet = execute_task(task, repo_root=repo_root)
             path = output_dir / f'{task["id"]}.json'
