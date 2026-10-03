@@ -93,7 +93,7 @@ def test_classical_worker_spec_matches_implemented_target_and_safety(tmp_path: P
         t for t in build_plan()["waves"][2] if t["id"] == "classical_candidate_spec"
     )
     packet = execute_task(task, repo_root=tmp_path)
-    spec = packet["result"]["spec"]
+    spec = packet["evidence"][0]["spec"]
     assert spec["target"] == "future_log_return_by_predeclared_horizon_reconstructed_to_price_for_APE"
     assert spec["implementation_source"] == "scripts/multitimeframe_tournament_v2.py"
     assert spec["selection"] == "development_validation_only_minimum_MAPE_then_declared_candidate_order_tie_break"
