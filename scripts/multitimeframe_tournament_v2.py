@@ -117,6 +117,7 @@ def evaluate(
     candidate_errors = {name: [] for name in CANDIDATES}
     candidate_directions = {name: [] for name in CANDIDATES}
     persistence_errors: list[float] = []
+    origin_records: list[dict[str, object]] = []
 
     for origin in origins:
         train_origins = [i for i in valid_indices if i < origin and i + horizon <= origin]
@@ -127,14 +128,24 @@ def evaluate(
 
         current = float(candles[origin]["close"])
         actual = float(candles[origin + horizon]["close"])
-        persistence_errors.append(abs(current - actual) / actual)
+        persistence_error = abs(current - actual) / actual
+        persistence_errors.append(persistence_error)
+        origin_records.append({
+            "origin_index": origin,
+            "origin_timestamp": candles[origin].get("timestamp"),
+            "actual_close": actual,
+            "persistence_error": persistence_error,
+            "candidate_errors": {},
+        })
         row = feature_cache[origin]
 
         for name in CANDIDATES:
             predictor = _fit_candidate(name, x, y)
             predicted_return = _predict_candidate(name, predictor, row)
             predicted = current * math.exp(predicted_return)
-            candidate_errors[name].append(abs(predicted - actual) / actual)
+            model_error = abs(predicted - actual) / actual
+            candidate_errors[name].append(model_error)
+            origin_records[-1]["candidate_errors"][name] = model_error
             candidate_directions[name].append((predicted_return >= 0) == (actual >= current))
 
     results: dict[str, dict[str, float]] = {}
@@ -151,4 +162,5 @@ def evaluate(
         "samples": len(origins),
         "persistence_mape": statistics.mean(persistence_errors),
         "candidates": results,
+        "origin_level_paired_losses": origin_records,
     }
