@@ -47,7 +47,9 @@ def _mbb(diffs: list[float], block: int, seed: int) -> tuple[float, list[float]]
     boot.sort()
     lo = boot[int(0.025 * BOOTSTRAP_REPS)]
     hi = boot[int(0.975 * BOOTSTRAP_REPS) - 1]
-    # One-sided H0: mean improvement <= 0 versus H1: > 0. Under the\n    # centered null, evidence is how often a null bootstrap mean is at least\n    # as large as the observed positive improvement.\n    p = (1 + sum(x >= observed for x in null)) / (BOOTSTRAP_REPS + 1)
+    # One-sided H0: mean improvement <= 0 versus H1: > 0.
+    # Under the centered null, count bootstrap means at least as large as observed.
+    p = (1 + sum(x >= observed for x in null)) / (BOOTSTRAP_REPS + 1)
     return p, [lo, hi]
 
 
