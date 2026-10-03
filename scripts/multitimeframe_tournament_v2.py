@@ -78,7 +78,7 @@ def evaluate(
     step: int,
 ) -> dict[str, object]:
     """Run V2 locally without mutating the frozen V1 module."""
-    from scripts.multitimeframe_features_v3 import (
+    from multitimeframe_features_v3 import (
         WINDOWS,
         feature_vector,
         is_temporally_valid_sample,
