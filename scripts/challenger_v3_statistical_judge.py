@@ -112,7 +112,8 @@ def main() -> None:
         "bootstrap": {"method": "moving_block", "repetitions": BOOTSTRAP_REPS, "seed_base": SEED},
         "multiplicity": {"method": "holm_bonferroni", "alpha": ALPHA, "family": "all_evaluated_horizon_x_ablation_nested_winners"},
         "results": rows,
-        "selection_bias_control": "candidate selected on earlier origins; statistics computed only on later origins",\n        "interpretation": "Nested hypothesis-strength diagnostics only; passing does not authorize freeze or promotion.",
+        "selection_bias_control": "candidate selected on earlier origins; statistics computed only on later origins",
+        "interpretation": "Nested hypothesis-strength diagnostics only; passing does not authorize freeze or promotion.",
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(output, indent=2, sort_keys=True) + "\n", encoding="utf-8")
