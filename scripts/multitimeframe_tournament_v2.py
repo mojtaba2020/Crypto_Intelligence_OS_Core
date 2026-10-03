@@ -76,8 +76,10 @@ def evaluate(
     horizon: int,
     min_train: int,
     step: int,
+    feature_ablation: str = "all_features",
 ) -> dict[str, object]:
     """Run V2 locally without mutating the frozen V1 module."""
+    from challenger_v3_feature_ablation import apply_mask, feature_mask
     from multitimeframe_features_v3 import (
         WINDOWS,
         feature_vector,
