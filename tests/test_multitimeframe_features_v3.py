@@ -144,14 +144,14 @@ def test_baseline_ablation_exactly_matches_legacy_feature_prefix(family: str, or
     baseline = apply_mask(full, baseline_mask)
 
     names = feature_names(family)
-    regime_prefixes = ("trend_", "vol_ratio_", "range_position_")
+    regime_prefixes = ("trend_", "vol_ratio_", "range_position_", "state_v31_")
     legacy_indices = tuple(
         i for i, name in enumerate(names)
         if not name.startswith(regime_prefixes)
     )
     assert baseline_mask == legacy_indices
     assert baseline == [full[i] for i in legacy_indices]
-    assert len(baseline) + 7 == len(full)
+    assert len(baseline) + 12 == len(full)
 
 
 @pytest.mark.parametrize(
@@ -172,3 +172,36 @@ def test_regime_realized_vol_matches_original_trailing_semantics(
     assert _realized_vol(candles, origin, window) == pytest.approx(
         statistics.pstdev(returns)
     )
+
+
+@pytest.mark.parametrize(
+    ("family", "origin"),
+    [("daily", 365), ("weekly", 52), ("monthly", 36)],
+)
+def test_v31_state_features_are_declared_finite_and_bounded_where_expected(
+    family: str, origin: int
+) -> None:
+    names = feature_names(family)
+    state_names = [name for name in names if name.startswith("state_v31_")]
+    assert len(state_names) == 5
+    values = feature_vector(_candles(origin + 10), origin, family)
+    lookup = dict(zip(names, values))
+    percentile_name = next(name for name in state_names if "volatility_percentile" in name)
+    assert 0.0 < lookup[percentile_name] <= 1.0
+    assert all(math.isfinite(lookup[name]) for name in state_names)
+
+
+def test_v31_state_features_are_point_in_time_safe() -> None:
+    candles = _candles(500)
+    origin = 365
+    names = feature_names("daily")
+    before = dict(zip(names, feature_vector(candles, origin, "daily")))
+    for row in candles[origin + 1 :]:
+        row["open"] *= 500.0
+        row["high"] *= 500.0
+        row["low"] *= 500.0
+        row["close"] *= 500.0
+        row["volume"] *= 500.0
+    after = dict(zip(names, feature_vector(candles, origin, "daily")))
+    state_names = [name for name in names if name.startswith("state_v31_")]
+    assert [before[name] for name in state_names] == [after[name] for name in state_names]
