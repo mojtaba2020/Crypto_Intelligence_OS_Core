@@ -72,6 +72,7 @@ jobs:
           PY
 
       - name: Run V3 classical development tournament
+        timeout-minutes: 45
         run: |
           python scripts/run_challenger_v3_classical_development.py \
             --data-dir artifacts/prepared \
