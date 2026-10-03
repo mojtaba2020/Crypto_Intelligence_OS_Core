@@ -12,7 +12,10 @@ import random
 import statistics
 from pathlib import Path
 
-from multitimeframe_lab_v1 import SPECS
+try:
+    from .multitimeframe_lab_v1 import SPECS
+except ImportError:  # direct script execution with scripts/ on sys.path
+    from multitimeframe_lab_v1 import SPECS
 
 ALPHA = 0.05
 BOOTSTRAP_REPS = 10000
