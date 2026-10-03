@@ -34,6 +34,8 @@ def main() -> None:
     skipped: dict[str, dict[str, object]] = {}
 
     for spec in SPECS:
+        if args.horizon is not None and spec.label != args.horizon:
+            continue
         if spec.family not in SUPPORTED_FAMILIES:
             continue
 
