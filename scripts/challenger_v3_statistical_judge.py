@@ -74,20 +74,21 @@ def main() -> None:
         report = json.loads(path.read_text(encoding="utf-8"))
         for horizon, result in report.get("results", {}).items():
             spec = spec_by_label[horizon]
-            for ablation, candidate in result["ablation_selected_candidates"].items():
+            for ablation in result["ablation_selected_candidates"]:
                 metrics = result["ablation_metrics"][ablation]
                 paired = metrics["origin_level_paired_losses"]
-                diffs = [
-                    float(item["persistence_error"]) - float(item["candidate_errors"][candidate])
-                    for item in paired
-                ]
-                seed = SEED + sum(ord(ch) for ch in horizon + ":" + ablation)
+                candidate, cut = select_candidate(paired, tuple(metrics["candidates"].keys()))
+                diffs = heldout_paired_differences(paired, candidate, cut)
+                seed = SEED + sum(ord(ch) for ch in horizon + ":" + ablation + ":nested")
                 p, ci = _mbb(diffs, spec.bootstrap_block_bars, seed)
                 rows.append({
                     "horizon": horizon,
                     "ablation": ablation,
                     "candidate": candidate,
+                    "selection_samples": cut,
                     "samples": len(diffs),
+                    "selection_method": "earlier_origins_only",
+                    "diagnostic_method": "later_origins_only",
                     "model_mape": metrics["candidates"][candidate]["mape"],
                     "persistence_mape": metrics["persistence_mape"],
                     "mean_loss_improvement": statistics.mean(diffs),
@@ -104,14 +105,14 @@ def main() -> None:
         )
 
     output = {
-        "status": "CHALLENGER_V3_DEVELOPMENT_STATISTICAL_DIAGNOSTICS_ONLY",
+        "status": "CHALLENGER_V3_NESTED_DEVELOPMENT_STATISTICAL_DIAGNOSTICS_ONLY",
         "confirmatory": False,
         "fresh_locked_oos_access": False,
         "production_promotion": False,
         "bootstrap": {"method": "moving_block", "repetitions": BOOTSTRAP_REPS, "seed_base": SEED},
-        "multiplicity": {"method": "holm_bonferroni", "alpha": ALPHA, "family": "all_evaluated_horizon_x_ablation_winners"},
+        "multiplicity": {"method": "holm_bonferroni", "alpha": ALPHA, "family": "all_evaluated_horizon_x_ablation_nested_winners"},
         "results": rows,
-        "interpretation": "Hypothesis-strength diagnostics only; passing does not authorize freeze or promotion.",
+        "selection_bias_control": "candidate selected on earlier origins; statistics computed only on later origins",\n        "interpretation": "Nested hypothesis-strength diagnostics only; passing does not authorize freeze or promotion.",
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(output, indent=2, sort_keys=True) + "\n", encoding="utf-8")
