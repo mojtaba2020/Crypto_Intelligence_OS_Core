@@ -72,16 +72,18 @@ def _statistical_gate_spec() -> dict:
 
 def _classical_spec() -> dict:
     return {
-        "version": "v3-classical-candidates-1",
-        "target": "future_close_by_predeclared_horizon",
+        "version": "v3-classical-candidates-2-implemented",
+        "target": "future_log_return_by_predeclared_horizon_reconstructed_to_price_for_APE",
         "candidates": [
             {"name": "ridge", "config": {"alpha": 1.0, "scaler": "train_fold_only"}},
-            {"name": "elastic_net", "config": {"alpha": 0.0001, "l1_ratio": 0.25, "max_iter": 5000, "random_state": 20261002}},
-            {"name": "extra_trees", "config": {"n_estimators": 300, "min_samples_leaf": 5, "random_state": 20261002}},
-            {"name": "random_forest", "config": {"n_estimators": 300, "min_samples_leaf": 5, "max_features": 0.75, "random_state": 20261002}},
-            {"name": "hist_gradient_boosting", "config": {"learning_rate": 0.05, "max_iter": 200, "max_leaf_nodes": 15, "l2_regularization": 1.0, "random_state": 20261002}},
+            {"name": "elastic_net", "config": {"alpha": 0.0001, "l1_ratio": 0.25, "max_iter": 5000, "random_state": 20260929}},
+            {"name": "extra_trees", "config": {"implementation": "multitimeframe_tournament_v1._fit_candidate", "frozen_by_code": true}},
+            {"name": "random_forest", "config": {"n_estimators": 100, "min_samples_leaf": 5, "max_features": 0.75, "random_state": 20260929, "n_jobs": 2}},
+            {"name": "hist_gradient_boosting", "config": {"learning_rate": 0.05, "max_iter": 150, "max_leaf_nodes": 15, "l2_regularization": 1.0, "random_state": 20260929}},
+            {"name": "boosting", "config": {"implementation": "multitimeframe_tournament_v1._fit_candidate", "frozen_by_code": true}},
         ],
-        "selection": "development_validation_only_then_deterministic_tie_break",
+        "selection": "development_validation_only_minimum_MAPE_then_declared_candidate_order_tie_break",
+        "implementation_source": "scripts/multitimeframe_tournament_v2.py",
         "forbidden": ["fresh_locked_oos", "V2_locked_oos_tuning", "production_promotion"],
     }
 
