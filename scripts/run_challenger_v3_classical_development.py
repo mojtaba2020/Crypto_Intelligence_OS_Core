@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 
 from multitimeframe_lab_v1 import SPECS
@@ -56,6 +57,8 @@ def main() -> None:
         # Locked-test candles are physically excluded.
         validation_view = candles[: split.validation_end]
 
+        started = time.perf_counter()
+        print('[V3] START ' + spec.label, flush=True)
         try:
             metrics = evaluate(
                 validation_view,
@@ -72,6 +75,8 @@ def main() -> None:
             }
             continue
 
+        elapsed = time.perf_counter() - started
+        print('[V3] DONE ' + spec.label + ' seconds=' + format(elapsed, '.2f'), flush=True)
         candidate_metrics = metrics["candidates"]
         rank = {name: index for index, name in enumerate(CANDIDATES)}
         selected = min(
@@ -91,6 +96,7 @@ def main() -> None:
             "locked_test_access": False,
             "validation_boundary": split.validation_end,
             "selected_candidate": selected,
+            "runtime_seconds": round(elapsed, 3),
             "metrics": metrics,
         }
 
