@@ -14,6 +14,12 @@ WINDOWS = {
     "monthly": (2, 3, 6, 12, 24, 36),
 }
 
+REGIME_WINDOWS = {
+    "daily": (7, 30, 90),
+    "weekly": (4, 13, 26),
+    "monthly": (3, 6, 12),
+}
+
 
 def _next_period_timestamp(timestamp: int, family: str) -> int:
     if family == "daily":
@@ -86,7 +92,29 @@ def feature_names(family: str) -> tuple[str, ...]:
         "body_pct",
         "log_volume_vs_median",
     ]
+    fast, medium, slow = REGIME_WINDOWS[family]
+    names += [
+        f"trend_close_vs_sma_{fast}",
+        f"trend_close_vs_sma_{medium}",
+        f"trend_sma_{fast}_vs_{medium}",
+        f"trend_sma_{medium}_vs_{slow}",
+        f"vol_ratio_{fast}_vs_{medium}",
+        f"vol_ratio_{medium}_vs_{slow}",
+        f"range_position_{medium}",
+    ]
     return tuple(names)
+
+
+def _mean_close(candles: list[dict[str, float]], origin: int, window: int) -> float:
+    return statistics.fmean(float(row["close"]) for row in candles[origin - window + 1 : origin + 1])
+
+
+def _realized_vol(candles: list[dict[str, float]], origin: int, window: int) -> float:
+    returns = [
+        math.log(float(candles[i]["close"]) / float(candles[i - 1]["close"]))
+        for i in range(origin - window + 1, origin + 1)
+    ]
+    return statistics.pstdev(returns)
 
 
 def feature_vector(
@@ -129,6 +157,34 @@ def feature_vector(
             (current - low) / (high - low) if high > low else 0.5,
             (current - open_price) / open_price,
             math.log((volume + 1e-12) / (median_volume + 1e-12)),
+        ]
+    )
+
+    fast, medium, slow = REGIME_WINDOWS[family]
+    sma_fast = _mean_close(candles, origin, fast)
+    sma_medium = _mean_close(candles, origin, medium)
+    sma_slow = _mean_close(candles, origin, slow)
+    vol_fast = _realized_vol(candles, origin, fast)
+    vol_medium = _realized_vol(candles, origin, medium)
+    vol_slow = _realized_vol(candles, origin, slow)
+    medium_rows = candles[origin - medium + 1 : origin + 1]
+    medium_high = max(float(row["high"]) for row in medium_rows)
+    medium_low = min(float(row["low"]) for row in medium_rows)
+    range_position = (
+        (current - medium_low) / (medium_high - medium_low)
+        if medium_high > medium_low
+        else 0.5
+    )
+
+    values.extend(
+        [
+            current / sma_fast - 1.0,
+            current / sma_medium - 1.0,
+            sma_fast / sma_medium - 1.0,
+            sma_medium / sma_slow - 1.0,
+            vol_fast / (vol_medium + 1e-12),
+            vol_medium / (vol_slow + 1e-12),
+            range_position,
         ]
     )
     if len(values) != len(feature_names(family)) or any(not math.isfinite(x) for x in values):
