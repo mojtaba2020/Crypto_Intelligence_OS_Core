@@ -49,3 +49,14 @@ jobs:
 
       - name: Run complete quality gate
         run: python scripts/quality_gate.py
+
+      - name: Smoke test Bitstamp hourly long-history ingestion
+        if: matrix.python-version == '3.13'
+        run: |
+          mkdir -p artifacts/long-history-smoke
+          python scripts/backfill_bitstamp_hourly.py \
+            --start "2024-01-01T00:00:00+00:00" \
+            --end "2024-01-03T00:00:00+00:00" \
+            --database artifacts/long-history-smoke/bitstamp.sqlite \
+            --report artifacts/long-history-smoke/report.json
+          cat artifacts/long-history-smoke/report.json
