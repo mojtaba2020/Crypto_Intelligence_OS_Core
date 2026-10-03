@@ -7,7 +7,7 @@ information families fairly.
 """
 from __future__ import annotations
 
-from scripts.multitimeframe_features_v3 import feature_names
+from multitimeframe_features_v3 import feature_names
 
 ABLATIONS = ("baseline", "regime_only_delta", "all_features")
 
