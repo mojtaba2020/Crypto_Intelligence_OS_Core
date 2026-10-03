@@ -129,3 +129,46 @@ def test_regime_features_do_not_read_future_rows() -> None:
         row["close"] *= 1_000.0
         row["volume"] *= 1_000.0
     assert feature_vector(candles, origin, "daily") == before
+
+
+@pytest.mark.parametrize(
+    ("family", "origin"),
+    [("daily", 365), ("weekly", 52), ("monthly", 36)],
+)
+def test_baseline_ablation_exactly_matches_legacy_feature_prefix(family: str, origin: int) -> None:
+    from scripts.challenger_v3_feature_ablation import apply_mask, feature_mask
+
+    candles = _candles(origin + 10)
+    full = feature_vector(candles, origin, family)
+    baseline_mask = feature_mask(family, "baseline")
+    baseline = apply_mask(full, baseline_mask)
+
+    names = feature_names(family)
+    regime_prefixes = ("trend_", "vol_ratio_", "range_position_")
+    legacy_indices = tuple(
+        i for i, name in enumerate(names)
+        if not name.startswith(regime_prefixes)
+    )
+    assert baseline_mask == legacy_indices
+    assert baseline == [full[i] for i in legacy_indices]
+    assert len(baseline) + 7 == len(full)
+
+
+@pytest.mark.parametrize(
+    ("family", "origin", "window"),
+    [("daily", 365, 30), ("weekly", 52, 13), ("monthly", 36, 6)],
+)
+def test_regime_realized_vol_matches_original_trailing_semantics(
+    family: str, origin: int, window: int
+) -> None:
+    import statistics
+    from scripts.multitimeframe_features_v3 import _realized_vol
+
+    candles = _candles(origin + 10)
+    returns = [
+        math.log(float(candles[i]["close"]) / float(candles[i - 1]["close"]))
+        for i in range(origin - max(window, 1) + 1, origin + 1)
+    ]
+    assert _realized_vol(candles, origin, window) == pytest.approx(
+        statistics.pstdev(returns)
+    )
