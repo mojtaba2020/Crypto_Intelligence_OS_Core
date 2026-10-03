@@ -10,7 +10,8 @@ from pathlib import Path
 
 from multitimeframe_lab_v1 import SPECS
 from multitimeframe_split_v1 import chronological_split
-from challenger_v3_feature_ablation import ABLATIONS\nfrom multitimeframe_tournament_v2 import CANDIDATES, evaluate
+from challenger_v3_feature_ablation import ABLATIONS
+from multitimeframe_tournament_v2 import CANDIDATES, evaluate
 from resample_multitimeframe_ohlcv import prepared_data_identity
 
 SUPPORTED_FAMILIES = {"daily", "weekly", "monthly"}
