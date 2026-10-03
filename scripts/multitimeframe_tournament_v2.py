@@ -102,7 +102,11 @@ def evaluate(
         for i in range(longest, len(candles) - horizon)
         if is_temporally_valid_sample(candles, family, i, horizon)
     ]
-    feature_cache = {i: feature_vector(candles, i, family) for i in valid_indices}
+    mask = feature_mask(family, feature_ablation)
+    feature_cache = {
+        i: apply_mask(feature_vector(candles, i, family), mask)
+        for i in valid_indices
+    }
     label_cache = {
         i: math.log(float(candles[i + horizon]["close"]) / float(candles[i]["close"]))
         for i in valid_indices
