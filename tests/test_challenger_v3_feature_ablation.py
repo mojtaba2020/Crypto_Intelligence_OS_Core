@@ -15,11 +15,15 @@ from scripts.multitimeframe_features_v3 import feature_names
 def test_ablation_partition_is_complete_and_disjoint(family: str) -> None:
     baseline = set(feature_mask(family, "baseline"))
     regime = set(feature_mask(family, "regime_only_delta"))
+    state_v31 = set(feature_mask(family, "state_v31_delta"))
     all_features = set(feature_mask(family, "all_features"))
     assert baseline
     assert regime
+    assert state_v31
     assert baseline.isdisjoint(regime)
-    assert baseline | regime == all_features
+    assert baseline.isdisjoint(state_v31)
+    assert regime.isdisjoint(state_v31)
+    assert baseline | regime | state_v31 == all_features
     assert len(all_features) == len(feature_names(family))
 
 
