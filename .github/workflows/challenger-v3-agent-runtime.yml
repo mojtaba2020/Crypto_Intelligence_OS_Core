@@ -69,7 +69,7 @@ jobs:
       fail-fast: false
       matrix:
         horizon: [1d, 2d, 3d, 1w, 2w, 3w, 1mo, 3mo]
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
