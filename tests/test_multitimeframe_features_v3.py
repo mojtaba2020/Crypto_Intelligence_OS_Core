@@ -103,3 +103,29 @@ def test_incomplete_bucket_mask_invalidates_only_windows_that_touch_it() -> None
     assert is_temporally_valid_sample(candles, "daily", 700, 3)
     candles[500]["is_complete"] = False
     assert not is_temporally_valid_sample(candles, "daily", 700, 3)
+
+
+@pytest.mark.parametrize(
+    ("family", "origin"),
+    [("daily", 365), ("weekly", 52), ("monthly", 36)],
+)
+def test_regime_features_are_declared_and_finite(family: str, origin: int) -> None:
+    names = feature_names(family)
+    assert any(name.startswith("trend_") for name in names)
+    assert any(name.startswith("vol_ratio_") for name in names)
+    values = feature_vector(_candles(origin + 10), origin, family)
+    assert len(values) == len(names)
+    assert all(math.isfinite(value) for value in values)
+
+
+def test_regime_features_do_not_read_future_rows() -> None:
+    candles = _candles(500)
+    origin = 365
+    before = feature_vector(candles, origin, "daily")
+    for row in candles[origin + 1 :]:
+        row["open"] *= 1_000.0
+        row["high"] *= 1_000.0
+        row["low"] *= 1_000.0
+        row["close"] *= 1_000.0
+        row["volume"] *= 1_000.0
+    assert feature_vector(candles, origin, "daily") == before
