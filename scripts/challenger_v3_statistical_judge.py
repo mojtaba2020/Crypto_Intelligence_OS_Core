@@ -14,8 +14,10 @@ from pathlib import Path
 
 try:
     from .multitimeframe_lab_v1 import SPECS
+    from .challenger_v3_nested_selection import heldout_paired_differences, select_candidate
 except ImportError:  # direct script execution with scripts/ on sys.path
     from multitimeframe_lab_v1 import SPECS
+    from challenger_v3_nested_selection import heldout_paired_differences, select_candidate
 
 ALPHA = 0.05
 BOOTSTRAP_REPS = 10000
