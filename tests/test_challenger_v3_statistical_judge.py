@@ -25,7 +25,7 @@ def test_holm_stops_rejecting_after_first_failure() -> None:
     rows = [
         {"p_value": 0.001},
         {"p_value": 0.02},
-        {"p_value": 0.03},
+        {"p_value": 0.04},
     ]
     _holm(rows)
     ordered = sorted(rows, key=lambda row: float(row["p_value"]))
