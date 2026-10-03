@@ -79,3 +79,23 @@ def test_model_agents_complete_after_feature_packet(tmp_path: Path) -> None:
         assert packet["production_eligible"] is False
         assert packet["leakage_checks"]["fresh_oos_access"] is False
         assert packet["evidence"][0]["upstream_task"] == "point_in_time_feature_spec"
+
+
+def test_classical_worker_spec_matches_implemented_target_and_safety(tmp_path: Path) -> None:
+    import json
+
+    evidence_dir = tmp_path / "artifacts" / "v3-agent-evidence"
+    evidence_dir.mkdir(parents=True)
+    (evidence_dir / "point_in_time_feature_spec.json").write_text(
+        json.dumps({"result": {"status": "completed"}}), encoding="utf-8"
+    )
+    task = next(
+        t for t in build_plan()["waves"][2] if t["id"] == "classical_candidate_spec"
+    )
+    packet = execute_task(task, repo_root=tmp_path)
+    spec = packet["result"]["spec"]
+    assert spec["target"] == "future_log_return_by_predeclared_horizon_reconstructed_to_price_for_APE"
+    assert spec["implementation_source"] == "scripts/multitimeframe_tournament_v2.py"
+    assert spec["selection"] == "development_validation_only_minimum_MAPE_then_declared_candidate_order_tie_break"
+    assert "fresh_locked_oos" in spec["forbidden"]
+    assert "production_promotion" in spec["forbidden"]
