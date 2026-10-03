@@ -71,13 +71,33 @@ jobs:
           print("\n".join(str(path) for path in paths))
           PY
 
-      - name: Run V3 classical development tournament
-        timeout-minutes: 45
+      - name: Run V3 1d development horizon
+        run: python scripts/run_challenger_v3_classical_development.py --data-dir artifacts/prepared --exchange bitstamp --horizon 1d --output artifacts/v3-agent-evidence/classical-development-1d.json
+
+      - name: Run V3 2d development horizon
+        run: python scripts/run_challenger_v3_classical_development.py --data-dir artifacts/prepared --exchange bitstamp --horizon 2d --output artifacts/v3-agent-evidence/classical-development-2d.json
+
+      - name: Run V3 3d development horizon
+        run: python scripts/run_challenger_v3_classical_development.py --data-dir artifacts/prepared --exchange bitstamp --horizon 3d --output artifacts/v3-agent-evidence/classical-development-3d.json
+
+      - name: Run V3 1w development horizon
+        run: python scripts/run_challenger_v3_classical_development.py --data-dir artifacts/prepared --exchange bitstamp --horizon 1w --output artifacts/v3-agent-evidence/classical-development-1w.json
+
+      - name: Run V3 2w development horizon
+        run: python scripts/run_challenger_v3_classical_development.py --data-dir artifacts/prepared --exchange bitstamp --horizon 2w --output artifacts/v3-agent-evidence/classical-development-2w.json
+
+      - name: Run V3 3w development horizon
+        run: python scripts/run_challenger_v3_classical_development.py --data-dir artifacts/prepared --exchange bitstamp --horizon 3w --output artifacts/v3-agent-evidence/classical-development-3w.json
+
+      - name: Run V3 monthly development horizons
         run: |
-          python scripts/run_challenger_v3_classical_development.py \
-            --data-dir artifacts/prepared \
-            --exchange bitstamp \
-            --output artifacts/v3-agent-evidence/classical-development-tournament.json
+          for horizon in 1mo 3mo; do
+            python scripts/run_challenger_v3_classical_development.py \
+              --data-dir artifacts/prepared \
+              --exchange bitstamp \
+              --horizon "$horizon" \
+              --output "artifacts/v3-agent-evidence/classical-development-$horizon.json"
+          done
 
       - name: Upload V3 evidence
         uses: actions/upload-artifact@v6
