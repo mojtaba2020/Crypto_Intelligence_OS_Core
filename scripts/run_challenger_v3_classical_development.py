@@ -28,7 +28,13 @@ def main() -> None:
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--exchange", default="bitstamp")
-    parser.add_argument("--horizon", default=None, help="Evaluate only this spec label, e.g. 1d or 1w")
+    valid_horizons = tuple(spec.label for spec in SPECS if spec.family in SUPPORTED_FAMILIES)
+    parser.add_argument(
+        "--horizon",
+        default=None,
+        choices=valid_horizons,
+        help="Evaluate only one predeclared horizon.",
+    )
     args = parser.parse_args()
 
     results: dict[str, dict[str, object]] = {}
