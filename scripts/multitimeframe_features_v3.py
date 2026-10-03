@@ -102,6 +102,13 @@ def feature_names(family: str) -> tuple[str, ...]:
         f"vol_ratio_{medium}_vs_{slow}",
         f"range_position_{medium}",
     ]
+    names += [
+        "state_v31_volume_robust_z",
+        f"state_v31_volume_ratio_{fast}_vs_{medium}",
+        f"state_v31_volatility_percentile_{fast}_in_{slow}",
+        "state_v31_trend_x_volatility",
+        "state_v31_regime_transition",
+    ]
     return tuple(names)
 
 
@@ -115,6 +122,20 @@ def _realized_vol(candles: list[dict[str, float]], origin: int, window: int) -> 
         for i in range(origin - window + 1, origin + 1)
     ]
     return statistics.pstdev(returns)
+
+
+def _median_abs_deviation(values: list[float]) -> float:
+    med = statistics.median(values)
+    return statistics.median(abs(x - med) for x in values)
+
+
+def _trailing_volatility_percentile(
+    candles: list[dict[str, float]], origin: int, fast: int, reference: int
+) -> float:
+    start = max(fast, origin - reference + 1)
+    vols = [_realized_vol(candles, i, fast) for i in range(start, origin + 1)]
+    current = vols[-1]
+    return sum(v <= current for v in vols) / len(vols)
 
 
 def feature_vector(
@@ -176,15 +197,41 @@ def feature_vector(
         else 0.5
     )
 
+    trend_fast_medium = sma_fast / sma_medium - 1.0
+    vol_fast_medium = vol_fast / (vol_medium + 1e-12)
     values.extend(
         [
             current / sma_fast - 1.0,
             current / sma_medium - 1.0,
-            sma_fast / sma_medium - 1.0,
+            trend_fast_medium,
             sma_medium / sma_slow - 1.0,
-            vol_fast / (vol_medium + 1e-12),
+            vol_fast_medium,
             vol_medium / (vol_slow + 1e-12),
             range_position,
+        ]
+    )
+
+    medium_volumes = [float(row["volume"]) for row in candles[origin - medium + 1 : origin + 1]]
+    fast_volumes = medium_volumes[-fast:]
+    volume_median = statistics.median(medium_volumes)
+    volume_mad = _median_abs_deviation(medium_volumes)
+    robust_volume_z = (volume - volume_median) / (1.4826 * volume_mad + 1e-12)
+    volume_ratio_fast_medium = statistics.fmean(fast_volumes) / (statistics.fmean(medium_volumes) + 1e-12)
+    volatility_percentile = _trailing_volatility_percentile(candles, origin, fast, slow)
+    trend_x_volatility = trend_fast_medium * (vol_fast_medium - 1.0)
+
+    prev_sma_fast = _mean_close(candles, origin - 1, fast)
+    prev_sma_medium = _mean_close(candles, origin - 1, medium)
+    prev_trend = prev_sma_fast / prev_sma_medium - 1.0
+    regime_transition = float((trend_fast_medium > 0) - (prev_trend > 0))
+
+    values.extend(
+        [
+            robust_volume_z,
+            volume_ratio_fast_medium,
+            volatility_percentile,
+            trend_x_volatility,
+            regime_transition,
         ]
     )
     if len(values) != len(feature_names(family)) or any(not math.isfinite(x) for x in values):
