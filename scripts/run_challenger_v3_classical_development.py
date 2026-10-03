@@ -93,6 +93,16 @@ def main() -> None:
         print('[V3] DONE ' + spec.label + ' seconds=' + format(elapsed, '.2f'), flush=True)
         candidate_metrics = metrics["candidates"]
         rank = {name: index for index, name in enumerate(CANDIDATES)}
+        ablation_selected = {}
+        for ablation, ablation_result in ablation_metrics.items():
+            ablation_candidates = ablation_result["candidates"]
+            ablation_selected[ablation] = min(
+                CANDIDATES,
+                key=lambda name: (
+                    float(ablation_candidates[name]["mape"]),
+                    rank[name],
+                ),
+            )
         selected = min(
             CANDIDATES,
             key=lambda name: (
@@ -113,6 +123,7 @@ def main() -> None:
             "runtime_seconds": round(elapsed, 3),
             "metrics": metrics,
             "ablation_metrics": ablation_metrics,
+            "ablation_selected_candidates": ablation_selected,
         }
 
     report = {
