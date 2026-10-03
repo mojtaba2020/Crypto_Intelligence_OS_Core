@@ -43,11 +43,11 @@ def _fit_candidate(name: str, x: list[list[float]], y: list[float]):
         )
     elif name == "random_forest":
         model = RandomForestRegressor(
-            n_estimators=200,
+            n_estimators=100,
             min_samples_leaf=5,
             max_features=0.75,
             random_state=20260929,
-            n_jobs=-1,
+            n_jobs=2,
         )
     elif name == "hist_gradient_boosting":
         model = HistGradientBoostingRegressor(
@@ -94,28 +94,35 @@ def evaluate(
     if len(origins) < 20:
         raise ValueError("Insufficient out-of-sample origins")
 
+    # Precompute every valid point-in-time feature/label once. The original
+    # implementation rebuilt the full training matrix for every origin, which
+    # was scientifically equivalent but needlessly expensive.
+    valid_indices = [
+        i
+        for i in range(longest, len(candles) - horizon)
+        if is_temporally_valid_sample(candles, family, i, horizon)
+    ]
+    feature_cache = {i: feature_vector(candles, i, family) for i in valid_indices}
+    label_cache = {
+        i: math.log(float(candles[i + horizon]["close"]) / float(candles[i]["close"]))
+        for i in valid_indices
+    }
+
     candidate_errors = {name: [] for name in CANDIDATES}
     candidate_directions = {name: [] for name in CANDIDATES}
     persistence_errors: list[float] = []
 
     for origin in origins:
-        train_origins = [
-            i
-            for i in v1._known_training_origins(longest, origin, horizon)
-            if is_temporally_valid_sample(candles, family, i, horizon)
-        ]
-        x = [feature_vector(candles, i, family) for i in train_origins]
-        y = [
-            math.log(float(candles[i + horizon]["close"]) / float(candles[i]["close"]))
-            for i in train_origins
-        ]
+        train_origins = [i for i in valid_indices if i < origin and i + horizon <= origin]
+        x = [feature_cache[i] for i in train_origins]
+        y = [label_cache[i] for i in train_origins]
         if len(x) != len(y):
             raise RuntimeError("Feature/label alignment invariant violated")
 
         current = float(candles[origin]["close"])
         actual = float(candles[origin + horizon]["close"])
         persistence_errors.append(abs(current - actual) / actual)
-        row = feature_vector(candles, origin, family)
+        row = feature_cache[origin]
 
         for name in CANDIDATES:
             predictor = _fit_candidate(name, x, y)
