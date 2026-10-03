@@ -71,13 +71,35 @@ jobs:
           print("\n".join(str(path) for path in paths))
           PY
 
-      - name: Run V3 classical development tournament
-        timeout-minutes: 45
+      - name: Run V3 daily development horizons
         run: |
-          python scripts/run_challenger_v3_classical_development.py \
-            --data-dir artifacts/prepared \
-            --exchange bitstamp \
-            --output artifacts/v3-agent-evidence/classical-development-tournament.json
+          for horizon in 1d 2d 3d; do
+            python scripts/run_challenger_v3_classical_development.py \
+              --data-dir artifacts/prepared \
+              --exchange bitstamp \
+              --horizon "$horizon" \
+              --output "artifacts/v3-agent-evidence/classical-development-$horizon.json"
+          done
+
+      - name: Run V3 weekly development horizons
+        run: |
+          for horizon in 1w 2w 3w; do
+            python scripts/run_challenger_v3_classical_development.py \
+              --data-dir artifacts/prepared \
+              --exchange bitstamp \
+              --horizon "$horizon" \
+              --output "artifacts/v3-agent-evidence/classical-development-$horizon.json"
+          done
+
+      - name: Run V3 monthly development horizons
+        run: |
+          for horizon in 1mo 3mo; do
+            python scripts/run_challenger_v3_classical_development.py \
+              --data-dir artifacts/prepared \
+              --exchange bitstamp \
+              --horizon "$horizon" \
+              --output "artifacts/v3-agent-evidence/classical-development-$horizon.json"
+          done
 
       - name: Upload V3 evidence
         uses: actions/upload-artifact@v6
