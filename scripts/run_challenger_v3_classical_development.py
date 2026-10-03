@@ -27,7 +27,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--exchange", default="bitstamp")\n    parser.add_argument("--horizon", default=None, help="Evaluate only this spec label, e.g. 1d or 1w")
+    parser.add_argument("--exchange", default="bitstamp")
+    parser.add_argument("--horizon", default=None, help="Evaluate only this spec label, e.g. 1d or 1w")
     args = parser.parse_args()
 
     results: dict[str, dict[str, object]] = {}
