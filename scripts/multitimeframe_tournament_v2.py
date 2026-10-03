@@ -21,6 +21,10 @@ CANDIDATES = (
     "random_forest",
     "hist_gradient_boosting",
     "boosting",
+    "huber",
+    "bayesian_ridge",
+    "random_forest_sqrt",
+    "extra_trees_sqrt",
 )
 
 
@@ -29,17 +33,40 @@ def _fit_candidate(name: str, x: list[list[float]], y: list[float]):
         return v1._fit_candidate(name, x, y)
 
     try:
-        from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor
-        from sklearn.linear_model import ElasticNet
+        from sklearn.ensemble import ExtraTreesRegressor, HistGradientBoostingRegressor, RandomForestRegressor
+        from sklearn.linear_model import BayesianRidge, ElasticNet, HuberRegressor
         from sklearn.pipeline import make_pipeline
         from sklearn.preprocessing import StandardScaler
     except ImportError as exc:
         raise RuntimeError("scikit-learn is required for Challenger V2") from exc
 
-    if name == "elastic_net":
+    if name == "huber":
+        model = make_pipeline(
+            StandardScaler(),
+            HuberRegressor(epsilon=1.35, alpha=0.0001, max_iter=1000),
+        )
+    elif name == "bayesian_ridge":
+        model = make_pipeline(StandardScaler(), BayesianRidge())
+    elif name == "elastic_net":
         model = make_pipeline(
             StandardScaler(),
             ElasticNet(alpha=0.0001, l1_ratio=0.25, max_iter=5000, random_state=20260929),
+        )
+    elif name == "random_forest_sqrt":
+        model = RandomForestRegressor(
+            n_estimators=200,
+            min_samples_leaf=5,
+            max_features="sqrt",
+            random_state=20261003,
+            n_jobs=2,
+        )
+    elif name == "extra_trees_sqrt":
+        model = ExtraTreesRegressor(
+            n_estimators=200,
+            min_samples_leaf=5,
+            max_features="sqrt",
+            random_state=20261003,
+            n_jobs=2,
         )
     elif name == "random_forest":
         model = RandomForestRegressor(
@@ -58,7 +85,7 @@ def _fit_candidate(name: str, x: list[list[float]], y: list[float]):
             random_state=20260929,
         )
     else:
-        raise ValueError(f"Unknown Challenger V2 candidate: {name}")
+        raise ValueError(f"Unknown Challenger V3 candidate: {name}")
 
     model.fit(x, y)
     return model.predict
