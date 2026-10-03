@@ -111,7 +111,8 @@ def main() -> None:
             "validation_boundary": split.validation_end,
             "selected_candidate": selected,
             "runtime_seconds": round(elapsed, 3),
-            "metrics": metrics,\n            "ablation_metrics": ablation_metrics,
+            "metrics": metrics,
+            "ablation_metrics": ablation_metrics,
         }
 
     report = {
