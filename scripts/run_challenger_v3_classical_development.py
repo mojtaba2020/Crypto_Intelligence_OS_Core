@@ -69,13 +69,17 @@ def main() -> None:
         started = time.perf_counter()
         print('[V3] START ' + spec.label, flush=True)
         try:
-            metrics = evaluate(
-                validation_view,
-                spec.family,
-                spec.horizon_bars,
-                spec.minimum_history_bars,
-                spec.evaluation_step_bars,
-            )
+            ablation_metrics = {}
+            for ablation in ABLATIONS:
+                ablation_metrics[ablation] = evaluate(
+                    validation_view,
+                    spec.family,
+                    spec.horizon_bars,
+                    spec.minimum_history_bars,
+                    spec.evaluation_step_bars,
+                    feature_ablation=ablation,
+                )
+            metrics = ablation_metrics["all_features"]
         except ValueError as exc:
             skipped[spec.label] = {
                 "status": "NOT_EVALUATED_INSUFFICIENT_GAP_SAFE_VALIDATION",
