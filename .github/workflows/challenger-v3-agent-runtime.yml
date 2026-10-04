@@ -48,6 +48,7 @@ jobs:
           git rev-parse HEAD | tee artifacts/v3-agent-evidence/v3-research-commit.txt
           python scripts/fetch_multitimeframe_exchange_audit_v1.py --start "2011-08-18T00:00:00+00:00" --end "2026-09-29T00:00:00+00:00" --output-dir artifacts/real-data
           python scripts/prepare_multitimeframe_real_data_v1.py --input-dir artifacts/real-data --output-dir artifacts/prepared
+          PYTHONPATH=scripts python scripts/challenger_v3_model_curriculum.py > artifacts/v3-agent-evidence/model-curriculum.json
           python -m scripts.challenger_v3_orchestrator --output artifacts/v3-agent-evidence/orchestrator-plan.json
           python - <<'PY'
           from pathlib import Path
