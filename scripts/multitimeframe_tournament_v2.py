@@ -25,6 +25,12 @@ CANDIDATES = (
     "bayesian_ridge",
     "random_forest_sqrt",
     "extra_trees_sqrt",
+    "gradient_boosting_huber",
+    "gradient_boosting_absolute",
+    "hist_gradient_boosting_absolute",
+    "ada_boost",
+    "random_forest_leaf10",
+    "extra_trees_leaf10",
 )
 
 
@@ -33,7 +39,7 @@ def _fit_candidate(name: str, x: list[list[float]], y: list[float]):
         return v1._fit_candidate(name, x, y)
 
     try:
-        from sklearn.ensemble import ExtraTreesRegressor, HistGradientBoostingRegressor, RandomForestRegressor
+        from sklearn.ensemble import (AdaBoostRegressor, ExtraTreesRegressor, GradientBoostingRegressor, HistGradientBoostingRegressor, RandomForestRegressor)
         from sklearn.linear_model import BayesianRidge, ElasticNet, HuberRegressor
         from sklearn.pipeline import make_pipeline
         from sklearn.preprocessing import StandardScaler
@@ -67,6 +73,36 @@ def _fit_candidate(name: str, x: list[list[float]], y: list[float]):
             max_features="sqrt",
             random_state=20261003,
             n_jobs=2,
+        )
+    elif name == "gradient_boosting_huber":
+        model = GradientBoostingRegressor(
+            loss="huber", n_estimators=150, learning_rate=0.03, max_depth=2,
+            min_samples_leaf=8, random_state=20261004,
+        )
+    elif name == "gradient_boosting_absolute":
+        model = GradientBoostingRegressor(
+            loss="absolute_error", n_estimators=150, learning_rate=0.03, max_depth=2,
+            min_samples_leaf=8, random_state=20261004,
+        )
+    elif name == "hist_gradient_boosting_absolute":
+        model = HistGradientBoostingRegressor(
+            loss="absolute_error", learning_rate=0.04, max_iter=150,
+            max_leaf_nodes=7, min_samples_leaf=10, l2_regularization=2.0,
+            random_state=20261004,
+        )
+    elif name == "ada_boost":
+        model = AdaBoostRegressor(
+            n_estimators=150, learning_rate=0.03, loss="square", random_state=20261004,
+        )
+    elif name == "random_forest_leaf10":
+        model = RandomForestRegressor(
+            n_estimators=200, min_samples_leaf=10, max_features=0.75,
+            random_state=20261004, n_jobs=2,
+        )
+    elif name == "extra_trees_leaf10":
+        model = ExtraTreesRegressor(
+            n_estimators=200, min_samples_leaf=10, max_features=0.75,
+            random_state=20261004, n_jobs=2,
         )
     elif name == "random_forest":
         model = RandomForestRegressor(
