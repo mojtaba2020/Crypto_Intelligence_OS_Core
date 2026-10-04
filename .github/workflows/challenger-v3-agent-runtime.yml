@@ -23,9 +23,9 @@ jobs:
           python -m pip install -e ".[dev,research]"
       - name: Compile and unit gates
         run: |
-          python -m py_compile scripts/run_challenger_v3_classical_development.py scripts/multitimeframe_tournament_v2.py scripts/multitimeframe_tournament_v1.py scripts/multitimeframe_features_v3.py scripts/challenger_v3_feature_ablation.py scripts/challenger_v3_nested_selection.py scripts/challenger_v3_statistical_judge.py scripts/challenger_v3_teacher_diagnostic.py
+          python -m py_compile scripts/run_challenger_v3_classical_development.py scripts/multitimeframe_tournament_v2.py scripts/multitimeframe_tournament_v1.py scripts/multitimeframe_features_v3.py scripts/challenger_v3_feature_ablation.py scripts/challenger_v3_nested_selection.py scripts/challenger_v3_statistical_judge.py scripts/challenger_v3_teacher_diagnostic.py scripts/challenger_v3_teacher_transfer.py
           PYTHONPATH=scripts python -c "from multitimeframe_tournament_v2 import CANDIDATES, evaluate; print(CANDIDATES)"
-          python -m pytest -q tests/test_challenger_v3_orchestrator.py tests/test_challenger_v3_workers.py tests/test_multitimeframe_features_v3.py tests/test_challenger_v3_feature_ablation.py tests/test_challenger_v3_nested_selection.py tests/test_challenger_v3_statistical_judge.py
+          python -m pytest -q tests/test_challenger_v3_orchestrator.py tests/test_challenger_v3_workers.py tests/test_multitimeframe_features_v3.py tests/test_challenger_v3_feature_ablation.py tests/test_challenger_v3_nested_selection.py tests/test_challenger_v3_statistical_judge.py tests/test_challenger_v3_teacher_transfer.py
 
   prepare-data:
     needs: validate
@@ -163,9 +163,41 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+  teacher-transfer:
+    needs: [prepare-data, teacher-diagnostic]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: research/challenger-v3-agents
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,research]"
+      - uses: actions/download-artifact@v7
+        with:
+          name: challenger-v3-prepared-data
+          path: artifacts
+      - name: Transfer 1w teacher information structure to recipient models
+        run: |
+          mkdir -p artifacts/v3-teacher-transfer
+          PYTHONPATH=scripts python scripts/challenger_v3_teacher_transfer.py \
+            --data artifacts/prepared/bitstamp_1w.json \
+            --output artifacts/v3-teacher-transfer/teacher-transfer-1w.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: challenger-v3-teacher-transfer
+          path: artifacts/v3-teacher-transfer/
+          if-no-files-found: error
+          retention-days: 90
+
   collect:
     if: ${{ always() }}
-    needs: [tournament, development-statistics, teacher-diagnostic]
+    needs: [tournament, development-statistics, teacher-diagnostic, teacher-transfer]
     runs-on: ubuntu-slim
     steps:
       - uses: actions/download-artifact@v7
@@ -181,6 +213,10 @@ jobs:
         with:
           name: challenger-v3-teacher-diagnostic
           path: artifacts/v3-agent-evidence/teacher
+      - uses: actions/download-artifact@v7
+        with:
+          name: challenger-v3-teacher-transfer
+          path: artifacts/v3-agent-evidence/teacher-transfer
       - uses: actions/upload-artifact@v6
         with:
           name: challenger-v3-agent-evidence
