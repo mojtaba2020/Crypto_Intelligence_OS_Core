@@ -367,11 +367,39 @@ def main() -> None:
                 seed = SEED + sum(
                     ord(character) for character in horizon + ":" + ablation + ":nested:cmbb"
                 )
-                primary = _studentized_circular_mbb(
-                    differences,
-                    spec.bootstrap_block_origins,
-                    seed,  # type: ignore[arg-type]
-                )
+                inference_eligible = len(diagnostic_records) >= MIN_DIAGNOSTIC_ORIGINS
+                if inference_eligible:
+                    primary = _studentized_circular_mbb(
+                        differences,
+                        spec.bootstrap_block_origins,
+                        seed,  # type: ignore[arg-type]
+                    )
+                    raw_p_value = primary["raw_p_value"]
+                    lower_bound = primary["one_sided_lower_confidence_bound"]
+                    sensitivity = {
+                        "stationary_bootstrap": _stationary_bootstrap_sensitivity(
+                            differences,
+                            spec.bootstrap_block_origins,
+                            seed + 1,  # type: ignore[arg-type]
+                        ),
+                        "hac": _hac_sensitivity(differences, spec.bootstrap_block_origins),  # type: ignore[arg-type]
+                        "policy": "predeclared_sensitivity_only_never_select_by_favorability",
+                    }
+                else:
+                    # Expected evidence insufficiency is a scientific non-result, not a
+                    # workflow error. Keep the hypothesis in the Holm family with p=1
+                    # so the predeclared minimum is never weakened to rescue a signal.
+                    primary = {
+                        "method": "not_evaluated_insufficient_diagnostic_origins",
+                        "minimum_required": MIN_DIAGNOSTIC_ORIGINS,
+                        "observed": len(diagnostic_records),
+                    }
+                    raw_p_value = 1.0
+                    lower_bound = 0.0
+                    sensitivity = {
+                        "status": "not_evaluated_insufficient_diagnostic_origins",
+                        "policy": "predeclared_sensitivity_only_never_select_by_favorability",
+                    }
                 rows.append(
                     {
                         "horizon": horizon,
@@ -390,20 +418,11 @@ def main() -> None:
                         "approximate_block_duration_source_bars": (
                             spec.bootstrap_block_origins * spec.evaluation_step_bars
                         ),
+                        "inference_eligible": inference_eligible,
                         "primary_inference": primary,
-                        "raw_p_value": primary["raw_p_value"],
-                        "one_sided_lower_confidence_bound_95": primary[
-                            "one_sided_lower_confidence_bound"
-                        ],
-                        "sensitivity_diagnostics": {
-                            "stationary_bootstrap": _stationary_bootstrap_sensitivity(
-                                differences,
-                                spec.bootstrap_block_origins,
-                                seed + 1,  # type: ignore[arg-type]
-                            ),
-                            "hac": _hac_sensitivity(differences, spec.bootstrap_block_origins),  # type: ignore[arg-type]
-                            "policy": "predeclared_sensitivity_only_never_select_by_favorability",
-                        },
+                        "raw_p_value": raw_p_value,
+                        "one_sided_lower_confidence_bound_95": lower_bound,
+                        "sensitivity_diagnostics": sensitivity,
                     }
                 )
 
