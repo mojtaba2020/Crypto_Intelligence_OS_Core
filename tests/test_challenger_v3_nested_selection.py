@@ -1,7 +1,9 @@
+import pytest
 from scripts.challenger_v3_nested_selection import (
     NestedSelectionPolicy,
     evidence_manifest,
     heldout_paired_differences,
+    purged_diagnostic_records,
     select_candidate,
 )
 
@@ -9,13 +11,15 @@ from scripts.challenger_v3_nested_selection import (
 def _records(n=50):
     rows = []
     for i in range(n):
-        rows.append({
-            "persistence_error": 0.10,
-            "candidate_errors": {
-                "a": 0.05 if i < 30 else 0.12,
-                "b": 0.06 if i < 30 else 0.07,
-            },
-        })
+        rows.append(
+            {
+                "persistence_error": 0.10,
+                "candidate_errors": {
+                    "a": 0.05 if i < 30 else 0.12,
+                    "b": 0.06 if i < 30 else 0.07,
+                },
+            }
+        )
     return rows
 
 
@@ -49,3 +53,22 @@ def test_manifest_preserves_locked_evidence_boundaries():
     assert m["v2_locked_oos_used_for_tuning"] is False
     assert m["confirmatory"] is False
     assert m["production_eligible"] is False
+
+
+def test_target_maturity_purge_only_removes_overlapping_origins():
+    rows = _records()
+    daily, daily_purged = purged_diagnostic_records(
+        rows, 30, horizon_bars=2, evaluation_step_bars=30
+    )
+    monthly, monthly_purged = purged_diagnostic_records(
+        rows, 30, horizon_bars=3, evaluation_step_bars=1
+    )
+    assert daily_purged == 0
+    assert len(daily) == 20
+    assert monthly_purged == 2
+    assert len(monthly) == 18
+
+
+def test_target_maturity_purge_fails_if_no_diagnostics_remain():
+    with pytest.raises(ValueError, match="leaves no diagnostic"):
+        purged_diagnostic_records(_records(35), 20, horizon_bars=30, evaluation_step_bars=1)

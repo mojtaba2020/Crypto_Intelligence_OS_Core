@@ -123,10 +123,10 @@ jobs:
           mkdir -p artifacts/v3-statistical-evidence
           PYTHONPATH=scripts python scripts/challenger_v3_statistical_judge.py \
             --evidence-dir artifacts/v3-horizon-evidence \
-            --output artifacts/v3-statistical-evidence/development-statistical-diagnostics.json
+            --output artifacts/v3-statistical-evidence/corrected-development-statistical-diagnostics.json
       - uses: actions/upload-artifact@v6
         with:
-          name: challenger-v3-statistical-diagnostics
+          name: challenger-v3-corrected-statistical-diagnostics
           path: artifacts/v3-statistical-evidence/
           if-no-files-found: error
           retention-days: 90
@@ -240,7 +240,7 @@ jobs:
           merge-multiple: true
       - uses: actions/download-artifact@v7
         with:
-          name: challenger-v3-statistical-diagnostics
+          name: challenger-v3-corrected-statistical-diagnostics
           path: artifacts/v3-agent-evidence/statistics
       - uses: actions/download-artifact@v7
         with:

@@ -18,32 +18,35 @@ class HorizonSpec:
     promotion_eligible: bool
     minimum_history_bars: int
     evaluation_step_bars: int
+    # Retained only so historical V1/V2 judges remain reproducible. New work must
+    # use the explicitly unit-labelled forecast-origin value below.
     bootstrap_block_bars: int
+    bootstrap_block_origins: int
 
 
 SPECS: tuple[HorizonSpec, ...] = (
-    HorizonSpec("1h", "1h", 1, "hourly", True, 2200, 24, 7),
-    HorizonSpec("2h", "1h", 2, "hourly", True, 2200, 24, 7),
-    HorizonSpec("3h", "1h", 3, "hourly", True, 2200, 24, 7),
-    HorizonSpec("4h", "1h", 4, "hourly", True, 2200, 24, 7),
-    HorizonSpec("12h", "1h", 12, "hourly", True, 2200, 24, 7),
-    HorizonSpec("1d", "1d", 1, "daily", True, 1460, 30, 14),
-    HorizonSpec("2d", "1d", 2, "daily", True, 1460, 30, 14),
-    HorizonSpec("3d", "1d", 3, "daily", True, 1460, 30, 14),
-    HorizonSpec("1w", "1w", 1, "weekly", True, 260, 4, 8),
-    HorizonSpec("2w", "1w", 2, "weekly", True, 260, 4, 8),
-    HorizonSpec("3w", "1w", 3, "weekly", True, 260, 4, 8),
-    HorizonSpec("1mo", "1mo", 1, "monthly", True, 120, 1, 4),
-    HorizonSpec("3mo", "1mo", 3, "monthly", True, 120, 1, 4),
-    HorizonSpec("6mo", "1mo", 6, "macro_cycle", False, 120, 1, 12),
-    HorizonSpec("1y", "1mo", 12, "macro_cycle", False, 120, 1, 12),
-    HorizonSpec("2y", "1mo", 24, "macro_cycle", False, 120, 1, 12),
-    HorizonSpec("3y", "1mo", 36, "macro_cycle", False, 120, 1, 12),
-    HorizonSpec("4y", "1mo", 48, "macro_cycle", False, 120, 1, 12),
-    HorizonSpec("5y", "1mo", 60, "macro_cycle", False, 120, 1, 12),
-    HorizonSpec("6y", "1mo", 72, "macro_cycle", False, 120, 1, 12),
-    HorizonSpec("7y", "1mo", 84, "macro_cycle", False, 120, 1, 12),
-    HorizonSpec("8y", "1mo", 96, "macro_cycle", False, 120, 1, 12),
+    HorizonSpec("1h", "1h", 1, "hourly", True, 2200, 24, 7, 1),
+    HorizonSpec("2h", "1h", 2, "hourly", True, 2200, 24, 7, 1),
+    HorizonSpec("3h", "1h", 3, "hourly", True, 2200, 24, 7, 1),
+    HorizonSpec("4h", "1h", 4, "hourly", True, 2200, 24, 7, 1),
+    HorizonSpec("12h", "1h", 12, "hourly", True, 2200, 24, 7, 1),
+    HorizonSpec("1d", "1d", 1, "daily", True, 1460, 30, 14, 1),
+    HorizonSpec("2d", "1d", 2, "daily", True, 1460, 30, 14, 1),
+    HorizonSpec("3d", "1d", 3, "daily", True, 1460, 30, 14, 1),
+    HorizonSpec("1w", "1w", 1, "weekly", True, 260, 4, 8, 2),
+    HorizonSpec("2w", "1w", 2, "weekly", True, 260, 4, 8, 2),
+    HorizonSpec("3w", "1w", 3, "weekly", True, 260, 4, 8, 2),
+    HorizonSpec("1mo", "1mo", 1, "monthly", True, 120, 1, 4, 4),
+    HorizonSpec("3mo", "1mo", 3, "monthly", True, 120, 1, 4, 4),
+    HorizonSpec("6mo", "1mo", 6, "macro_cycle", False, 120, 1, 12, 12),
+    HorizonSpec("1y", "1mo", 12, "macro_cycle", False, 120, 1, 12, 12),
+    HorizonSpec("2y", "1mo", 24, "macro_cycle", False, 120, 1, 12, 12),
+    HorizonSpec("3y", "1mo", 36, "macro_cycle", False, 120, 1, 12, 12),
+    HorizonSpec("4y", "1mo", 48, "macro_cycle", False, 120, 1, 12, 12),
+    HorizonSpec("5y", "1mo", 60, "macro_cycle", False, 120, 1, 12, 12),
+    HorizonSpec("6y", "1mo", 72, "macro_cycle", False, 120, 1, 12, 12),
+    HorizonSpec("7y", "1mo", 84, "macro_cycle", False, 120, 1, 12, 12),
+    HorizonSpec("8y", "1mo", 96, "macro_cycle", False, 120, 1, 12, 12),
 )
 
 
@@ -58,6 +61,7 @@ def validate_contract(specs: tuple[HorizonSpec, ...] = SPECS) -> None:
                 spec.minimum_history_bars,
                 spec.evaluation_step_bars,
                 spec.bootstrap_block_bars,
+                spec.bootstrap_block_origins,
             )
             <= 0
         ):
@@ -74,6 +78,8 @@ def manifest() -> dict[str, object]:
         "locked_test_reuse": "forbidden_for_feature_or_hyperparameter_selection",
         "statistical_policy": {
             "paired_test": "null_centered_moving_block_bootstrap",
+            "challenger_v3_paired_test": "studentized_circular_moving_block_bootstrap",
+            "challenger_v3_bootstrap_block_unit": "forecast_origins",
             "multiple_comparisons": "holm_bonferroni_within_declared_family",
             "automatic_promotion": False,
             "independent_exchange_replication_required": True,

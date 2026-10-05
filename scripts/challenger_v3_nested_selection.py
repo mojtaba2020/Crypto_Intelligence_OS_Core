@@ -3,10 +3,12 @@
 This module separates candidate selection from diagnostic evaluation inside the
 existing development/validation region. It never accesses locked OOS data.
 """
+
 from __future__ import annotations
 
+import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Mapping, Sequence
 
 
 @dataclass(frozen=True)
@@ -23,10 +25,13 @@ class NestedSelectionPolicy:
         return cut
 
 
+DEFAULT_NESTED_SELECTION_POLICY = NestedSelectionPolicy()
+
+
 def select_candidate(
     origin_records: Sequence[Mapping[str, object]],
     candidates: Sequence[str],
-    policy: NestedSelectionPolicy = NestedSelectionPolicy(),
+    policy: NestedSelectionPolicy = DEFAULT_NESTED_SELECTION_POLICY,
 ) -> tuple[str, int]:
     """Select only on the earlier origin subset using mean absolute percentage loss."""
     cut = policy.boundary(len(origin_records))
@@ -52,10 +57,33 @@ def heldout_paired_differences(
     out = []
     for record in origin_records[cut:]:
         out.append(
-            float(record["persistence_error"])
-            - float(record["candidate_errors"][candidate])
+            float(record["persistence_error"]) - float(record["candidate_errors"][candidate])
         )
     return out
+
+
+def purged_diagnostic_records(
+    origin_records: Sequence[Mapping[str, object]],
+    cut: int,
+    *,
+    horizon_bars: int,
+    evaluation_step_bars: int,
+) -> tuple[list[Mapping[str, object]], int]:
+    """Return diagnostic records after purging target overlap at the split boundary.
+
+    The last selection forecast matures ``horizon_bars`` after its origin.  Origins
+    are ``evaluation_step_bars`` apart, so only the intervening origins whose
+    targets would overlap the selection target are removed.
+    """
+    if cut <= 0 or cut >= len(origin_records):
+        raise ValueError("invalid nested diagnostic boundary")
+    if horizon_bars <= 0 or evaluation_step_bars <= 0:
+        raise ValueError("horizon and evaluation step must be positive")
+    purged = max(0, math.ceil(horizon_bars / evaluation_step_bars) - 1)
+    start = cut + purged
+    if start >= len(origin_records):
+        raise ValueError("target-maturity purge leaves no diagnostic origins")
+    return list(origin_records[start:]), purged
 
 
 def evidence_manifest(candidate: str, cut: int, origin_count: int) -> dict[str, object]:

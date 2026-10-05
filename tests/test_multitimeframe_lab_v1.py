@@ -49,3 +49,15 @@ def test_contract_is_fail_closed_and_requires_replication() -> None:
 
 def test_contract_validation_passes() -> None:
     validate_contract()
+
+
+def test_bootstrap_blocks_are_explicitly_in_forecast_origin_units() -> None:
+    by_label = {spec.label: spec for spec in SPECS}
+    assert by_label["2d"].evaluation_step_bars == 30
+    assert by_label["2d"].bootstrap_block_bars == 14  # historical evidence only
+    assert by_label["2d"].bootstrap_block_origins == 1
+    assert by_label["1w"].bootstrap_block_origins == 2
+    assert by_label["3mo"].bootstrap_block_origins == 4
+    policy = manifest()["statistical_policy"]
+    assert policy["paired_test"] == "null_centered_moving_block_bootstrap"
+    assert policy["challenger_v3_bootstrap_block_unit"] == "forecast_origins"
