@@ -303,13 +303,31 @@ def _configured_model() -> str:
     return model
 
 
+def _provider_json_schema() -> dict:
+    properties = {}
+    for field in sorted(PROVIDER_FIELDS):
+        if field in LIST_FIELDS:
+            properties[field] = {"type": "array", "items": {"type": "string"}}
+        elif field in FALSE_FIELDS:
+            properties[field] = {"type": "boolean", "enum": [False]}
+        elif field == "reproducibility":
+            properties[field] = {"type": "object", "additionalProperties": {"type": "string"}}
+        elif field == "confidence":
+            properties[field] = {"type": "number", "minimum": 0, "maximum": 1}
+        elif field == "recommendation":
+            properties[field] = {"type": "string", "enum": ["continue", "reject", "audit"]}
+        else:
+            properties[field] = {"type": "string"}
+    return {"type": "object", "properties": properties, "required": sorted(PROVIDER_FIELDS), "additionalProperties": False}
+
+
 def call_provider(task: dict, context: list[dict]) -> tuple[dict, str, str, dict]:
     key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not key:
         raise RuntimeError("missing provider secret")
     model = _configured_model()
     prompt = build_prompt(task, context)
-    body = {"model": model, "input": prompt, "max_output_tokens": MAX_OUTPUT_TOKENS, "store": False}
+    body = {"model": model, "input": prompt, "max_output_tokens": MAX_OUTPUT_TOKENS, "store": False, "text": {"format": {"type": "json_schema", "name": "challenger_v3_research_packet", "strict": True, "schema": _provider_json_schema()}}}
     if API_URL != "https://api.openai.com/v1/responses":
         raise RuntimeError("provider URL is not the allowlisted HTTPS endpoint")
     request = urllib.request.Request(  # noqa: S310 -- exact HTTPS URL allowlisted above
