@@ -361,7 +361,9 @@ def call_provider(task: dict, context: list[dict]) -> tuple[dict, str, str, dict
         detail = exc.read(8_192)
         try:
             error_payload = json.loads(detail.decode("utf-8"), parse_constant=_reject_constant)
-            message = str(error_payload.get("error", {}).get("message", "provider rejected request"))
+            message = str(
+                error_payload.get("error", {}).get("message", "provider rejected request")
+            )
         except (UnicodeDecodeError, json.JSONDecodeError, AttributeError):
             message = "provider rejected request"
         message = message.replace(key, "[REDACTED]")[:1_000]
