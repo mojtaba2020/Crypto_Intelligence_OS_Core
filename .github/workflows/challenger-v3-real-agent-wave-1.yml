@@ -1,0 +1,115 @@
+name: Challenger V3 Real Agent Wave 1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-context:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/v3-real-agent-wave-1
+          fetch-depth: 0
+      - name: Build SHA-pinned development-only evidence pack
+        run: |
+          python - <<'PY'
+          import hashlib, json, shutil
+          from pathlib import Path
+
+          root = Path("artifacts/v3-real-agent-wave-1/evidence")
+          root.mkdir(parents=True, exist_ok=True)
+          approved = [
+              ("wave-brief", "research/v3-agent-wave-1/WAVE_BRIEF.md"),
+              ("real-agent-protocol", "research/CHALLENGER_V3_REAL_AGENT_RUNTIME_V1.md"),
+              ("feature-engine", "scripts/multitimeframe_features_v3.py"),
+              ("feature-ablation", "scripts/challenger_v3_feature_ablation.py"),
+              ("nested-selection", "scripts/challenger_v3_nested_selection.py"),
+              ("corrected-judge", "scripts/challenger_v3_statistical_judge.py"),
+              ("teacher-diagnostic", "scripts/challenger_v3_teacher_diagnostic.py"),
+              ("mechanism-ablation", "scripts/challenger_v3_1w_mechanism_ablation.py"),
+              ("model-curriculum", "scripts/challenger_v3_model_curriculum.py"),
+          ]
+          artifacts = []
+          for artifact_id, source_name in approved:
+              source = Path(source_name)
+              destination = root / source.name
+              shutil.copyfile(source, destination)
+              raw = destination.read_bytes()
+              artifacts.append({
+                  "id": artifact_id,
+                  "path": destination.name,
+                  "classification": "development_validation",
+                  "sha256": hashlib.sha256(raw).hexdigest(),
+              })
+          manifest = {
+              "schema_version": 1,
+              "scope": "development_validation_only",
+              "artifacts": artifacts,
+          }
+          (root / "manifest.json").write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v3-real-agent-wave-1-context
+          path: artifacts/v3-real-agent-wave-1/evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+  research-agents:
+    needs: prepare-context
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - task: FEATURE-01
+            contexts: "wave-brief real-agent-protocol feature-engine feature-ablation teacher-diagnostic mechanism-ablation"
+          - task: STATS-01
+            contexts: "wave-brief real-agent-protocol corrected-judge nested-selection"
+          - task: LEAKAGE-01
+            contexts: "wave-brief real-agent-protocol feature-engine nested-selection corrected-judge"
+          - task: NEURAL-01
+            contexts: "wave-brief real-agent-protocol feature-engine model-curriculum"
+          - task: DEVIL-01
+            contexts: "wave-brief real-agent-protocol teacher-diagnostic mechanism-ablation corrected-judge"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/v3-real-agent-wave-1
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install -e .
+      - uses: actions/download-artifact@v4
+        with:
+          name: v3-real-agent-wave-1-context
+          path: artifacts/v3-real-agent-wave-1/evidence
+      - name: Run bounded provider-connected research agent
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-4o-mini
+        run: |
+          args=()
+          for context in ${{ matrix.contexts }}; do
+            args+=(--context-id "$context")
+          done
+          python scripts/challenger_v3_real_agent_runtime.py \
+            --task "research/v3-agent-wave-1/tasks/${{ matrix.task }}.json" \
+            --manifest "artifacts/v3-real-agent-wave-1/evidence/manifest.json" \
+            --evidence-root "artifacts/v3-real-agent-wave-1/evidence" \
+            "${args[@]}" \
+            --artifact-root "artifacts/v3-real-agent-wave-1/results" \
+            --output-name "${{ matrix.task }}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v3-real-agent-${{ matrix.task }}
+          path: artifacts/v3-real-agent-wave-1/results/${{ matrix.task }}.json
+          if-no-files-found: error
+          retention-days: 90
