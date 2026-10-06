@@ -39,7 +39,9 @@ jobs:
           python - <<'PY'
           import os
           from pathlib import Path
-          import hashlib\n          import json\n          from scripts.challenger_v3_real_agent_runtime import load_context, load_task
+          import hashlib
+          import json
+          from scripts.challenger_v3_real_agent_runtime import load_context, load_task
 
           task_id = os.environ["TASK_ID"]
           root = Path("research/v3_agent_wave1")
