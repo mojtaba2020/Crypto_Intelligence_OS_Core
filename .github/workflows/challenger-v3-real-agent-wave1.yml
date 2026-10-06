@@ -39,8 +39,6 @@ jobs:
           python - <<'PY'
           import os
           from pathlib import Path
-          import hashlib
-          import json
           from scripts.challenger_v3_real_agent_runtime import load_context, load_task
 
           task_id = os.environ["TASK_ID"]
@@ -52,16 +50,6 @@ jobs:
               "NEURAL-01": ["NEURAL-01-brief", "features-v3", "nested-selection"],
               "DEVIL-01": ["DEVIL-01-brief", "teacher-diagnostic", "statistical-judge"],
           }
-          manifest_path = root / "manifest.json"
-          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-          for entry in manifest["artifacts"]:
-              evidence_path = root / entry["path"]
-              entry["sha256"] = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
-          manifest_path.write_text(
-              json.dumps(manifest, indent=2, sort_keys=True) + chr(10),
-              encoding="utf-8",
-          )
-
           task = load_task(root / "tasks" / f"{task_id}.json")
           if task["task_id"] != task_id:
               raise ValueError("task identity mismatch")
@@ -70,22 +58,6 @@ jobs:
           PY
         env:
           TASK_ID: ${{ matrix.task_id }}
-
-      - name: Refresh local manifest hashes after verified checkout
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import hashlib
-          import json
-          from pathlib import Path
-          root = Path("research/v3_agent_wave1")
-          path = root / "manifest.json"
-          manifest = json.loads(path.read_text(encoding="utf-8"))
-          for entry in manifest["artifacts"]:
-              entry["sha256"] = hashlib.sha256((root / entry["path"]).read_bytes()).hexdigest()
-          path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + chr(10), encoding="utf-8")
-          PY
 
       - name: Run bounded provider-connected research agent
         shell: bash
