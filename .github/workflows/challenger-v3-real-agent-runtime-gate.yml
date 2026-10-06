@@ -1,0 +1,38 @@
+name: Challenger V3 Real Agent Runtime Gate
+
+on:
+  pull_request:
+    paths:
+      - "scripts/challenger_v3_real_agent_runtime.py"
+      - "tests/test_challenger_v3_real_agent_runtime.py"
+      - ".github/workflows/challenger-v3-real-agent-runtime-gate.yml"
+  push:
+    branches:
+      - "research/v3-real-agent-runtime"
+    paths:
+      - "scripts/challenger_v3_real_agent_runtime.py"
+      - "tests/test_challenger_v3_real_agent_runtime.py"
+      - ".github/workflows/challenger-v3-real-agent-runtime-gate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-gate:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install project and quality tools
+        run: |
+          python -m pip install -e .
+          python -m pip install "ruff>=0.16.7,<1" "pytest>=9.1.1,<10"
+      - name: Lint hardened runtime
+        run: python -m ruff check scripts/challenger_v3_real_agent_runtime.py tests/test_challenger_v3_real_agent_runtime.py
+      - name: Test hardened runtime
+        run: python -m pytest -q tests/test_challenger_v3_real_agent_runtime.py
