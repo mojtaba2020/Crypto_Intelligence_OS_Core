@@ -6,7 +6,7 @@ on:
     branches:
       - research/v3-agent-wave-1
     paths:
-      - "research/v3_agent_wave1/RUN_WAVE1"
+      - "research/v3_agent_wave1/RUN_WAVE1*"
 
 permissions:
   contents: read
