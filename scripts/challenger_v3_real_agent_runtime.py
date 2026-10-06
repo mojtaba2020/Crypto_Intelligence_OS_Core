@@ -358,7 +358,14 @@ def call_provider(task: dict, context: list[dict]) -> tuple[dict, str, str, dict
         with urllib.request.urlopen(request, timeout=45) as response:  # noqa: S310
             raw = response.read(MAX_HTTP_RESPONSE_BYTES + 1)
     except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"provider HTTP {exc.code}") from exc
+        detail = exc.read(8_192)
+        try:
+            error_payload = json.loads(detail.decode("utf-8"), parse_constant=_reject_constant)
+            message = str(error_payload.get("error", {}).get("message", "provider rejected request"))
+        except (UnicodeDecodeError, json.JSONDecodeError, AttributeError):
+            message = "provider rejected request"
+        message = message.replace(key, "[REDACTED]")[:1_000]
+        raise RuntimeError(f"provider HTTP {exc.code}: {message}") from exc
     except (urllib.error.URLError, TimeoutError) as exc:
         raise RuntimeError("provider connection failed") from exc
     if len(raw) > MAX_HTTP_RESPONSE_BYTES:
