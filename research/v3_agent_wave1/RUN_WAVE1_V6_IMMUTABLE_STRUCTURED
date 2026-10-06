@@ -1,0 +1,1 @@
+Execute Wave 1 only after immutable-manifest, structured-output, runtime, security, and preflight gates.
