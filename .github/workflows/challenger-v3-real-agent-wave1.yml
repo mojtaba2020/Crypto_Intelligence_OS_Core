@@ -1,0 +1,104 @@
+name: Challenger V3 Real Agent Wave 1
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/v3-agent-wave-1
+    paths:
+      - "research/v3_agent_wave1/RUN_WAVE1"
+
+permissions:
+  contents: read
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        task_id:
+          - FEATURE-01
+          - STATS-01
+          - LEAKAGE-01
+          - NEURAL-01
+          - DEVIL-01
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Verify frozen manifest and task before provider call
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from scripts.challenger_v3_real_agent_runtime import load_context, load_task
+
+          task_id = os.environ["TASK_ID"]
+          root = Path("research/v3_agent_wave1")
+          mapping = {
+              "FEATURE-01": ["FEATURE-01-brief", "teacher-diagnostic", "features-v3", "feature-ablation"],
+              "STATS-01": ["STATS-01-brief", "statistical-judge", "nested-selection"],
+              "LEAKAGE-01": ["LEAKAGE-01-brief", "features-v3", "nested-selection", "statistical-judge"],
+              "NEURAL-01": ["NEURAL-01-brief", "features-v3", "nested-selection"],
+              "DEVIL-01": ["DEVIL-01-brief", "teacher-diagnostic", "statistical-judge"],
+          }
+          task = load_task(root / "tasks" / f"{task_id}.json")
+          if task["task_id"] != task_id:
+              raise ValueError("task identity mismatch")
+          context, _ = load_context(root / "manifest.json", root, mapping[task_id])
+          print(f"preflight accepted: {task_id}; context_bytes={sum(x['bytes'] for x in context)}")
+          PY
+        env:
+          TASK_ID: ${{ matrix.task_id }}
+
+      - name: Run bounded provider-connected research agent
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${TASK_ID}" in
+            FEATURE-01)
+              CONTEXT=(FEATURE-01-brief teacher-diagnostic features-v3 feature-ablation)
+              ;;
+            STATS-01)
+              CONTEXT=(STATS-01-brief statistical-judge nested-selection)
+              ;;
+            LEAKAGE-01)
+              CONTEXT=(LEAKAGE-01-brief features-v3 nested-selection statistical-judge)
+              ;;
+            NEURAL-01)
+              CONTEXT=(NEURAL-01-brief features-v3 nested-selection)
+              ;;
+            DEVIL-01)
+              CONTEXT=(DEVIL-01-brief teacher-diagnostic statistical-judge)
+              ;;
+            *)
+              echo "unknown task" >&2
+              exit 2
+              ;;
+          esac
+
+          ARGS=()
+          for id in "${CONTEXT[@]}"; do
+            ARGS+=(--context-id "${id}")
+          done
+
+          python -m scripts.challenger_v3_real_agent_runtime             --task "research/v3_agent_wave1/tasks/${TASK_ID}.json"             --manifest "research/v3_agent_wave1/manifest.json"             --evidence-root "research/v3_agent_wave1"             "${ARGS[@]}"             --artifact-root "artifacts/challenger-v3-real-agent-wave1"             --output-name "${TASK_ID}.json"
+        env:
+          TASK_ID: ${{ matrix.task_id }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Upload accepted agent packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: challenger-v3-real-agent-wave1-${{ matrix.task_id }}
+          path: artifacts/challenger-v3-real-agent-wave1/${{ matrix.task_id }}.json
+          if-no-files-found: error
+          retention-days: 30
