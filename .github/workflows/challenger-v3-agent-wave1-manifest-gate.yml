@@ -68,6 +68,14 @@ jobs:
               encoding="utf-8",
           )
 
+          frozen_path = root / "manifest.json"
+          generated_bytes = manifest_path.read_bytes()
+          frozen_bytes = frozen_path.read_bytes()
+          if frozen_bytes != generated_bytes:
+              raise ValueError(
+                  "frozen manifest drift: regenerate and review manifest.json before execution"
+              )
+
           contexts = {
               "FEATURE-01": [
                   "FEATURE-01-brief",
