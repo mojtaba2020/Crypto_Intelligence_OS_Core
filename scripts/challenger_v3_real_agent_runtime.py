@@ -303,7 +303,7 @@ def _configured_model() -> str:
     return model
 
 
-def call_provider(task: dict, context: list[dict]) -> tuple[dict, str, str]:
+def call_provider(task: dict, context: list[dict]) -> tuple[dict, str, str, dict]:
     key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not key:
         raise RuntimeError("missing provider secret")
@@ -341,7 +341,18 @@ def call_provider(task: dict, context: list[dict]) -> tuple[dict, str, str]:
     if not isinstance(packet, dict):
         raise ValueError("provider output must be one JSON object")
     validate_envelope(packet)
-    return packet, model, _sha256(prompt.encode("utf-8"))
+    usage_raw = payload.get("usage")
+    if not isinstance(usage_raw, dict):
+        raise ValueError("provider usage metadata is missing")
+    usage = {}
+    for label in ("input_tokens", "output_tokens", "total_tokens"):
+        value = usage_raw.get(label)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"provider usage {label} must be a non-negative integer")
+        usage[label] = value
+    if usage["total_tokens"] < usage["input_tokens"] + usage["output_tokens"]:
+        raise ValueError("provider usage total_tokens is inconsistent")
+    return packet, model, _sha256(prompt.encode("utf-8")), usage
 
 
 def _git_commit() -> str:
@@ -370,6 +381,7 @@ def build_audited_packet(
     manifest_sha256: str,
     model: str,
     prompt_sha256: str,
+    usage: dict,
 ) -> dict:
     identities = [
         {key: item[key] for key in ("id", "path", "classification", "sha256", "bytes")}
@@ -390,6 +402,7 @@ def build_audited_packet(
         "provider_model": model,
         "prompt_sha256": prompt_sha256,
         "validation_result": "accepted",
+        "provider_usage": usage,
         **provider_packet,
     }
 
@@ -459,9 +472,9 @@ def run(
             raise FileExistsError("output destination already exists")
         task = load_task(task_path)
         context, manifest_sha256 = load_context(manifest_path, evidence_root, artifact_ids)
-        provider_packet, model, prompt_sha256 = call_provider(task, context)
+        provider_packet, model, prompt_sha256, usage = call_provider(task, context)
         packet = build_audited_packet(
-            provider_packet, task, context, manifest_sha256, model, prompt_sha256
+            provider_packet, task, context, manifest_sha256, model, prompt_sha256, usage
         )
         publish_packet(packet, root, output_name)
     except (
