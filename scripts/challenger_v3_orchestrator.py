@@ -81,7 +81,10 @@ def build_plan() -> dict:
         "mode": "plan_only",
         "agents": [{"agent_id": a, "role": r} for a, r in AGENTS],
         "waves": waves,
-        "locked_oos_policy": "V2 locked OOS is read-only historical evidence; never optimize V3 against it.",
+        "locked_oos_policy": (
+            "V2 locked OOS is read-only historical evidence; "
+            "never optimize V3 against it."
+        ),
     }
 
 
