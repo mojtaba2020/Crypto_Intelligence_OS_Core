@@ -50,7 +50,10 @@ def plan():
                     "horizon": h,
                     "family": family,
                     "models": models,
-                    "objective": "beat persistence on causal development evidence without tuning on locked OOS",
+                    "objective": (
+                        "beat persistence on causal development evidence without "
+                        "tuning on locked OOS"
+                    ),
                     "required_checks": [
                         "paired losses",
                         "chronological stability",
@@ -66,7 +69,10 @@ def plan():
         "fresh_locked_oos_access": False,
         "v2_locked_oos_used_for_tuning": False,
         "production_eligible": False,
-        "rule": "expand model-family diversity before deep tuning; no agent vote can crown a champion",
+        "rule": (
+            "expand model-family diversity before deep tuning; "
+            "no agent vote can crown a champion"
+        ),
     }
 
 
