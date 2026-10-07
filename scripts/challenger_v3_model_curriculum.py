@@ -69,9 +69,11 @@ def plan():
         "fresh_locked_oos_access": False,
         "v2_locked_oos_used_for_tuning": False,
         "production_eligible": False,
-        "rule": (
-            "expand model-family diversity before deep tuning; "
-            "no agent vote can crown a champion"
+        "rule": " ".join(
+            (
+                "expand model-family diversity before deep tuning;",
+                "no agent vote can crown a champion",
+            )
         ),
     }
 
