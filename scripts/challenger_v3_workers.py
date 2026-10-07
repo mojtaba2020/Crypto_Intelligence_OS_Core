@@ -83,7 +83,10 @@ def _statistical_gate_spec() -> dict:
             "sample_count",
             "origin_level_paired_losses",
         ],
-        "locked_oos_policy": "future_V3_locked_OOS_evaluated_once_after_freeze_and_never_used_for_tuning",
+        "locked_oos_policy": (
+            "future_V3_locked_OOS_evaluated_once_after_freeze_"
+            "and_never_used_for_tuning"
+        ),
     }
 
 
@@ -137,7 +140,10 @@ def _classical_spec() -> dict:
                 },
             },
         ],
-        "selection": "development_validation_only_minimum_MAPE_then_declared_candidate_order_tie_break",
+        "selection": (
+            "development_validation_only_minimum_MAPE_then_"
+            "declared_candidate_order_tie_break"
+        ),
         "implementation_source": "scripts/multitimeframe_tournament_v2.py",
         "forbidden": ["fresh_locked_oos", "V2_locked_oos_tuning", "production_promotion"],
     }
