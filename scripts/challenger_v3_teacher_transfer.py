@@ -11,9 +11,14 @@ import argparse
 import json
 from pathlib import Path
 
-import multitimeframe_tournament_v2 as tournament
-from challenger_v3_feature_ablation import feature_mask
-from multitimeframe_features_v3 import feature_names
+try:
+    from scripts import multitimeframe_tournament_v2 as tournament
+    from scripts.challenger_v3_feature_ablation import feature_mask
+    from scripts.multitimeframe_features_v3 import feature_names
+except ModuleNotFoundError:
+    import multitimeframe_tournament_v2 as tournament
+    from challenger_v3_feature_ablation import feature_mask
+    from multitimeframe_features_v3 import feature_names
 
 TEACHER = {"horizon": "1w", "model": "elastic_net", "features": "regime_only_delta"}
 RECIPIENTS = (
@@ -55,7 +60,18 @@ def _evaluate_with_indices(
     import math
     import statistics
 
-    from multitimeframe_features_v3 import WINDOWS, feature_vector, is_temporally_valid_sample
+    try:
+        from scripts.multitimeframe_features_v3 import (
+            WINDOWS,
+            feature_vector,
+            is_temporally_valid_sample,
+        )
+    except ModuleNotFoundError:
+        from multitimeframe_features_v3 import (
+            WINDOWS,
+            feature_vector,
+            is_temporally_valid_sample,
+        )
 
     family, horizon, min_train, step = "weekly", 1, 260, 4
     longest = max(WINDOWS[family])
