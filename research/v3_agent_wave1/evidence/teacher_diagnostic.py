@@ -171,7 +171,10 @@ def main() -> None:
                 "random_forest_sqrt",
                 "extra_trees_sqrt",
             ],
-            "next_test": "retrain recipients on teacher-derived stable feature subset under identical causal walk-forward splits",
+            "next_test": (
+                "retrain recipients on teacher-derived stable feature subset "
+                "under identical causal walk-forward splits"
+            ),
         },
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
