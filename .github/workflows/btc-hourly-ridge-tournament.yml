@@ -1,0 +1,115 @@
+name: BTC Hourly Model Tournament
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/train_hourly_ridge_tournament.py"
+      - "scripts/train_hourly_extra_trees_tournament.py"
+      - "scripts/train_hourly_boosting_tournament.py"
+      - "scripts/hourly_momentum_diagnostic.py"
+      - "scripts/generate_hourly_champion_losses.py"
+      - "scripts/hourly_champion_challenger.py"
+      - "scripts/paired_block_bootstrap.py"
+      - "scripts/hourly_features_v2.py"
+      - "scripts/validate_hourly_features_v2.py"
+      - "scripts/compare_hourly_features_v2.py"
+      - "scripts/ablate_hourly_features_v2.py"
+      - "scripts/attribute_hourly_candle_features_v2.py"
+      - ".github/workflows/btc-hourly-ridge-tournament.yml"
+
+jobs:
+  tournament:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Fetch closed Coinbase hourly BTC candles
+        run: |
+          python scripts/hourly_momentum_diagnostic.py --output research/hourly_diagnostic.json
+          python - <<'PY'
+          import json
+          import urllib.parse
+          import urllib.request
+          from datetime import UTC, datetime
+
+          api = "https://api.exchange.coinbase.com"
+          headers = {"User-Agent": "Crypto-Intelligence-OS/1.0", "Accept": "application/json"}
+          now = int(datetime.now(UTC).timestamp()) // 3600 * 3600
+          closes = {}
+          candles = {}
+          end = now
+          for _ in range(9):
+              start = end - 290 * 3600
+              q = urllib.parse.urlencode({
+                  "start": datetime.fromtimestamp(start, UTC).isoformat(),
+                  "end": datetime.fromtimestamp(end, UTC).isoformat(),
+                  "granularity": 3600,
+              })
+              req = urllib.request.Request(api + "/products/BTC-USD/candles?" + q, headers=headers)
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  rows = json.load(response)
+              for row in rows:
+                  ts = int(row[0])
+                  if ts < now:
+                      closes[ts] = float(row[4])
+                      candles[ts] = {"low": float(row[1]), "high": float(row[2]), "open": float(row[3]), "close": float(row[4]), "volume": float(row[5])}
+              end = start
+          ordered = [closes[k] for k in sorted(closes)]
+          if len(ordered) < 2200:
+              raise SystemExit(f"Only {len(ordered)} hourly closes fetched")
+          ordered_candles = [candles[k] for k in sorted(candles)]
+          with open("research/hourly_closes_training.json", "w", encoding="utf-8") as f:
+              json.dump(ordered, f)
+          with open("research/hourly_ohlcv_training.json", "w", encoding="utf-8") as f:
+              json.dump(ordered_candles, f)
+          print(f"Fetched {len(ordered)} closed hourly BTC OHLCV candles")
+          PY
+      - name: Validate Feature Engineering V2
+        run: |
+          python scripts/validate_hourly_features_v2.py --input research/hourly_ohlcv_training.json --output research/hourly_features_v2_validation.json
+      - name: Train and walk-forward test Ridge
+        run: |
+          python scripts/train_hourly_ridge_tournament.py --input research/hourly_closes_training.json --output research/hourly_ridge_tournament.json
+      - name: Train and walk-forward test Extra Trees
+        run: |
+          python scripts/train_hourly_extra_trees_tournament.py --input research/hourly_closes_training.json --output research/hourly_extra_trees_tournament.json
+      - name: Train and walk-forward test Gradient Boosting
+        run: |
+          python scripts/train_hourly_boosting_tournament.py --input research/hourly_closes_training.json --output research/hourly_boosting_tournament.json
+      - name: Generate point-in-time losses for Champion/Challenger judge
+        run: |
+          python scripts/generate_hourly_champion_losses.py --input research/hourly_closes_training.json --output research/hourly_champion_losses.json
+      - name: Run fail-closed Champion/Challenger judge
+        run: |
+          python scripts/hourly_champion_challenger.py --input research/hourly_champion_losses.json --output research/hourly_champion_challenger.json
+      - name: A/B walk-forward test Feature V1 vs V2
+        run: |
+          python scripts/compare_hourly_features_v2.py --input research/hourly_ohlcv_training.json --output research/hourly_features_v2_ab.json
+      - name: Ablate standardized Feature V2 families
+        run: |
+          python scripts/ablate_hourly_features_v2.py --input research/hourly_ohlcv_training.json --output research/hourly_features_v2_ablation.json
+      - name: Attribute standardized candle features
+        run: |
+          python scripts/attribute_hourly_candle_features_v2.py --input research/hourly_ohlcv_training.json --output research/hourly_candle_feature_attribution.json
+      - name: Print tournament reports
+        run: |
+          cat research/hourly_ridge_tournament.json
+          cat research/hourly_extra_trees_tournament.json
+          cat research/hourly_boosting_tournament.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: btc-hourly-model-tournament
+          path: |
+            research/hourly_ridge_tournament.json
+            research/hourly_extra_trees_tournament.json
+            research/hourly_boosting_tournament.json
+            research/hourly_diagnostic.json
+            research/hourly_features_v2_validation.json
+            research/hourly_features_v2_ab.json
+            research/hourly_features_v2_ablation.json
+            research/hourly_candle_feature_attribution.json
+            research/hourly_champion_losses.json
+            research/hourly_champion_challenger.json

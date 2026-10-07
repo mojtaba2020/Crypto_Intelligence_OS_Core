@@ -1,0 +1,50 @@
+name: Public Repo Security Audit
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  secret-and-sensitive-file-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reject tracked sensitive file types
+        shell: bash
+        run: |
+          set -euo pipefail
+          bad="$(git ls-files | grep -Ei '(^|/)(\.env($|\.)|credentials\.json$|secrets\.json$|id_rsa$|id_ed25519$)|\.(pem|p12|pfx|key)$' || true)"
+          if [ -n "$bad" ]; then
+            echo "::error::Sensitive-looking tracked files detected."
+            echo "$bad"
+            exit 1
+          fi
+
+      - name: Scan tracked text for high-confidence secret patterns
+        shell: bash
+        run: |
+          set -euo pipefail
+          patterns='AKIA[0-9A-Z]{16}|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----'
+          if git grep -I -n -E "$patterns" -- .; then
+            echo "::error::High-confidence credential pattern detected."
+            exit 1
+          fi
+          echo "No high-confidence credential patterns found in tracked text."
+
+      - name: Verify public-repo hygiene files
+        shell: bash
+        run: |
+          test -f SECURITY.md
+          grep -q '^artifacts/$' .gitignore
+          grep -q '^\*\.sqlite$' .gitignore
+          grep -q '^\*\.key$' .gitignore
