@@ -263,11 +263,13 @@ def validate_envelope(packet: dict) -> None:
         for item in value:
             _validate_string(item, field)
     reproducibility = packet["reproducibility"]
-    if not isinstance(reproducibility, dict) or len(reproducibility) > MAX_REPRODUCIBILITY_ITEMS:
-        raise ValueError("reproducibility must be a bounded string-to-string object")
-    for key, value in reproducibility.items():
-        _validate_string(key, "reproducibility key")
-        _validate_string(value, "reproducibility value")
+    if not isinstance(reproducibility, list) or len(reproducibility) > MAX_REPRODUCIBILITY_ITEMS:
+        raise ValueError("reproducibility must be a bounded list of key/value objects")
+    for item in reproducibility:
+        if not isinstance(item, dict) or set(item) != {"key", "value"}:
+            raise ValueError("reproducibility entries must match the closed key/value schema")
+        _validate_string(item["key"], "reproducibility key")
+        _validate_string(item["value"], "reproducibility value")
     confidence = packet["confidence"]
     if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
         raise ValueError("confidence must be a number")
@@ -311,7 +313,19 @@ def _provider_json_schema() -> dict:
         elif field in FALSE_FIELDS:
             properties[field] = {"type": "boolean", "enum": [False]}
         elif field == "reproducibility":
-            properties[field] = {"type": "object", "additionalProperties": {"type": "string"}}
+            properties[field] = {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "key": {"type": "string"},
+                        "value": {"type": "string"},
+                    },
+                    "required": ["key", "value"],
+                    "additionalProperties": False,
+                },
+                "maxItems": MAX_REPRODUCIBILITY_ITEMS,
+            }
         elif field == "confidence":
             properties[field] = {"type": "number", "minimum": 0, "maximum": 1}
         elif field == "recommendation":
