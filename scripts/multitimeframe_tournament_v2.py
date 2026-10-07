@@ -11,7 +11,10 @@ from __future__ import annotations
 import math
 import statistics
 
-import multitimeframe_tournament_v1 as v1
+try:
+    from scripts import multitimeframe_tournament_v1 as v1
+except ModuleNotFoundError:
+    import multitimeframe_tournament_v1 as v1
 
 HORIZONS = v1.HORIZONS
 CANDIDATES = (
