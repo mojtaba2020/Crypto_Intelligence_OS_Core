@@ -17,6 +17,16 @@ def test_v2_classical_lane_is_separate_and_deterministic() -> None:
         "random_forest",
         "hist_gradient_boosting",
         "boosting",
+        "huber",
+        "bayesian_ridge",
+        "random_forest_sqrt",
+        "extra_trees_sqrt",
+        "gradient_boosting_huber",
+        "gradient_boosting_absolute",
+        "hist_gradient_boosting_absolute",
+        "ada_boost",
+        "random_forest_leaf10",
+        "extra_trees_leaf10",
     )
     assert len(V2_CANDIDATES) == len(set(V2_CANDIDATES))
 
