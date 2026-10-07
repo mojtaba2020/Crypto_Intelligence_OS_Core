@@ -17,9 +17,22 @@ from sklearn.linear_model import ElasticNet, Ridge
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from challenger_v3_feature_ablation import apply_mask, feature_mask
-from multitimeframe_features_v3 import feature_names, feature_vector, is_temporally_valid_sample
-from multitimeframe_split_v1 import chronological_split
+try:
+    from scripts.challenger_v3_feature_ablation import apply_mask, feature_mask
+    from scripts.multitimeframe_features_v3 import (
+        feature_names,
+        feature_vector,
+        is_temporally_valid_sample,
+    )
+    from scripts.multitimeframe_split_v1 import chronological_split
+except ModuleNotFoundError:
+    from challenger_v3_feature_ablation import apply_mask, feature_mask
+    from multitimeframe_features_v3 import (
+        feature_names,
+        feature_vector,
+        is_temporally_valid_sample,
+    )
+    from multitimeframe_split_v1 import chronological_split
 
 SEED = 20260929
 CONFIGS = (
