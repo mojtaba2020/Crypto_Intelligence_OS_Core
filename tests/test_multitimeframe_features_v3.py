@@ -183,7 +183,7 @@ def test_v31_state_features_are_declared_finite_and_bounded_where_expected(
     state_names = [name for name in names if name.startswith("state_v31_")]
     assert len(state_names) == 5
     values = feature_vector(_candles(origin + 10), origin, family)
-    lookup = dict(zip(names, values))
+    lookup = dict(zip(names, values, strict=True))
     percentile_name = next(name for name in state_names if "volatility_percentile" in name)
     assert 0.0 < lookup[percentile_name] <= 1.0
     assert all(math.isfinite(lookup[name]) for name in state_names)
@@ -193,13 +193,13 @@ def test_v31_state_features_are_point_in_time_safe() -> None:
     candles = _candles(500)
     origin = 365
     names = feature_names("daily")
-    before = dict(zip(names, feature_vector(candles, origin, "daily")))
+    before = dict(zip(names, feature_vector(candles, origin, "daily"), strict=True))
     for row in candles[origin + 1 :]:
         row["open"] *= 500.0
         row["high"] *= 500.0
         row["low"] *= 500.0
         row["close"] *= 500.0
         row["volume"] *= 500.0
-    after = dict(zip(names, feature_vector(candles, origin, "daily")))
+    after = dict(zip(names, feature_vector(candles, origin, "daily"), strict=True))
     state_names = [name for name in names if name.startswith("state_v31_")]
     assert [before[name] for name in state_names] == [after[name] for name in state_names]
