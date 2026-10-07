@@ -124,7 +124,10 @@ def main():
             "Elastic Net L1/L2 mixing outperforms pure L2-like and pure L1 controls",
             "any apparent advantage remains directionally stable across chronological thirds",
         ],
-        "selection_policy": "diagnostic explanation only; no hyperparameter winner may be frozen from this experiment",
+        "selection_policy": (
+            "diagnostic explanation only; no hyperparameter winner may be frozen "
+            "from this experiment"
+        ),
         "fresh_locked_oos_access": False,
         "v2_locked_oos_used_for_tuning": False,
         "confirmatory": False,
