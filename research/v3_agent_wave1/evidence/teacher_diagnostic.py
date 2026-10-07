@@ -7,6 +7,7 @@ stability, and stress-tests whether paired improvement is concentrated in a few
 forecast origins.  The output is evidence for transfer hypotheses, never a
 promotion decision.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -64,13 +65,17 @@ def main() -> None:
     names = [feature_names(family)[i] for i in mask]
     longest = 52
     valid = [
-        i for i in range(longest, len(view) - horizon)
+        i
+        for i in range(longest, len(view) - horizon)
         if is_temporally_valid_sample(view, family, i, horizon)
     ]
     cache = {i: apply_mask(feature_vector(view, i, family), mask) for i in valid}
-    labels = {i: math.log(float(view[i + horizon]["close"]) / float(view[i]["close"])) for i in valid}
+    labels = {
+        i: math.log(float(view[i + horizon]["close"]) / float(view[i]["close"])) for i in valid
+    }
     origins = [
-        i for i in range(longest + min_train, len(view) - horizon, step)
+        i
+        for i in range(longest + min_train, len(view) - horizon, step)
         if is_temporally_valid_sample(view, family, i, horizon)
     ]
     if len(origins) < 20:
@@ -95,25 +100,29 @@ def main() -> None:
         model_error = abs(predicted - actual) / actual
         improvement = base_error - model_error
         paired.append(improvement)
-        origin_rows.append({
-            "origin_index": origin,
-            "origin_timestamp": view[origin].get("timestamp"),
-            "improvement": improvement,
-            "persistence_error": base_error,
-            "model_error": model_error,
-        })
+        origin_rows.append(
+            {
+                "origin_index": origin,
+                "origin_timestamp": view[origin].get("timestamp"),
+                "improvement": improvement,
+                "persistence_error": base_error,
+                "model_error": model_error,
+            }
+        )
 
     feature_diagnostics = []
     for name in names:
         vals = coefficient_history[name]
-        feature_diagnostics.append({
-            "feature": name,
-            "mean_standardized_coefficient": statistics.fmean(vals),
-            "median_standardized_coefficient": statistics.median(vals),
-            "mean_absolute_coefficient": statistics.fmean(abs(v) for v in vals),
-            "sign_stability": _sign_stability(vals),
-            "nonzero_fraction": statistics.fmean(abs(v) > 1e-12 for v in vals),
-        })
+        feature_diagnostics.append(
+            {
+                "feature": name,
+                "mean_standardized_coefficient": statistics.fmean(vals),
+                "median_standardized_coefficient": statistics.median(vals),
+                "mean_absolute_coefficient": statistics.fmean(abs(v) for v in vals),
+                "sign_stability": _sign_stability(vals),
+                "nonzero_fraction": statistics.fmean(abs(v) > 1e-12 for v in vals),
+            }
+        )
     feature_diagnostics.sort(key=lambda row: row["mean_absolute_coefficient"], reverse=True)
 
     ranked = sorted(origin_rows, key=lambda row: row["improvement"], reverse=True)
@@ -121,8 +130,7 @@ def main() -> None:
     top3_positive = sum(max(0.0, row["improvement"]) for row in ranked[:3])
     trimmed = sorted(paired)[1:-1] if len(paired) > 2 else paired
     leave_one_out_means = [
-        statistics.fmean(paired[:i] + paired[i + 1 :])
-        for i in range(len(paired))
+        statistics.fmean(paired[:i] + paired[i + 1 :]) for i in range(len(paired))
     ]
 
     report = {
@@ -153,9 +161,15 @@ def main() -> None:
                 "leave-one-out and trimmed mean remain directionally positive",
             ],
             "recipient_models": [
-                "ridge", "huber", "bayesian_ridge", "boosting",
-                "hist_gradient_boosting", "random_forest", "extra_trees",
-                "random_forest_sqrt", "extra_trees_sqrt",
+                "ridge",
+                "huber",
+                "bayesian_ridge",
+                "boosting",
+                "hist_gradient_boosting",
+                "random_forest",
+                "extra_trees",
+                "random_forest_sqrt",
+                "extra_trees_sqrt",
             ],
             "next_test": "retrain recipients on teacher-derived stable feature subset under identical causal walk-forward splits",
         },

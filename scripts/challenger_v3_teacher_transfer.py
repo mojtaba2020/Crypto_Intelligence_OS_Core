@@ -11,14 +11,21 @@ import argparse
 import json
 from pathlib import Path
 
+import multitimeframe_tournament_v2 as tournament
 from challenger_v3_feature_ablation import feature_mask
 from multitimeframe_features_v3 import feature_names
-import multitimeframe_tournament_v2 as tournament
 
 TEACHER = {"horizon": "1w", "model": "elastic_net", "features": "regime_only_delta"}
 RECIPIENTS = (
-    "ridge", "huber", "bayesian_ridge", "boosting", "hist_gradient_boosting",
-    "random_forest", "extra_trees", "random_forest_sqrt", "extra_trees_sqrt",
+    "ridge",
+    "huber",
+    "bayesian_ridge",
+    "boosting",
+    "hist_gradient_boosting",
+    "random_forest",
+    "extra_trees",
+    "random_forest_sqrt",
+    "extra_trees_sqrt",
 )
 # Predeclared rule: retain teacher features with sign_stability >= 0.90 and
 # nonzero_fraction >= 0.90. Run #34 therefore excludes only range_position_13
@@ -42,27 +49,35 @@ def stable_feature_indices() -> list[int]:
     return indices
 
 
-def _evaluate_with_indices(candles: list[dict[str, float]], indices: list[int]) -> dict[str, object]:
-    from multitimeframe_features_v3 import WINDOWS, feature_vector, is_temporally_valid_sample
+def _evaluate_with_indices(
+    candles: list[dict[str, float]], indices: list[int]
+) -> dict[str, object]:
     import math
     import statistics
+
+    from multitimeframe_features_v3 import WINDOWS, feature_vector, is_temporally_valid_sample
 
     family, horizon, min_train, step = "weekly", 1, 260, 4
     longest = max(WINDOWS[family])
     last_origin = len(candles) - horizon - 1
     origins = [
-        o for o in range(longest + min_train, last_origin + 1, step)
+        o
+        for o in range(longest + min_train, last_origin + 1, step)
         if is_temporally_valid_sample(candles, family, o, horizon)
     ]
     if len(origins) < 20:
         raise ValueError("Insufficient out-of-sample origins")
 
     valid = [
-        i for i in range(longest, len(candles) - horizon)
+        i
+        for i in range(longest, len(candles) - horizon)
         if is_temporally_valid_sample(candles, family, i, horizon)
     ]
     features = {i: [feature_vector(candles, i, family)[j] for j in indices] for i in valid}
-    labels = {i: math.log(float(candles[i + horizon]["close"]) / float(candles[i]["close"])) for i in valid}
+    labels = {
+        i: math.log(float(candles[i + horizon]["close"]) / float(candles[i]["close"]))
+        for i in valid
+    }
 
     errors = {name: [] for name in RECIPIENTS}
     persistence: list[float] = []
@@ -80,12 +95,14 @@ def _evaluate_with_indices(candles: list[dict[str, float]], indices: list[int]) 
             err = abs(current * math.exp(pred_return) - actual) / actual
             errors[name].append(err)
             row_errors[name] = err
-        paired.append({
-            "origin_index": origin,
-            "origin_timestamp": candles[origin].get("timestamp"),
-            "persistence_error": base,
-            "candidate_errors": row_errors,
-        })
+        paired.append(
+            {
+                "origin_index": origin,
+                "origin_timestamp": candles[origin].get("timestamp"),
+                "persistence_error": base,
+                "candidate_errors": row_errors,
+            }
+        )
 
     candidates = {}
     for name in RECIPIENTS:

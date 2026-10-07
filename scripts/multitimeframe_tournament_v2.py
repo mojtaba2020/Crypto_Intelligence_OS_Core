@@ -39,7 +39,13 @@ def _fit_candidate(name: str, x: list[list[float]], y: list[float]):
         return v1._fit_candidate(name, x, y)
 
     try:
-        from sklearn.ensemble import (AdaBoostRegressor, ExtraTreesRegressor, GradientBoostingRegressor, HistGradientBoostingRegressor, RandomForestRegressor)
+        from sklearn.ensemble import (
+            AdaBoostRegressor,
+            ExtraTreesRegressor,
+            GradientBoostingRegressor,
+            HistGradientBoostingRegressor,
+            RandomForestRegressor,
+        )
         from sklearn.linear_model import BayesianRidge, ElasticNet, HuberRegressor
         from sklearn.pipeline import make_pipeline
         from sklearn.preprocessing import StandardScaler
@@ -76,33 +82,54 @@ def _fit_candidate(name: str, x: list[list[float]], y: list[float]):
         )
     elif name == "gradient_boosting_huber":
         model = GradientBoostingRegressor(
-            loss="huber", n_estimators=150, learning_rate=0.03, max_depth=2,
-            min_samples_leaf=8, random_state=20261004,
+            loss="huber",
+            n_estimators=150,
+            learning_rate=0.03,
+            max_depth=2,
+            min_samples_leaf=8,
+            random_state=20261004,
         )
     elif name == "gradient_boosting_absolute":
         model = GradientBoostingRegressor(
-            loss="absolute_error", n_estimators=150, learning_rate=0.03, max_depth=2,
-            min_samples_leaf=8, random_state=20261004,
+            loss="absolute_error",
+            n_estimators=150,
+            learning_rate=0.03,
+            max_depth=2,
+            min_samples_leaf=8,
+            random_state=20261004,
         )
     elif name == "hist_gradient_boosting_absolute":
         model = HistGradientBoostingRegressor(
-            loss="absolute_error", learning_rate=0.04, max_iter=150,
-            max_leaf_nodes=7, min_samples_leaf=10, l2_regularization=2.0,
+            loss="absolute_error",
+            learning_rate=0.04,
+            max_iter=150,
+            max_leaf_nodes=7,
+            min_samples_leaf=10,
+            l2_regularization=2.0,
             random_state=20261004,
         )
     elif name == "ada_boost":
         model = AdaBoostRegressor(
-            n_estimators=150, learning_rate=0.03, loss="square", random_state=20261004,
+            n_estimators=150,
+            learning_rate=0.03,
+            loss="square",
+            random_state=20261004,
         )
     elif name == "random_forest_leaf10":
         model = RandomForestRegressor(
-            n_estimators=200, min_samples_leaf=10, max_features=0.75,
-            random_state=20261004, n_jobs=2,
+            n_estimators=200,
+            min_samples_leaf=10,
+            max_features=0.75,
+            random_state=20261004,
+            n_jobs=2,
         )
     elif name == "extra_trees_leaf10":
         model = ExtraTreesRegressor(
-            n_estimators=200, min_samples_leaf=10, max_features=0.75,
-            random_state=20261004, n_jobs=2,
+            n_estimators=200,
+            min_samples_leaf=10,
+            max_features=0.75,
+            random_state=20261004,
+            n_jobs=2,
         )
     elif name == "random_forest":
         model = RandomForestRegressor(
@@ -168,10 +195,7 @@ def evaluate(
         if is_temporally_valid_sample(candles, family, i, horizon)
     ]
     mask = feature_mask(family, feature_ablation)
-    feature_cache = {
-        i: apply_mask(feature_vector(candles, i, family), mask)
-        for i in valid_indices
-    }
+    feature_cache = {i: apply_mask(feature_vector(candles, i, family), mask) for i in valid_indices}
     label_cache = {
         i: math.log(float(candles[i + horizon]["close"]) / float(candles[i]["close"]))
         for i in valid_indices
@@ -193,13 +217,15 @@ def evaluate(
         actual = float(candles[origin + horizon]["close"])
         persistence_error = abs(current - actual) / actual
         persistence_errors.append(persistence_error)
-        origin_records.append({
-            "origin_index": origin,
-            "origin_timestamp": candles[origin].get("timestamp"),
-            "actual_close": actual,
-            "persistence_error": persistence_error,
-            "candidate_errors": {},
-        })
+        origin_records.append(
+            {
+                "origin_index": origin,
+                "origin_timestamp": candles[origin].get("timestamp"),
+                "actual_close": actual,
+                "persistence_error": persistence_error,
+                "candidate_errors": {},
+            }
+        )
         row = feature_cache[origin]
 
         for name in CANDIDATES:

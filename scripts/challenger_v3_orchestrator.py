@@ -19,12 +19,32 @@ AGENTS = (
 
 TASKS = (
     {"id": "data_manifest_audit", "agent": "V3-DATA", "depends_on": []},
-    {"id": "point_in_time_feature_spec", "agent": "V3-FEATURE", "depends_on": ["data_manifest_audit"]},
-    {"id": "classical_candidate_spec", "agent": "V3-CLASSICAL", "depends_on": ["point_in_time_feature_spec"]},
-    {"id": "neural_adapter_spec", "agent": "V3-NEURAL", "depends_on": ["point_in_time_feature_spec"]},
+    {
+        "id": "point_in_time_feature_spec",
+        "agent": "V3-FEATURE",
+        "depends_on": ["data_manifest_audit"],
+    },
+    {
+        "id": "classical_candidate_spec",
+        "agent": "V3-CLASSICAL",
+        "depends_on": ["point_in_time_feature_spec"],
+    },
+    {
+        "id": "neural_adapter_spec",
+        "agent": "V3-NEURAL",
+        "depends_on": ["point_in_time_feature_spec"],
+    },
     {"id": "statistical_gate_spec", "agent": "V3-STATS", "depends_on": ["data_manifest_audit"]},
-    {"id": "leakage_adversarial_review", "agent": "V3-AUDIT", "depends_on": ["classical_candidate_spec", "neural_adapter_spec", "statistical_gate_spec"]},
-    {"id": "selection_bias_challenge", "agent": "V3-DEVIL", "depends_on": ["leakage_adversarial_review"]},
+    {
+        "id": "leakage_adversarial_review",
+        "agent": "V3-AUDIT",
+        "depends_on": ["classical_candidate_spec", "neural_adapter_spec", "statistical_gate_spec"],
+    },
+    {
+        "id": "selection_bias_challenge",
+        "agent": "V3-DEVIL",
+        "depends_on": ["leakage_adversarial_review"],
+    },
     {"id": "v3_readiness_packet", "agent": "V3-ORCH", "depends_on": ["selection_bias_challenge"]},
 )
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from scripts.challenger_v3_orchestrator import build_plan
@@ -39,14 +39,26 @@ def _feature_spec() -> dict:
         "version": "v3-pit-features-1",
         "availability_rule": "feature_at_t_uses_information_available_at_or_before_t",
         "families": {
-            "returns": ["log_return_1", "log_return_3", "log_return_7", "log_return_14", "log_return_30"],
+            "returns": [
+                "log_return_1",
+                "log_return_3",
+                "log_return_7",
+                "log_return_14",
+                "log_return_30",
+            ],
             "trend": ["close_vs_sma_7", "close_vs_sma_30", "close_vs_sma_90", "sma_7_vs_30"],
             "volatility": ["realized_vol_7", "realized_vol_30", "true_range_14"],
             "range": ["distance_from_30d_high", "distance_from_30d_low", "range_position_30"],
             "volume": ["volume_z_30", "volume_change_7"],
             "calendar": ["day_of_week", "month_of_year"],
         },
-        "forbidden": ["centered_windows", "future_fills", "future_normalization", "future_labels", "locked_oos_derived_features"],
+        "forbidden": [
+            "centered_windows",
+            "future_fills",
+            "future_normalization",
+            "future_labels",
+            "locked_oos_derived_features",
+        ],
         "fit_policy": "fit_scalers_and_encoders_on_each_training_fold_only",
     }
 
@@ -65,7 +77,12 @@ def _statistical_gate_spec() -> dict:
             "confidence_interval_lower_bound_gt_0",
             "holm_adjusted_null_rejected_true",
         ],
-        "required_reporting": ["MAPE", "direction_accuracy", "sample_count", "origin_level_paired_losses"],
+        "required_reporting": [
+            "MAPE",
+            "direction_accuracy",
+            "sample_count",
+            "origin_level_paired_losses",
+        ],
         "locked_oos_policy": "future_V3_locked_OOS_evaluated_once_after_freeze_and_never_used_for_tuning",
     }
 
@@ -76,11 +93,49 @@ def _classical_spec() -> dict:
         "target": "future_log_return_by_predeclared_horizon_reconstructed_to_price_for_APE",
         "candidates": [
             {"name": "ridge", "config": {"alpha": 1.0, "scaler": "train_fold_only"}},
-            {"name": "elastic_net", "config": {"alpha": 0.0001, "l1_ratio": 0.25, "max_iter": 5000, "random_state": 20260929}},
-            {"name": "extra_trees", "config": {"implementation": "multitimeframe_tournament_v1._fit_candidate", "frozen_by_code": True}},
-            {"name": "random_forest", "config": {"n_estimators": 100, "min_samples_leaf": 5, "max_features": 0.75, "random_state": 20260929, "n_jobs": 2}},
-            {"name": "hist_gradient_boosting", "config": {"learning_rate": 0.05, "max_iter": 150, "max_leaf_nodes": 15, "l2_regularization": 1.0, "random_state": 20260929}},
-            {"name": "boosting", "config": {"implementation": "multitimeframe_tournament_v1._fit_candidate", "frozen_by_code": True}},
+            {
+                "name": "elastic_net",
+                "config": {
+                    "alpha": 0.0001,
+                    "l1_ratio": 0.25,
+                    "max_iter": 5000,
+                    "random_state": 20260929,
+                },
+            },
+            {
+                "name": "extra_trees",
+                "config": {
+                    "implementation": "multitimeframe_tournament_v1._fit_candidate",
+                    "frozen_by_code": True,
+                },
+            },
+            {
+                "name": "random_forest",
+                "config": {
+                    "n_estimators": 100,
+                    "min_samples_leaf": 5,
+                    "max_features": 0.75,
+                    "random_state": 20260929,
+                    "n_jobs": 2,
+                },
+            },
+            {
+                "name": "hist_gradient_boosting",
+                "config": {
+                    "learning_rate": 0.05,
+                    "max_iter": 150,
+                    "max_leaf_nodes": 15,
+                    "l2_regularization": 1.0,
+                    "random_state": 20260929,
+                },
+            },
+            {
+                "name": "boosting",
+                "config": {
+                    "implementation": "multitimeframe_tournament_v1._fit_candidate",
+                    "frozen_by_code": True,
+                },
+            },
         ],
         "selection": "development_validation_only_minimum_MAPE_then_declared_candidate_order_tie_break",
         "implementation_source": "scripts/multitimeframe_tournament_v2.py",
@@ -129,7 +184,11 @@ def execute_task(task: dict, *, repo_root: Path) -> dict:
         if not _completed_upstream(repo_root, "data_manifest_audit"):
             missing.append("completed data_manifest_audit evidence packet")
         else:
-            spec = _feature_spec() if task["id"] == "point_in_time_feature_spec" else _statistical_gate_spec()
+            spec = (
+                _feature_spec()
+                if task["id"] == "point_in_time_feature_spec"
+                else _statistical_gate_spec()
+            )
             evidence.append({"upstream_task": "data_manifest_audit", "spec": spec})
     elif task["id"] in {"classical_candidate_spec", "neural_adapter_spec"}:
         if not _completed_upstream(repo_root, "point_in_time_feature_spec"):
@@ -146,7 +205,7 @@ def execute_task(task: dict, *, repo_root: Path) -> dict:
         "agent_id": task["agent"],
         "role": task["role"],
         "task_id": task["id"],
-        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "created_at_utc": datetime.now(UTC).isoformat(),
         "scope": task["scope"],
         "hypothesis": "Task can be evaluated from declared development/validation evidence.",
         "method": "bounded_local_worker_v1",
@@ -172,7 +231,7 @@ def run_ready_tasks(*, repo_root: Path, output_dir: Path) -> list[Path]:
     for wave in plan["waves"][:3]:
         for task in wave:
             packet = execute_task(task, repo_root=repo_root)
-            path = output_dir / f'{task["id"]}.json'
+            path = output_dir / f"{task['id']}.json"
             path.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
             written.append(path)
     return written

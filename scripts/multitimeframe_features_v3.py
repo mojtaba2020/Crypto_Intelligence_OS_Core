@@ -113,7 +113,9 @@ def feature_names(family: str) -> tuple[str, ...]:
 
 
 def _mean_close(candles: list[dict[str, float]], origin: int, window: int) -> float:
-    return statistics.fmean(float(row["close"]) for row in candles[origin - window + 1 : origin + 1])
+    return statistics.fmean(
+        float(row["close"]) for row in candles[origin - window + 1 : origin + 1]
+    )
 
 
 def _realized_vol(candles: list[dict[str, float]], origin: int, window: int) -> float:
@@ -192,9 +194,7 @@ def feature_vector(
     medium_high = max(float(row["high"]) for row in medium_rows)
     medium_low = min(float(row["low"]) for row in medium_rows)
     range_position = (
-        (current - medium_low) / (medium_high - medium_low)
-        if medium_high > medium_low
-        else 0.5
+        (current - medium_low) / (medium_high - medium_low) if medium_high > medium_low else 0.5
     )
 
     trend_fast_medium = sma_fast / sma_medium - 1.0
@@ -216,7 +216,9 @@ def feature_vector(
     volume_median = statistics.median(medium_volumes)
     volume_mad = _median_abs_deviation(medium_volumes)
     robust_volume_z = (volume - volume_median) / (1.4826 * volume_mad + 1e-12)
-    volume_ratio_fast_medium = statistics.fmean(fast_volumes) / (statistics.fmean(medium_volumes) + 1e-12)
+    volume_ratio_fast_medium = statistics.fmean(fast_volumes) / (
+        statistics.fmean(medium_volumes) + 1e-12
+    )
     volatility_percentile = _trailing_volatility_percentile(candles, origin, fast, slow)
     trend_x_volatility = trend_fast_medium * (vol_fast_medium - 1.0)
 

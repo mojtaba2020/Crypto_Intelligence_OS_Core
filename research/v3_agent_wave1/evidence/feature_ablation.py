@@ -5,6 +5,7 @@ This module never accesses locked OOS. It only defines masks over the causal
 point-in-time feature vector so identical walk-forward splits can compare
 information families fairly.
 """
+
 from __future__ import annotations
 
 try:
@@ -18,8 +19,11 @@ ABLATIONS = ("baseline", "regime_only_delta", "state_v31_delta", "all_features")
 def feature_mask(family: str, ablation: str) -> tuple[int, ...]:
     names = feature_names(family)
     regime = tuple(
-        i for i, name in enumerate(names)
-        if name.startswith("trend_") or name.startswith("vol_ratio_") or name.startswith("range_position_")
+        i
+        for i, name in enumerate(names)
+        if name.startswith("trend_")
+        or name.startswith("vol_ratio_")
+        or name.startswith("range_position_")
     )
     state_v31 = tuple(i for i, name in enumerate(names) if name.startswith("state_v31_"))
     baseline = tuple(i for i in range(len(names)) if i not in regime and i not in state_v31)
@@ -50,7 +54,6 @@ def ablation_manifest(family: str) -> dict[str, object]:
         "fresh_locked_oos_access": False,
         "v2_locked_oos_used_for_tuning": False,
         "ablations": {
-            ablation: [names[i] for i in feature_mask(family, ablation)]
-            for ablation in ABLATIONS
+            ablation: [names[i] for i in feature_mask(family, ablation)] for ablation in ABLATIONS
         },
     }

@@ -8,9 +8,9 @@ import json
 import time
 from pathlib import Path
 
+from challenger_v3_feature_ablation import ABLATIONS
 from multitimeframe_lab_v1 import SPECS
 from multitimeframe_split_v1 import chronological_split
-from challenger_v3_feature_ablation import ABLATIONS
 from multitimeframe_tournament_v2 import CANDIDATES, evaluate
 from resample_multitimeframe_ohlcv import prepared_data_identity
 
@@ -68,7 +68,7 @@ def main() -> None:
         validation_view = candles[: split.validation_end]
 
         started = time.perf_counter()
-        print('[V3] START ' + spec.label, flush=True)
+        print("[V3] START " + spec.label, flush=True)
         try:
             ablation_metrics = {}
             for ablation in ABLATIONS:
@@ -90,7 +90,7 @@ def main() -> None:
             continue
 
         elapsed = time.perf_counter() - started
-        print('[V3] DONE ' + spec.label + ' seconds=' + format(elapsed, '.2f'), flush=True)
+        print("[V3] DONE " + spec.label + " seconds=" + format(elapsed, ".2f"), flush=True)
         candidate_metrics = metrics["candidates"]
         rank = {name: index for index, name in enumerate(CANDIDATES)}
         ablation_selected = {}

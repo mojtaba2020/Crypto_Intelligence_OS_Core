@@ -146,8 +146,7 @@ def test_baseline_ablation_exactly_matches_legacy_feature_prefix(family: str, or
     names = feature_names(family)
     regime_prefixes = ("trend_", "vol_ratio_", "range_position_", "state_v31_")
     legacy_indices = tuple(
-        i for i, name in enumerate(names)
-        if not name.startswith(regime_prefixes)
+        i for i, name in enumerate(names) if not name.startswith(regime_prefixes)
     )
     assert baseline_mask == legacy_indices
     assert baseline == [full[i] for i in legacy_indices]
@@ -162,6 +161,7 @@ def test_regime_realized_vol_matches_original_trailing_semantics(
     family: str, origin: int, window: int
 ) -> None:
     import statistics
+
     from scripts.multitimeframe_features_v3 import _realized_vol
 
     candles = _candles(origin + 10)
@@ -169,9 +169,7 @@ def test_regime_realized_vol_matches_original_trailing_semantics(
         math.log(float(candles[i]["close"]) / float(candles[i - 1]["close"]))
         for i in range(origin - max(window, 1) + 1, origin + 1)
     ]
-    assert _realized_vol(candles, origin, window) == pytest.approx(
-        statistics.pstdev(returns)
-    )
+    assert _realized_vol(candles, origin, window) == pytest.approx(statistics.pstdev(returns))
 
 
 @pytest.mark.parametrize(
