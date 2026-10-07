@@ -262,10 +262,12 @@ class FakeResponse:
 
 
 def provider_http_body(packet: dict | None = None) -> bytes:
-    return json.dumps({
-        "output_text": json.dumps(packet or provider_packet()),
-        "usage": {"input_tokens": 120, "output_tokens": 30, "total_tokens": 150},
-    }).encode()
+    return json.dumps(
+        {
+            "output_text": json.dumps(packet or provider_packet()),
+            "usage": {"input_tokens": 120, "output_tokens": 30, "total_tokens": 150},
+        }
+    ).encode()
 
 
 def test_provider_response_read_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -426,10 +428,12 @@ def test_provider_usage_is_required(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_provider_usage_rejects_inconsistent_total(monkeypatch: pytest.MonkeyPatch) -> None:
-    raw = json.dumps({
-        "output_text": json.dumps(provider_packet()),
-        "usage": {"input_tokens": 120, "output_tokens": 30, "total_tokens": 149},
-    }).encode()
+    raw = json.dumps(
+        {
+            "output_text": json.dumps(provider_packet()),
+            "usage": {"input_tokens": 120, "output_tokens": 30, "total_tokens": 149},
+        }
+    ).encode()
     response = FakeResponse(raw)
     monkeypatch.setenv("OPENAI_API_KEY", "not-a-real-key")
     monkeypatch.setattr(runtime.urllib.request, "urlopen", lambda *_args, **_kwargs: response)
