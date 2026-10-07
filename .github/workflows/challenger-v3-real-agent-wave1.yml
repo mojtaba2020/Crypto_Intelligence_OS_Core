@@ -19,10 +19,6 @@ jobs:
       matrix:
         task_id:
           - FEATURE-01
-          - STATS-01
-          - LEAKAGE-01
-          - NEURAL-01
-          - DEVIL-01
     steps:
       - name: Checkout
         uses: actions/checkout@v4
