@@ -1,5 +1,5 @@
-from challenger_v3_1w_mechanism_ablation import CONFIGS, SUBSETS, _subset_indices
-from multitimeframe_features_v3 import feature_names
+from scripts.challenger_v3_1w_mechanism_ablation import CONFIGS, SUBSETS, _subset_indices
+from scripts.multitimeframe_features_v3 import feature_names
 
 
 def test_mechanism_grid_is_bounded_and_predeclared():
