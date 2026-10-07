@@ -1,0 +1,67 @@
+name: V3 Wave 1 Style Autofix
+
+on:
+  push:
+    branches:
+      - research/v3-agent-wave-1
+    paths:
+      - ".github/workflows/v3-wave1-style-autofix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: research/v3-agent-wave-1
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Ruff
+        run: python -m pip install --disable-pip-version-check ruff
+
+      - name: Apply safe Ruff fixes and formatting
+        run: |
+          files=(
+            research/v3_agent_wave1/evidence/feature_ablation.py
+            research/v3_agent_wave1/evidence/features_v3.py
+            research/v3_agent_wave1/evidence/teacher_diagnostic.py
+            scripts/challenger_v3_1w_mechanism_ablation.py
+            scripts/challenger_v3_feature_ablation.py
+            scripts/challenger_v3_model_curriculum.py
+            scripts/challenger_v3_orchestrator.py
+            scripts/challenger_v3_teacher_diagnostic.py
+            scripts/challenger_v3_teacher_transfer.py
+            scripts/challenger_v3_workers.py
+            scripts/multitimeframe_features_v3.py
+            scripts/multitimeframe_tournament_v2.py
+            scripts/run_challenger_v2_locked_oos.py
+            scripts/run_challenger_v3_classical_development.py
+            tests/test_challenger_v3_1w_mechanism_ablation.py
+            tests/test_challenger_v3_feature_ablation.py
+            tests/test_challenger_v3_workers.py
+            tests/test_multitimeframe_features_v3.py
+          )
+          ruff check --fix "${files[@]}"
+          ruff format "${files[@]}"
+          ruff check "${files[@]}"
+
+      - name: Commit style-only changes
+        run: |
+          if git diff --quiet; then
+            echo "No style changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add             research/v3_agent_wave1/evidence/feature_ablation.py             research/v3_agent_wave1/evidence/features_v3.py             research/v3_agent_wave1/evidence/teacher_diagnostic.py             scripts/challenger_v3_1w_mechanism_ablation.py             scripts/challenger_v3_feature_ablation.py             scripts/challenger_v3_model_curriculum.py             scripts/challenger_v3_orchestrator.py             scripts/challenger_v3_teacher_diagnostic.py             scripts/challenger_v3_teacher_transfer.py             scripts/challenger_v3_workers.py             scripts/multitimeframe_features_v3.py             scripts/multitimeframe_tournament_v2.py             scripts/run_challenger_v2_locked_oos.py             scripts/run_challenger_v3_classical_development.py             tests/test_challenger_v3_1w_mechanism_ablation.py             tests/test_challenger_v3_feature_ablation.py             tests/test_challenger_v3_workers.py             tests/test_multitimeframe_features_v3.py
+          git commit -m "Fix V3 Wave 1 Ruff style violations"
+          git push origin HEAD:research/v3-agent-wave-1
