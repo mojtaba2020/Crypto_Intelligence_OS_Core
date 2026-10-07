@@ -21,7 +21,7 @@ def provider_packet() -> dict:
         "counterevidence": [],
         "leakage_checks": ["Check timestamps."],
         "failure_modes": ["Insufficient development samples."],
-        "reproducibility": {"seed": "7"},
+        "reproducibility": [{"key": "seed", "value": "7"}],
         "confidence": 0.5,
         "recommendation": "audit",
         "fresh_locked_oos_access": False,
@@ -222,6 +222,22 @@ def test_provider_list_members_must_be_bounded_strings() -> None:
     packet["evidence"] = [None]
     with pytest.raises(ValueError, match="evidence"):
         runtime.validate_envelope(packet)
+
+
+def test_reproducibility_uses_closed_key_value_entries() -> None:
+    packet = provider_packet()
+    packet["reproducibility"] = [{"key": "seed", "value": "7", "extra": "forbidden"}]
+    with pytest.raises(ValueError, match="closed key/value schema"):
+        runtime.validate_envelope(packet)
+
+
+def test_provider_schema_closes_nested_reproducibility_objects() -> None:
+    schema = runtime._provider_json_schema()
+    reproducibility = schema["properties"]["reproducibility"]
+    assert reproducibility["type"] == "array"
+    item = reproducibility["items"]
+    assert item["required"] == ["key", "value"]
+    assert item["additionalProperties"] is False
 
 
 def test_trusted_metadata_is_generated_locally(
