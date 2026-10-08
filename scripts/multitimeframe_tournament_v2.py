@@ -224,6 +224,7 @@ def evaluate(
             {
                 "origin_index": origin,
                 "origin_timestamp": candles[origin].get("timestamp"),
+                "target_timestamp": candles[origin + horizon].get("timestamp"),
                 "actual_close": actual,
                 "persistence_error": persistence_error,
                 "candidate_errors": {},

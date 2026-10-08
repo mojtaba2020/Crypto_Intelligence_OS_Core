@@ -85,6 +85,29 @@ def test_target_maturity_purge_only_removes_overlapping_origins():
     assert len(monthly) == 18
 
 
+def test_exact_timestamp_purge_handles_irregular_calendar_spacing():
+    rows = _records(8)
+    origin_timestamps = [0, 31, 59, 90, 120, 151, 181, 212]
+    for row, timestamp in zip(rows, origin_timestamps, strict=True):
+        row["origin_timestamp"] = timestamp
+    rows[2]["target_timestamp"] = 120
+    diagnostic, purged = purged_diagnostic_records(
+        rows, 3, horizon_bars=3, evaluation_step_bars=1
+    )
+    assert purged == 1
+    assert diagnostic[0]["origin_timestamp"] == 120
+
+
+def test_exact_timestamp_purge_rejects_partial_metadata():
+    rows = _records()
+    for i, row in enumerate(rows):
+        row["origin_timestamp"] = i
+    rows[29]["target_timestamp"] = 32
+    rows[31].pop("origin_timestamp")
+    with pytest.raises(ValueError, match="complete timestamp metadata"):
+        purged_diagnostic_records(rows, 30, horizon_bars=3, evaluation_step_bars=1)
+
+
 def test_target_maturity_purge_fails_if_no_diagnostics_remain():
     with pytest.raises(ValueError, match="leaves no diagnostic"):
         purged_diagnostic_records(_records(35), 20, horizon_bars=30, evaluation_step_bars=1)

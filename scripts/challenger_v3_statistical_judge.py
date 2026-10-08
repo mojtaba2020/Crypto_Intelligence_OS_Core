@@ -270,15 +270,22 @@ def _validate_origin_records(
         raise ValueError("origin-level evidence must not be empty")
     indexes: list[int] = []
     timestamps: list[float] = []
-    timestamp_presence = []
+    target_timestamps: list[float] = []
     required_candidates = set(candidates)
     for row in records:
         if "origin_index" not in row:
             raise ValueError("origin_index is required")
         indexes.append(int(row["origin_index"]))
-        timestamp_presence.append(row.get("origin_timestamp") is not None)
-        if row.get("origin_timestamp") is not None:
-            timestamps.append(float(row["origin_timestamp"]))
+        if row.get("origin_timestamp") is None or row.get("target_timestamp") is None:
+            raise ValueError("origin_timestamp and target_timestamp are required")
+        origin_timestamp = float(row["origin_timestamp"])
+        target_timestamp = float(row["target_timestamp"])
+        if not math.isfinite(origin_timestamp) or not math.isfinite(target_timestamp):
+            raise ValueError("origin and target timestamps must be finite")
+        if target_timestamp <= origin_timestamp:
+            raise ValueError("target timestamp must be strictly after origin timestamp")
+        timestamps.append(origin_timestamp)
+        target_timestamps.append(target_timestamp)
         errors = row.get("candidate_errors")
         if not isinstance(errors, Mapping) or set(errors) != required_candidates:
             raise ValueError("candidate losses are incomplete or contain undeclared candidates")
@@ -287,10 +294,10 @@ def _validate_origin_records(
             raise ValueError("losses must be finite and non-negative")
     if indexes != sorted(indexes) or len(indexes) != len(set(indexes)):
         raise ValueError("origin indexes must be strictly chronological and unique")
-    if any(timestamp_presence) and not all(timestamp_presence):
-        raise ValueError("origin timestamps must be consistently present or absent")
-    if timestamps and (timestamps != sorted(timestamps) or len(timestamps) != len(set(timestamps))):
+    if timestamps != sorted(timestamps) or len(timestamps) != len(set(timestamps)):
         raise ValueError("origin timestamps must be strictly chronological and unique")
+    if target_timestamps != sorted(target_timestamps):
+        raise ValueError("target timestamps must be chronological")
 
 
 def _validate_dataset_identity(value: object) -> str:

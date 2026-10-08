@@ -95,6 +95,7 @@ def _records(indexes=(0, 1), timestamps=(10, 20)):
         {
             "origin_index": index,
             "origin_timestamp": timestamp,
+            "target_timestamp": timestamp + 5,
             "persistence_error": 0.2,
             "candidate_errors": {"a": 0.1, "b": 0.15},
         }
@@ -109,6 +110,17 @@ def test_origin_validation_rejects_duplicate_and_nonordered_origins() -> None:
         _validate_origin_records(_records((2, 1)), ("a", "b"))
     with pytest.raises(ValueError, match="timestamps"):
         _validate_origin_records(_records((1, 2), (20, 10)), ("a", "b"))
+
+
+def test_origin_validation_requires_exact_target_timestamp_metadata() -> None:
+    rows = _records()
+    rows[0].pop("target_timestamp")
+    with pytest.raises(ValueError, match="target_timestamp"):
+        _validate_origin_records(rows, ("a", "b"))
+    rows = _records()
+    rows[0]["target_timestamp"] = rows[0]["origin_timestamp"]
+    with pytest.raises(ValueError, match="strictly after"):
+        _validate_origin_records(rows, ("a", "b"))
 
 
 def test_origin_validation_rejects_incomplete_or_nonfinite_losses() -> None:
