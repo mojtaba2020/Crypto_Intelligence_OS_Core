@@ -146,13 +146,14 @@ def test_dataset_identity_and_duplicate_evidence_fail_closed() -> None:
         _validate_origin_records(rows, ("a", "b"))
 
 
-def test_contiguous_origin_deletion_detects_cluster_dependence() -> None:
+def test_contiguous_origin_deletion_finds_worst_case_block() -> None:
     values = [0.02] * 12 + [-0.15, -0.15] + [0.02] * 12
     result = _contiguous_origin_deletion_sensitivity(values, 2)
     assert result["maximum_deleted_block_origins"] == 2
     assert result["selection_rule"] == "never_replaces_primary_method"
     assert len(result["tested_block_lengths"]) == 2
-    assert result["minimum_remaining_mean_improvement"] > statistics.fmean(values)
+    assert result["minimum_remaining_mean_improvement"] < statistics.fmean(values)
+    assert result["worst_deleted_block_origins"] == 2
 
 
 def test_contiguous_origin_deletion_can_disqualify_fragile_positive_mean() -> None:
