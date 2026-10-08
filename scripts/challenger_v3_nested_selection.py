@@ -88,7 +88,9 @@ def purged_diagnostic_records(
     target_timestamp = origin_records[cut - 1].get("target_timestamp")
     if any(timestamps_present) or target_timestamp is not None:
         if not all(timestamps_present) or target_timestamp is None:
-            raise ValueError("complete timestamp metadata is required for exact target-maturity purge")
+            raise ValueError(
+                "complete timestamp metadata is required for exact target-maturity purge"
+            )
         maturity = float(target_timestamp)
         start = cut
         while start < len(origin_records):
