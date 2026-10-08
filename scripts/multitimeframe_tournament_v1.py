@@ -6,11 +6,18 @@ from __future__ import annotations
 import math
 import statistics
 
-from multitimeframe_features_v3 import (
-    WINDOWS,
-    feature_vector,
-    is_temporally_valid_sample,
-)
+try:
+    from scripts.multitimeframe_features_v3 import (
+        WINDOWS,
+        feature_vector,
+        is_temporally_valid_sample,
+    )
+except ModuleNotFoundError:
+    from multitimeframe_features_v3 import (
+        WINDOWS,
+        feature_vector,
+        is_temporally_valid_sample,
+    )
 
 HORIZONS = {"daily": (1, 2, 3), "weekly": (1, 2, 3), "monthly": (1, 3)}
 CANDIDATES = ("ridge", "extra_trees", "boosting")

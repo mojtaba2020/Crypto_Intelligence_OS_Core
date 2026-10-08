@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "scope": "development_validation_only",
+  "artifacts": [
+    {
+      "id": "wave1-development-context",
+      "path": "development_context.json",
+      "classification": "development_validation",
+      "sha256": "15caad4cda29b46d23d17723a307c2b1d22e72cc4ce3213a83745ab38227b91a"
+    }
+  ]
+}

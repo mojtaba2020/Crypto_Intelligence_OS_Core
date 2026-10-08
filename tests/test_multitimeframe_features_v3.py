@@ -60,6 +60,7 @@ def test_gap_safe_sample_rejects_missing_daily_period() -> None:
     candles = _candles(370)
     for i, row in enumerate(candles):
         row["timestamp"] = float(i * 86_400)
+        row["is_complete"] = True
     assert is_temporally_valid_sample(candles, "daily", 365, 1)
     candles[200]["timestamp"] += 86_400
     assert not is_temporally_valid_sample(candles, "daily", 365, 1)
@@ -69,7 +70,22 @@ def test_gap_safe_sample_rejects_target_crossing_gap() -> None:
     candles = _candles(370)
     for i, row in enumerate(candles):
         row["timestamp"] = float(i * 86_400)
+        row["is_complete"] = True
     candles[366]["timestamp"] += 86_400
+    assert not is_temporally_valid_sample(candles, "daily", 365, 1)
+
+
+def test_temporal_validity_fails_closed_without_timestamp_metadata() -> None:
+    candles = _candles(370)
+    for row in candles:
+        row["is_complete"] = True
+    assert not is_temporally_valid_sample(candles, "daily", 365, 1)
+
+
+def test_temporal_validity_fails_closed_without_completeness_metadata() -> None:
+    candles = _candles(370)
+    for i, row in enumerate(candles):
+        row["timestamp"] = float(i * 86_400)
     assert not is_temporally_valid_sample(candles, "daily", 365, 1)
 
 
@@ -77,6 +93,7 @@ def test_feature_and_target_continuity_are_checked_independently() -> None:
     candles = _candles(800)
     for i, row in enumerate(candles):
         row["timestamp"] = float(i * 86_400)
+        row["is_complete"] = True
     # An old unrelated gap must not poison a later otherwise-valid sample.
     candles[10]["timestamp"] += 86_400
     assert has_valid_feature_history(candles, "daily", 700)
@@ -88,6 +105,7 @@ def test_feature_history_gap_does_not_invalidate_unrelated_target_logic() -> Non
     candles = _candles(800)
     for i, row in enumerate(candles):
         row["timestamp"] = float(i * 86_400)
+        row["is_complete"] = True
     candles[500]["timestamp"] += 86_400
     assert not has_valid_feature_history(candles, "daily", 700)
     assert has_valid_forecast_target(candles, "daily", 700, 3)
@@ -146,8 +164,7 @@ def test_baseline_ablation_exactly_matches_legacy_feature_prefix(family: str, or
     names = feature_names(family)
     regime_prefixes = ("trend_", "vol_ratio_", "range_position_", "state_v31_")
     legacy_indices = tuple(
-        i for i, name in enumerate(names)
-        if not name.startswith(regime_prefixes)
+        i for i, name in enumerate(names) if not name.startswith(regime_prefixes)
     )
     assert baseline_mask == legacy_indices
     assert baseline == [full[i] for i in legacy_indices]
@@ -162,6 +179,7 @@ def test_regime_realized_vol_matches_original_trailing_semantics(
     family: str, origin: int, window: int
 ) -> None:
     import statistics
+
     from scripts.multitimeframe_features_v3 import _realized_vol
 
     candles = _candles(origin + 10)
@@ -169,9 +187,7 @@ def test_regime_realized_vol_matches_original_trailing_semantics(
         math.log(float(candles[i]["close"]) / float(candles[i - 1]["close"]))
         for i in range(origin - max(window, 1) + 1, origin + 1)
     ]
-    assert _realized_vol(candles, origin, window) == pytest.approx(
-        statistics.pstdev(returns)
-    )
+    assert _realized_vol(candles, origin, window) == pytest.approx(statistics.pstdev(returns))
 
 
 @pytest.mark.parametrize(
@@ -185,7 +201,7 @@ def test_v31_state_features_are_declared_finite_and_bounded_where_expected(
     state_names = [name for name in names if name.startswith("state_v31_")]
     assert len(state_names) == 5
     values = feature_vector(_candles(origin + 10), origin, family)
-    lookup = dict(zip(names, values))
+    lookup = dict(zip(names, values, strict=True))
     percentile_name = next(name for name in state_names if "volatility_percentile" in name)
     assert 0.0 < lookup[percentile_name] <= 1.0
     assert all(math.isfinite(lookup[name]) for name in state_names)
@@ -195,13 +211,13 @@ def test_v31_state_features_are_point_in_time_safe() -> None:
     candles = _candles(500)
     origin = 365
     names = feature_names("daily")
-    before = dict(zip(names, feature_vector(candles, origin, "daily")))
+    before = dict(zip(names, feature_vector(candles, origin, "daily"), strict=True))
     for row in candles[origin + 1 :]:
         row["open"] *= 500.0
         row["high"] *= 500.0
         row["low"] *= 500.0
         row["close"] *= 500.0
         row["volume"] *= 500.0
-    after = dict(zip(names, feature_vector(candles, origin, "daily")))
+    after = dict(zip(names, feature_vector(candles, origin, "daily"), strict=True))
     state_names = [name for name in names if name.startswith("state_v31_")]
     assert [before[name] for name in state_names] == [after[name] for name in state_names]

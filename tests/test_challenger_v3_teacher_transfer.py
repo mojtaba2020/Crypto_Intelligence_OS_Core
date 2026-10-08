@@ -1,9 +1,9 @@
-from challenger_v3_teacher_transfer import (
+from scripts.challenger_v3_teacher_transfer import (
     RECIPIENTS,
     STABLE_FEATURES,
     stable_feature_indices,
 )
-from multitimeframe_features_v3 import feature_names
+from scripts.multitimeframe_features_v3 import feature_names
 
 
 def test_teacher_subset_is_exact_and_weekly_native():

@@ -37,12 +37,15 @@ def select_candidate(
     cut = policy.boundary(len(origin_records))
     if not candidates:
         raise ValueError("candidate list must not be empty")
-    rank = {name: i for i, name in enumerate(candidates)}
+    canonical_candidates = tuple(sorted(set(candidates)))
+    if len(canonical_candidates) != len(candidates):
+        raise ValueError("candidate names must be unique")
+    rank = {name: i for i, name in enumerate(canonical_candidates)}
     means: dict[str, float] = {}
     for name in candidates:
         losses = [float(r["candidate_errors"][name]) for r in origin_records[:cut]]
         means[name] = sum(losses) / len(losses)
-    winner = min(candidates, key=lambda n: (means[n], rank[n]))
+    winner = min(canonical_candidates, key=lambda n: (means[n], rank[n]))
     return winner, cut
 
 
@@ -79,8 +82,29 @@ def purged_diagnostic_records(
         raise ValueError("invalid nested diagnostic boundary")
     if horizon_bars <= 0 or evaluation_step_bars <= 0:
         raise ValueError("horizon and evaluation step must be positive")
-    purged = max(0, math.ceil(horizon_bars / evaluation_step_bars) - 1)
-    start = cut + purged
+    fallback_purged = max(0, math.ceil(horizon_bars / evaluation_step_bars) - 1)
+
+    timestamps_present = [record.get("origin_timestamp") is not None for record in origin_records]
+    target_timestamp = origin_records[cut - 1].get("target_timestamp")
+    if any(timestamps_present) or target_timestamp is not None:
+        if not all(timestamps_present) or target_timestamp is None:
+            raise ValueError(
+                "complete timestamp metadata is required for exact target-maturity purge"
+            )
+        maturity = float(target_timestamp)
+        start = cut
+        while start < len(origin_records):
+            origin_timestamp = float(origin_records[start]["origin_timestamp"])
+            if origin_timestamp >= maturity:
+                break
+            start += 1
+        purged = start - cut
+    else:
+        # Legacy isolated utility callers may lack timestamps. Production V3
+        # statistical evidence is validated separately and must provide them.
+        purged = fallback_purged
+        start = cut + purged
+
     if start >= len(origin_records):
         raise ValueError("target-maturity purge leaves no diagnostic origins")
     return list(origin_records[start:]), purged

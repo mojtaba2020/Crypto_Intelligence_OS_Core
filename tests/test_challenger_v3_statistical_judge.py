@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import math
 import random
+import statistics
 
 import pytest
 from scripts.challenger_v3_statistical_judge import (
+    _chronological_regime_sensitivity,
+    _contiguous_origin_deletion_sensitivity,
     _hac_sensitivity,
     _holm,
+    _positive_concentration_sensitivity,
     _register_evidence_key,
     _stationary_bootstrap_sensitivity,
     _studentized_circular_mbb,
@@ -95,6 +99,7 @@ def _records(indexes=(0, 1), timestamps=(10, 20)):
         {
             "origin_index": index,
             "origin_timestamp": timestamp,
+            "target_timestamp": timestamp + 5,
             "persistence_error": 0.2,
             "candidate_errors": {"a": 0.1, "b": 0.15},
         }
@@ -109,6 +114,17 @@ def test_origin_validation_rejects_duplicate_and_nonordered_origins() -> None:
         _validate_origin_records(_records((2, 1)), ("a", "b"))
     with pytest.raises(ValueError, match="timestamps"):
         _validate_origin_records(_records((1, 2), (20, 10)), ("a", "b"))
+
+
+def test_origin_validation_requires_exact_target_timestamp_metadata() -> None:
+    rows = _records()
+    rows[0].pop("target_timestamp")
+    with pytest.raises(ValueError, match="target_timestamp"):
+        _validate_origin_records(rows, ("a", "b"))
+    rows = _records()
+    rows[0]["target_timestamp"] = rows[0]["origin_timestamp"]
+    with pytest.raises(ValueError, match="strictly after"):
+        _validate_origin_records(rows, ("a", "b"))
 
 
 def test_origin_validation_rejects_incomplete_or_nonfinite_losses() -> None:
@@ -130,6 +146,73 @@ def test_dataset_identity_and_duplicate_evidence_fail_closed() -> None:
     rows[0]["candidate_errors"]["a"] = math.inf
     with pytest.raises(ValueError, match="finite"):
         _validate_origin_records(rows, ("a", "b"))
+
+
+def test_contiguous_origin_deletion_finds_worst_case_block() -> None:
+    values = [0.02] * 12 + [-0.15, -0.15] + [0.02] * 12
+    result = _contiguous_origin_deletion_sensitivity(values, 2)
+    assert result["maximum_deleted_block_origins"] == 2
+    assert result["selection_rule"] == "never_replaces_primary_method"
+    assert len(result["tested_block_lengths"]) == 2
+    assert result["minimum_remaining_mean_improvement"] < statistics.fmean(values)
+    assert result["worst_deleted_block_origins"] == 2
+
+
+def test_contiguous_origin_deletion_can_disqualify_fragile_positive_mean() -> None:
+    values = [-0.01] * 20 + [0.5]
+    result = _contiguous_origin_deletion_sensitivity(values, 1)
+    assert statistics.fmean(values) > 0.0
+    assert result["minimum_remaining_mean_improvement"] < 0.0
+    assert result["positive_after_every_tested_deletion"] is False
+
+
+def test_contiguous_origin_deletion_fails_closed_on_invalid_block() -> None:
+    with pytest.raises(ValueError, match="leave at least one"):
+        _contiguous_origin_deletion_sensitivity([0.1, 0.2], 2)
+
+
+def test_positive_concentration_sensitivity_detects_single_origin_fragility() -> None:
+    values = [-0.01] * 12 + [0.5] + [-0.01] * 12
+    result = _positive_concentration_sensitivity(values, top_k=1)
+    assert result["top_k_positive_share"] == pytest.approx(1.0)
+    assert result["mean_improvement"] > 0.0
+    assert result["mean_after_removing_top_k_origins"] < 0.0
+    assert result["remains_positive_after_top_k_removal"] is False
+
+
+def test_positive_concentration_sensitivity_accepts_distributed_gain() -> None:
+    values = [0.03, 0.02, 0.01, 0.025, 0.015] * 5
+    result = _positive_concentration_sensitivity(values, top_k=3)
+    assert result["top_k_positive_share"] < 0.25
+    assert result["mean_after_removing_top_k_origins"] > 0.0
+    assert result["remains_positive_after_top_k_removal"] is True
+    assert result["selection_rule"] == "never_replaces_primary_method"
+
+
+def test_positive_concentration_sensitivity_fails_closed_on_tiny_sample() -> None:
+    with pytest.raises(ValueError, match="at least five"):
+        _positive_concentration_sensitivity([0.1] * 4)
+
+
+def test_chronological_regime_sensitivity_detects_sign_flip() -> None:
+    values = [0.03] * 6 + [0.02] * 6 + [-0.04] * 6
+    result = _chronological_regime_sensitivity(values)
+    assert result["positive_thirds"] == [True, True, False]
+    assert result["all_thirds_positive"] is False
+    assert result["minimum_third_mean_improvement"] < 0.0
+    assert result["selection_rule"] == "never_replaces_primary_method"
+
+
+def test_chronological_regime_sensitivity_accepts_stable_positive_thirds() -> None:
+    values = [0.03] * 6 + [0.02] * 6 + [0.01] * 6
+    result = _chronological_regime_sensitivity(values)
+    assert result["all_thirds_positive"] is True
+    assert result["minimum_third_mean_improvement"] > 0.0
+
+
+def test_chronological_regime_sensitivity_fails_closed_on_tiny_sample() -> None:
+    with pytest.raises(ValueError, match="at least six"):
+        _chronological_regime_sensitivity([0.1] * 5)
 
 
 def test_sensitivity_methods_are_permanently_labelled_nonselective() -> None:

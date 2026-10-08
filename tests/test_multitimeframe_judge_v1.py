@@ -23,6 +23,8 @@ def _candles(n: int) -> list[dict[str, float]]:
                 "low": close * 0.99,
                 "close": close,
                 "volume": 1000.0 + 10.0 * math.cos(i / 5),
+                "timestamp": float(i * 86_400),
+                "is_complete": True,
             }
         )
     return rows

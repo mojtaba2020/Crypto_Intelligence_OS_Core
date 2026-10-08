@@ -21,7 +21,7 @@ def provider_packet() -> dict:
         "counterevidence": [],
         "leakage_checks": ["Check timestamps."],
         "failure_modes": ["Insufficient development samples."],
-        "reproducibility": {"seed": "7"},
+        "reproducibility": [{"key": "seed", "value": "7"}],
         "confidence": 0.5,
         "recommendation": "audit",
         "fresh_locked_oos_access": False,
@@ -224,14 +224,31 @@ def test_provider_list_members_must_be_bounded_strings() -> None:
         runtime.validate_envelope(packet)
 
 
+def test_reproducibility_uses_closed_key_value_entries() -> None:
+    packet = provider_packet()
+    packet["reproducibility"] = [{"key": "seed", "value": "7", "extra": "forbidden"}]
+    with pytest.raises(ValueError, match="closed key/value schema"):
+        runtime.validate_envelope(packet)
+
+
+def test_provider_schema_closes_nested_reproducibility_objects() -> None:
+    schema = runtime._provider_json_schema()
+    reproducibility = schema["properties"]["reproducibility"]
+    assert reproducibility["type"] == "array"
+    item = reproducibility["items"]
+    assert item["required"] == ["key", "value"]
+    assert item["additionalProperties"] is False
+
+
 def test_trusted_metadata_is_generated_locally(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     root, manifest = evidence_setup(tmp_path)
     context, manifest_sha = load_one(root, manifest)
     monkeypatch.setattr(runtime, "_git_commit", lambda: "a" * 40)
+    usage = {"input_tokens": 120, "output_tokens": 30, "total_tokens": 150}
     packet = runtime.build_audited_packet(
-        provider_packet(), task(), context, manifest_sha, "test-model", "b" * 64
+        provider_packet(), task(), context, manifest_sha, "test-model", "b" * 64, usage
     )
     assert packet["agent_id"] == "V3-STATS"
     assert packet["code_commit"] == "a" * 40
@@ -241,6 +258,7 @@ def test_trusted_metadata_is_generated_locally(
     assert packet["provider_model"] == "test-model"
     assert packet["prompt_sha256"] == "b" * 64
     assert packet["validation_result"] == "accepted"
+    assert packet["provider_usage"] == usage
 
 
 class FakeResponse:
@@ -260,7 +278,12 @@ class FakeResponse:
 
 
 def provider_http_body(packet: dict | None = None) -> bytes:
-    return json.dumps({"output_text": json.dumps(packet or provider_packet())}).encode()
+    return json.dumps(
+        {
+            "output_text": json.dumps(packet or provider_packet()),
+            "usage": {"input_tokens": 120, "output_tokens": 30, "total_tokens": 150},
+        }
+    ).encode()
 
 
 def test_provider_response_read_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -291,7 +314,7 @@ def test_provider_request_preserves_useful_defenses(monkeypatch: pytest.MonkeyPa
 
     monkeypatch.setenv("OPENAI_API_KEY", "not-a-real-key")
     monkeypatch.setattr(runtime.urllib.request, "urlopen", fake_urlopen)
-    packet, model, prompt_sha = runtime.call_provider(task(), [])
+    packet, model, prompt_sha, usage = runtime.call_provider(task(), [])
     body = json.loads(observed["request"].data)
     assert observed["timeout"] == 45
     assert body["store"] is False
@@ -300,6 +323,7 @@ def test_provider_request_preserves_useful_defenses(monkeypatch: pytest.MonkeyPa
     assert packet == provider_packet()
     assert model == "gpt-4o-mini"
     assert len(prompt_sha) == 64
+    assert usage == {"input_tokens": 120, "output_tokens": 30, "total_tokens": 150}
 
 
 @pytest.mark.parametrize(
@@ -409,3 +433,25 @@ def test_end_to_end_provider_failure_publishes_nothing(
     assert result == 2
     assert not (output_root / "run-002.json").exists()
     assert not list(output_root.glob(".agent-*.tmp"))
+
+
+def test_provider_usage_is_required(monkeypatch: pytest.MonkeyPatch) -> None:
+    response = FakeResponse(json.dumps({"output_text": json.dumps(provider_packet())}).encode())
+    monkeypatch.setenv("OPENAI_API_KEY", "not-a-real-key")
+    monkeypatch.setattr(runtime.urllib.request, "urlopen", lambda *_args, **_kwargs: response)
+    with pytest.raises(ValueError, match="usage metadata"):
+        runtime.call_provider(task(), [])
+
+
+def test_provider_usage_rejects_inconsistent_total(monkeypatch: pytest.MonkeyPatch) -> None:
+    raw = json.dumps(
+        {
+            "output_text": json.dumps(provider_packet()),
+            "usage": {"input_tokens": 120, "output_tokens": 30, "total_tokens": 149},
+        }
+    ).encode()
+    response = FakeResponse(raw)
+    monkeypatch.setenv("OPENAI_API_KEY", "not-a-real-key")
+    monkeypatch.setattr(runtime.urllib.request, "urlopen", lambda *_args, **_kwargs: response)
+    with pytest.raises(ValueError, match="inconsistent"):
+        runtime.call_provider(task(), [])

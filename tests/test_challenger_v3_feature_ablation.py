@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from scripts.challenger_v3_feature_ablation import (
     ABLATIONS,
     ablation_manifest,
