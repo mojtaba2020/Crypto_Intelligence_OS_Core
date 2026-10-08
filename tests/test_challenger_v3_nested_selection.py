@@ -91,9 +91,7 @@ def test_exact_timestamp_purge_handles_irregular_calendar_spacing():
     for row, timestamp in zip(rows, origin_timestamps, strict=True):
         row["origin_timestamp"] = timestamp
     rows[2]["target_timestamp"] = 120
-    diagnostic, purged = purged_diagnostic_records(
-        rows, 3, horizon_bars=3, evaluation_step_bars=1
-    )
+    diagnostic, purged = purged_diagnostic_records(rows, 3, horizon_bars=3, evaluation_step_bars=1)
     assert purged == 1
     assert diagnostic[0]["origin_timestamp"] == 120
 
