@@ -231,6 +231,56 @@ def _hac_sensitivity(diffs: Sequence[float], block_origins: int) -> dict[str, ob
     }
 
 
+def _contiguous_origin_deletion_sensitivity(
+    diffs: Sequence[float], max_block_origins: int
+) -> dict[str, object]:
+    """Adversarially delete every contiguous origin block up to a fixed maximum."""
+    values = [float(value) for value in diffs]
+    if any(not math.isfinite(value) for value in values):
+        raise ValueError("paired differences must be finite")
+    if len(values) < 2:
+        raise ValueError("at least two paired differences are required")
+    if max_block_origins <= 0 or max_block_origins >= len(values):
+        raise ValueError("deletion block maximum must leave at least one origin")
+
+    minimum_remaining_mean = math.inf
+    worst_start = -1
+    worst_block = -1
+    by_block: list[dict[str, object]] = []
+    for block in range(1, max_block_origins + 1):
+        local_minimum = math.inf
+        local_start = -1
+        for start in range(0, len(values) - block + 1):
+            remaining = values[:start] + values[start + block :]
+            remaining_mean = statistics.fmean(remaining)
+            if remaining_mean < local_minimum:
+                local_minimum = remaining_mean
+                local_start = start
+            if remaining_mean < minimum_remaining_mean:
+                minimum_remaining_mean = remaining_mean
+                worst_start = start
+                worst_block = block
+        by_block.append(
+            {
+                "deleted_block_origins": block,
+                "minimum_remaining_mean_improvement": local_minimum,
+                "worst_start_origin_position": local_start,
+            }
+        )
+
+    return {
+        "method": "contiguous_origin_deletion_sensitivity_only",
+        "observed_mean_improvement": statistics.fmean(values),
+        "maximum_deleted_block_origins": max_block_origins,
+        "minimum_remaining_mean_improvement": minimum_remaining_mean,
+        "worst_deleted_block_origins": worst_block,
+        "worst_start_origin_position": worst_start,
+        "positive_after_every_tested_deletion": minimum_remaining_mean > 0.0,
+        "tested_block_lengths": by_block,
+        "selection_rule": "never_replaces_primary_method",
+    }
+
+
 def _holm(rows: list[dict[str, object]]) -> None:
     ordered = sorted(
         rows,
@@ -390,6 +440,10 @@ def main() -> None:
                             seed + 1,  # type: ignore[arg-type]
                         ),
                         "hac": _hac_sensitivity(differences, spec.bootstrap_block_origins),  # type: ignore[arg-type]
+                        "contiguous_origin_deletion": _contiguous_origin_deletion_sensitivity(
+                            differences,
+                            spec.bootstrap_block_origins,  # type: ignore[arg-type]
+                        ),
                         "policy": "predeclared_sensitivity_only_never_select_by_favorability",
                     }
                 else:
