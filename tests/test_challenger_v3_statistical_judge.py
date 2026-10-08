@@ -7,6 +7,7 @@ import statistics
 import pytest
 from scripts.challenger_v3_statistical_judge import (
     _chronological_regime_sensitivity,
+    _positive_concentration_sensitivity,
     _contiguous_origin_deletion_sensitivity,
     _hac_sensitivity,
     _holm,
@@ -168,6 +169,29 @@ def test_contiguous_origin_deletion_can_disqualify_fragile_positive_mean() -> No
 def test_contiguous_origin_deletion_fails_closed_on_invalid_block() -> None:
     with pytest.raises(ValueError, match="leave at least one"):
         _contiguous_origin_deletion_sensitivity([0.1, 0.2], 2)
+
+
+def test_positive_concentration_sensitivity_detects_single_origin_fragility() -> None:
+    values = [-0.01] * 12 + [0.5] + [-0.01] * 12
+    result = _positive_concentration_sensitivity(values, top_k=1)
+    assert result["top_k_positive_share"] == pytest.approx(1.0)
+    assert result["mean_improvement"] > 0.0
+    assert result["mean_after_removing_top_k_origins"] < 0.0
+    assert result["remains_positive_after_top_k_removal"] is False
+
+
+def test_positive_concentration_sensitivity_accepts_distributed_gain() -> None:
+    values = [0.03, 0.02, 0.01, 0.025, 0.015] * 5
+    result = _positive_concentration_sensitivity(values, top_k=3)
+    assert result["top_k_positive_share"] < 0.25
+    assert result["mean_after_removing_top_k_origins"] > 0.0
+    assert result["remains_positive_after_top_k_removal"] is True
+    assert result["selection_rule"] == "never_replaces_primary_method"
+
+
+def test_positive_concentration_sensitivity_fails_closed_on_tiny_sample() -> None:
+    with pytest.raises(ValueError, match="at least five"):
+        _positive_concentration_sensitivity([0.1] * 4)
 
 
 def test_chronological_regime_sensitivity_detects_sign_flip() -> None:
