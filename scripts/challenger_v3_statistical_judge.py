@@ -281,6 +281,33 @@ def _contiguous_origin_deletion_sensitivity(
     }
 
 
+def _chronological_regime_sensitivity(diffs: Sequence[float]) -> dict[str, object]:
+    """Report whether improvement is directionally stable across chronological thirds."""
+    values = [float(value) for value in diffs]
+    if any(not math.isfinite(value) for value in values):
+        raise ValueError("paired differences must be finite")
+    if len(values) < 6:
+        raise ValueError("at least six paired differences are required for regime thirds")
+
+    third = len(values) // 3
+    groups = (
+        values[:third],
+        values[third : 2 * third],
+        values[2 * third :],
+    )
+    means = [statistics.fmean(group) for group in groups]
+    positive = [mean > 0.0 for mean in means]
+    return {
+        "method": "chronological_thirds_regime_sensitivity_only",
+        "chronological_third_mean_improvements": means,
+        "positive_thirds": positive,
+        "all_thirds_positive": all(positive),
+        "minimum_third_mean_improvement": min(means),
+        "maximum_third_mean_improvement": max(means),
+        "selection_rule": "never_replaces_primary_method",
+    }
+
+
 def _holm(rows: list[dict[str, object]]) -> None:
     ordered = sorted(
         rows,
@@ -444,6 +471,7 @@ def main() -> None:
                             differences,
                             spec.bootstrap_block_origins,  # type: ignore[arg-type]
                         ),
+                        "chronological_regimes": _chronological_regime_sensitivity(differences),
                         "policy": "predeclared_sensitivity_only_never_select_by_favorability",
                     }
                 else:
