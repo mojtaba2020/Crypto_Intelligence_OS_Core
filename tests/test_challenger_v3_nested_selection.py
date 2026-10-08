@@ -38,6 +38,22 @@ def test_diagnostic_subset_is_not_used_for_selection():
     assert all(x < 0 for x in diffs)
 
 
+def test_tie_break_is_canonical_and_order_invariant():
+    rows = _records()
+    for row in rows:
+        row["candidate_errors"]["a"] = 0.05
+        row["candidate_errors"]["b"] = 0.05
+    first, first_cut = select_candidate(rows, ("b", "a"))
+    second, second_cut = select_candidate(rows, ("a", "b"))
+    assert first == second == "a"
+    assert first_cut == second_cut == 30
+
+
+def test_duplicate_candidate_names_fail_closed():
+    with pytest.raises(ValueError, match="unique"):
+        select_candidate(_records(), ("a", "a"))
+
+
 def test_policy_fails_closed_when_too_few_origins():
     try:
         NestedSelectionPolicy().boundary(34)

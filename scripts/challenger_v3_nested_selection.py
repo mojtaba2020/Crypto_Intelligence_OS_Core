@@ -37,12 +37,15 @@ def select_candidate(
     cut = policy.boundary(len(origin_records))
     if not candidates:
         raise ValueError("candidate list must not be empty")
-    rank = {name: i for i, name in enumerate(candidates)}
+    canonical_candidates = tuple(sorted(set(candidates)))
+    if len(canonical_candidates) != len(candidates):
+        raise ValueError("candidate names must be unique")
+    rank = {name: i for i, name in enumerate(canonical_candidates)}
     means: dict[str, float] = {}
     for name in candidates:
         losses = [float(r["candidate_errors"][name]) for r in origin_records[:cut]]
         means[name] = sum(losses) / len(losses)
-    winner = min(candidates, key=lambda n: (means[n], rank[n]))
+    winner = min(canonical_candidates, key=lambda n: (means[n], rank[n]))
     return winner, cut
 
 
