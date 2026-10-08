@@ -6,6 +6,7 @@ import statistics
 
 import pytest
 from scripts.challenger_v3_statistical_judge import (
+    _chronological_regime_sensitivity,
     _contiguous_origin_deletion_sensitivity,
     _hac_sensitivity,
     _holm,
@@ -167,6 +168,27 @@ def test_contiguous_origin_deletion_can_disqualify_fragile_positive_mean() -> No
 def test_contiguous_origin_deletion_fails_closed_on_invalid_block() -> None:
     with pytest.raises(ValueError, match="leave at least one"):
         _contiguous_origin_deletion_sensitivity([0.1, 0.2], 2)
+
+
+def test_chronological_regime_sensitivity_detects_sign_flip() -> None:
+    values = [0.03] * 6 + [0.02] * 6 + [-0.04] * 6
+    result = _chronological_regime_sensitivity(values)
+    assert result["positive_thirds"] == [True, True, False]
+    assert result["all_thirds_positive"] is False
+    assert result["minimum_third_mean_improvement"] < 0.0
+    assert result["selection_rule"] == "never_replaces_primary_method"
+
+
+def test_chronological_regime_sensitivity_accepts_stable_positive_thirds() -> None:
+    values = [0.03] * 6 + [0.02] * 6 + [0.01] * 6
+    result = _chronological_regime_sensitivity(values)
+    assert result["all_thirds_positive"] is True
+    assert result["minimum_third_mean_improvement"] > 0.0
+
+
+def test_chronological_regime_sensitivity_fails_closed_on_tiny_sample() -> None:
+    with pytest.raises(ValueError, match="at least six"):
+        _chronological_regime_sensitivity([0.1] * 5)
 
 
 def test_sensitivity_methods_are_permanently_labelled_nonselective() -> None:
