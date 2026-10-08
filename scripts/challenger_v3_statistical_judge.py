@@ -281,6 +281,40 @@ def _contiguous_origin_deletion_sensitivity(
     }
 
 
+def _positive_concentration_sensitivity(
+    diffs: Sequence[float], top_k: int = 3
+) -> dict[str, object]:
+    """Measure whether apparent improvement is dominated by a few forecast origins."""
+    values = [float(value) for value in diffs]
+    if any(not math.isfinite(value) for value in values):
+        raise ValueError("paired differences must be finite")
+    if len(values) < 5:
+        raise ValueError("at least five paired differences are required for concentration analysis")
+    if top_k <= 0 or top_k >= len(values):
+        raise ValueError("top_k must leave at least one origin")
+
+    positive = [max(0.0, value) for value in values]
+    total_positive = sum(positive)
+    ranked = sorted(enumerate(values), key=lambda item: item[1], reverse=True)
+    removed = ranked[:top_k]
+    removed_positions = [index for index, _value in removed]
+    remaining = [value for index, value in enumerate(values) if index not in removed_positions]
+    top_positive = sum(max(0.0, value) for _index, value in removed)
+    top_share = top_positive / total_positive if total_positive > 0.0 else None
+
+    return {
+        "method": "positive_improvement_concentration_sensitivity_only",
+        "top_k": top_k,
+        "positive_improvement_total": total_positive,
+        "top_k_positive_share": top_share,
+        "mean_improvement": statistics.fmean(values),
+        "mean_after_removing_top_k_origins": statistics.fmean(remaining),
+        "top_k_origin_positions": removed_positions,
+        "remains_positive_after_top_k_removal": statistics.fmean(remaining) > 0.0,
+        "selection_rule": "never_replaces_primary_method",
+    }
+
+
 def _chronological_regime_sensitivity(diffs: Sequence[float]) -> dict[str, object]:
     """Report whether improvement is directionally stable across chronological thirds."""
     values = [float(value) for value in diffs]
@@ -472,6 +506,7 @@ def main() -> None:
                             spec.bootstrap_block_origins,  # type: ignore[arg-type]
                         ),
                         "chronological_regimes": _chronological_regime_sensitivity(differences),
+                        "positive_concentration": _positive_concentration_sensitivity(differences),
                         "policy": "predeclared_sensitivity_only_never_select_by_favorability",
                     }
                 else:
