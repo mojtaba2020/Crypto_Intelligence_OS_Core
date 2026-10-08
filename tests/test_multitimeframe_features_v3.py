@@ -60,6 +60,7 @@ def test_gap_safe_sample_rejects_missing_daily_period() -> None:
     candles = _candles(370)
     for i, row in enumerate(candles):
         row["timestamp"] = float(i * 86_400)
+        row["is_complete"] = True
     assert is_temporally_valid_sample(candles, "daily", 365, 1)
     candles[200]["timestamp"] += 86_400
     assert not is_temporally_valid_sample(candles, "daily", 365, 1)
@@ -69,7 +70,22 @@ def test_gap_safe_sample_rejects_target_crossing_gap() -> None:
     candles = _candles(370)
     for i, row in enumerate(candles):
         row["timestamp"] = float(i * 86_400)
+        row["is_complete"] = True
     candles[366]["timestamp"] += 86_400
+    assert not is_temporally_valid_sample(candles, "daily", 365, 1)
+
+
+def test_temporal_validity_fails_closed_without_timestamp_metadata() -> None:
+    candles = _candles(370)
+    for row in candles:
+        row["is_complete"] = True
+    assert not is_temporally_valid_sample(candles, "daily", 365, 1)
+
+
+def test_temporal_validity_fails_closed_without_completeness_metadata() -> None:
+    candles = _candles(370)
+    for i, row in enumerate(candles):
+        row["timestamp"] = float(i * 86_400)
     assert not is_temporally_valid_sample(candles, "daily", 365, 1)
 
 
@@ -77,6 +93,7 @@ def test_feature_and_target_continuity_are_checked_independently() -> None:
     candles = _candles(800)
     for i, row in enumerate(candles):
         row["timestamp"] = float(i * 86_400)
+        row["is_complete"] = True
     # An old unrelated gap must not poison a later otherwise-valid sample.
     candles[10]["timestamp"] += 86_400
     assert has_valid_feature_history(candles, "daily", 700)
@@ -88,6 +105,7 @@ def test_feature_history_gap_does_not_invalidate_unrelated_target_logic() -> Non
     candles = _candles(800)
     for i, row in enumerate(candles):
         row["timestamp"] = float(i * 86_400)
+        row["is_complete"] = True
     candles[500]["timestamp"] += 86_400
     assert not has_valid_feature_history(candles, "daily", 700)
     assert has_valid_forecast_target(candles, "daily", 700, 3)

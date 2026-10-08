@@ -40,8 +40,8 @@ def _is_contiguous(candles: list[dict[str, float]], family: str, start: int, end
         return False
     needed = candles[start : end + 1]
     if not all("timestamp" in row for row in needed):
-        return True
-    if any(row.get("is_complete") is False for row in needed):
+        return False
+    if not all(row.get("is_complete") is True for row in needed):
         return False
     timestamps = [int(row["timestamp"]) for row in needed]
     return all(
