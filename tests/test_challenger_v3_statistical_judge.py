@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import math
 import random
+import statistics
 
 import pytest
 from scripts.challenger_v3_statistical_judge import (
+    _contiguous_origin_deletion_sensitivity,
     _hac_sensitivity,
     _holm,
     _register_evidence_key,
@@ -142,6 +144,28 @@ def test_dataset_identity_and_duplicate_evidence_fail_closed() -> None:
     rows[0]["candidate_errors"]["a"] = math.inf
     with pytest.raises(ValueError, match="finite"):
         _validate_origin_records(rows, ("a", "b"))
+
+
+def test_contiguous_origin_deletion_detects_cluster_dependence() -> None:
+    values = [0.02] * 12 + [-0.15, -0.15] + [0.02] * 12
+    result = _contiguous_origin_deletion_sensitivity(values, 2)
+    assert result["maximum_deleted_block_origins"] == 2
+    assert result["selection_rule"] == "never_replaces_primary_method"
+    assert len(result["tested_block_lengths"]) == 2
+    assert result["minimum_remaining_mean_improvement"] > statistics.fmean(values)
+
+
+def test_contiguous_origin_deletion_can_disqualify_fragile_positive_mean() -> None:
+    values = [-0.01] * 20 + [0.5]
+    result = _contiguous_origin_deletion_sensitivity(values, 1)
+    assert statistics.fmean(values) > 0.0
+    assert result["minimum_remaining_mean_improvement"] < 0.0
+    assert result["positive_after_every_tested_deletion"] is False
+
+
+def test_contiguous_origin_deletion_fails_closed_on_invalid_block() -> None:
+    with pytest.raises(ValueError, match="leave at least one"):
+        _contiguous_origin_deletion_sensitivity([0.1, 0.2], 2)
 
 
 def test_sensitivity_methods_are_permanently_labelled_nonselective() -> None:
