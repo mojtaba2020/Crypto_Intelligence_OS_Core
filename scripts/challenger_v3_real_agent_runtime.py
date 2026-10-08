@@ -29,7 +29,7 @@ MAX_CONTEXT_BYTES = 50_000
 MAX_TASK_BYTES = 8_192
 MAX_MANIFEST_BYTES = 64_000
 MAX_HTTP_RESPONSE_BYTES = 1_000_000
-MAX_OUTPUT_TOKENS = 1400
+MAX_OUTPUT_TOKENS = 4000
 MAX_STRING_CHARS = 8_000
 MAX_LIST_ITEMS = 100
 MAX_REPRODUCIBILITY_ITEMS = 50
@@ -392,6 +392,14 @@ def call_provider(task: dict, context: list[dict]) -> tuple[dict, str, str, dict
         raise ValueError("provider HTTP response is not valid UTF-8 JSON") from exc
     if not isinstance(payload, dict):
         raise ValueError("provider HTTP response must be one JSON object")
+    status = payload.get("status")
+    if status == "incomplete":
+        details = payload.get("incomplete_details")
+        reason = details.get("reason") if isinstance(details, dict) else None
+        raise ValueError(f"provider response incomplete: {reason or 'unknown reason'}")
+    if status not in {None, "completed"}:
+        raise ValueError(f"provider response status is not completed: {status}")
+
     text = extract_output_text(payload)
     try:
         packet = json.loads(text, parse_constant=_reject_constant)
