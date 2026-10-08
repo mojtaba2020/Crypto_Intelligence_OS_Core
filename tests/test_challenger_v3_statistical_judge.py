@@ -7,10 +7,10 @@ import statistics
 import pytest
 from scripts.challenger_v3_statistical_judge import (
     _chronological_regime_sensitivity,
-    _positive_concentration_sensitivity,
     _contiguous_origin_deletion_sensitivity,
     _hac_sensitivity,
     _holm,
+    _positive_concentration_sensitivity,
     _register_evidence_key,
     _stationary_bootstrap_sensitivity,
     _studentized_circular_mbb,
