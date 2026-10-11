@@ -3,7 +3,6 @@
 from copy import deepcopy
 
 import pytest
-
 from scripts.challenger_v3_stage6_decision import decide_stage6_cycle
 
 
