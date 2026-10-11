@@ -54,6 +54,68 @@ def _index_rows(rows: object, *, label: str) -> dict[tuple[str, str], dict]:
     return indexed
 
 
+
+def _verify_holm_family(rows: dict[tuple[str, str], dict], family_size: int) -> None:
+    """Independently recompute the declared Holm family without selecting models."""
+    ordered = sorted(
+        rows.values(),
+        key=lambda row: (
+            float(row["raw_p_value"]),
+            str(row["horizon"]),
+            str(row["ablation"]),
+        ),
+    )
+    if len(ordered) != family_size:
+        raise ValueError("Holm hypothesis family size mismatch")
+    rejecting = True
+    running_adjusted = 0.0
+    for rank, row in enumerate(ordered, 1):
+        key = (row["horizon"], row["ablation"])
+        raw = row.get("raw_p_value")
+        if (
+            isinstance(raw, bool)
+            or not isinstance(raw, (int, float))
+            or not math.isfinite(raw)
+            or not 0.0 <= raw <= 1.0
+        ):
+            raise ValueError(f"invalid Holm raw p-value at {key}")
+        if row.get("inference_eligible") is not True and raw != 1.0:
+            raise ValueError(f"ineligible hypothesis must retain p=1 at {key}")
+        multiplier = family_size - rank + 1
+        threshold = ALPHA / multiplier
+        expected_reject = rejecting and raw <= threshold
+        running_adjusted = max(running_adjusted, min(1.0, multiplier * raw))
+        reported_adjusted = row.get("holm_adjusted_p_value")
+        reported_threshold = row.get("holm_threshold")
+        if (
+            row.get("holm_rank") != rank
+            or row.get("holm_reject") is not expected_reject
+            or not isinstance(reported_adjusted, (int, float))
+            or not math.isfinite(reported_adjusted)
+            or not math.isclose(reported_adjusted, running_adjusted, rel_tol=0, abs_tol=1e-12)
+            or not isinstance(reported_threshold, (int, float))
+            or not math.isfinite(reported_threshold)
+            or not math.isclose(reported_threshold, threshold, rel_tol=0, abs_tol=1e-12)
+        ):
+            raise ValueError(f"Holm-adjusted statistics inconsistent at {key}")
+        mean = row.get("mean_paired_improvement")
+        lower = row.get("one_sided_lower_confidence_bound_95")
+        if (
+            isinstance(mean, bool)
+            or isinstance(lower, bool)
+            or not isinstance(mean, (int, float))
+            or not isinstance(lower, (int, float))
+            or not math.isfinite(mean)
+            or not math.isfinite(lower)
+        ):
+            raise ValueError(f"invalid scientific diagnostic values at {key}")
+        expected_pass = mean > 0.0 and lower > 0.0 and expected_reject
+        if row.get("diagnostic_pass") is not expected_pass:
+            raise ValueError(f"diagnostic pass contradicts Holm inference at {key}")
+        if not expected_reject:
+            rejecting = False
+
+
 def audit_failures(statistical: dict, freeze: dict) -> dict:
     """Fail on malformed/incomplete evidence, never reinterpret p-values."""
     if statistical.get("status") != EXPECTED_STATUS:
@@ -94,6 +156,7 @@ def audit_failures(statistical: dict, freeze: dict) -> dict:
 
     stats = _index_rows(statistical.get("results"), label="statistical")
     frozen = _index_rows(freeze.get("results"), label="freeze")
+    _verify_holm_family(stats, family_size)
     if freeze.get("candidate_count") != family_size:
         raise ValueError("freeze candidate count does not match declared family")
 
@@ -108,6 +171,7 @@ def audit_failures(statistical: dict, freeze: dict) -> dict:
         horizon_eligible = 0
         horizon_positive = 0
         horizon_samples: set[int] = set()
+        horizon_digests: set[str] = set()
         for ablation in ABLATIONS:
             key = (horizon, ablation)
             st, fr = stats[key], frozen[key]
@@ -118,6 +182,14 @@ def audit_failures(statistical: dict, freeze: dict) -> dict:
                 or st.get("hypothesis_family_size") != family_size
             ):
                 raise ValueError(f"hypothesis multiplicity mismatch at {key}")
+            digest = st.get("dataset_sha256")
+            if (
+                not isinstance(digest, str)
+                or len(digest) != 64
+                or any(character not in "0123456789abcdef" for character in digest)
+            ):
+                raise ValueError(f"invalid dataset identity at {key}")
+            horizon_digests.add(digest)
             count = st.get("diagnostic_sample_count")
             if not isinstance(count, int) or count < 0:
                 raise ValueError(f"invalid sample count at {key}")
@@ -149,6 +221,8 @@ def audit_failures(statistical: dict, freeze: dict) -> dict:
                 total_positive += 1
                 horizon_positive += 1
             failing_checks.update(name for name, passed in checks.items() if passed is not True)
+        if len(horizon_digests) != 1:
+            raise ValueError(f"inconsistent dataset identity within horizon: {horizon}")
         if len(horizon_samples) != 1:
             raise ValueError(f"inconsistent diagnostic counts within horizon: {horizon}")
         per_horizon.append(
