@@ -15,6 +15,11 @@ on:
 permissions:
   contents: read
 
+# Avoid spending runner time on superseded one-hour research runs.
+concurrency:
+  group: v3-pre-freeze-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   freeze-readiness-family:
     runs-on: ubuntu-latest
