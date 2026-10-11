@@ -75,6 +75,13 @@ jobs:
             --statistical-report artifacts/v3-freeze/statistical-declared-family.json \
             --output artifacts/v3-freeze/freeze-readiness-declared-family.json
 
+      - name: Audit all declared horizons and ablations without selection
+        run: |
+          PYTHONPATH=scripts:. python scripts/challenger_v3_failure_audit.py \
+            --statistical-report artifacts/v3-freeze/statistical-declared-family.json \
+            --freeze-report artifacts/v3-freeze/freeze-readiness-declared-family.json \
+            --output artifacts/v3-freeze/failure-audit-declared-family.json
+
       - name: Assert Fresh Locked OOS remained untouched
         run: |
           python - <<'PY'
@@ -95,5 +102,6 @@ jobs:
             artifacts/v3-development/
             artifacts/v3-freeze/statistical-declared-family.json
             artifacts/v3-freeze/freeze-readiness-declared-family.json
+            artifacts/v3-freeze/failure-audit-declared-family.json
           if-no-files-found: error
           retention-days: 30
