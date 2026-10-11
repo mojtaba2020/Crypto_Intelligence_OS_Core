@@ -271,11 +271,13 @@ def build_folds(
     for origin in origins:
         if not is_temporally_valid_sample(candles, family, origin, horizon):
             raise ValueError("Diagnostic forecast has missing/incomplete feature or target bars")
-        train_origins = [
-            i
-            for i in range(longest, origin - horizon + 1)
-            if is_temporally_valid_sample(candles, family, i, horizon)
-        ][-MAX_TRAIN_ROWS:]
+        train_origins = []
+        for i in range(origin - horizon, longest - 1, -1):
+            if is_temporally_valid_sample(candles, family, i, horizon):
+                train_origins.append(i)
+            if len(train_origins) == MAX_TRAIN_ROWS:
+                break
+        train_origins.reverse()
         if len(train_origins) < MIN_TRAIN_ROWS:
             raise ValueError("Insufficient mature and gap-safe training labels")
         if any(i + horizon > origin for i in train_origins):
@@ -292,6 +294,13 @@ def build_folds(
             {
                 "origin": origin,
                 "last_train_target_index": max(train_origins) + horizon,
+                "last_train_target_maturity_timestamp": _bar_end(
+                    int(candles[max(train_origins) + horizon]["timestamp"]), family
+                ),
+                "forecast_available_timestamp": _bar_end(int(candles[origin]["timestamp"]), family),
+                "target_maturity_timestamp": _bar_end(
+                    int(candles[origin + horizon]["timestamp"]), family
+                ),
                 "x": x,
                 "y": y,
                 "forecast_x": forecast_x,
@@ -361,7 +370,16 @@ def evaluate_exploratory(
                 "origin_index": origin,
                 "origin_timestamp": candles[origin]["timestamp"],
                 "last_train_target_index": fold["last_train_target_index"],
+                "last_train_target_maturity_timestamp": fold[
+                    "last_train_target_maturity_timestamp"
+                ],
+                "forecast_available_timestamp": fold["forecast_available_timestamp"],
+                "target_maturity_timestamp": fold["target_maturity_timestamp"],
                 "training_rows": len(fold["y"]),
+                "predicted_log_return": predicted_return,
+                "predicted_close": forecast,
+                "persistence_close": persistent,
+                "actual_close": actual,
                 "persistence_ape": persistence_ape,
                 "catboost_ape": catboost_ape,
                 "paired_improvement": persistence_ape - catboost_ape,
@@ -381,9 +399,26 @@ def evaluate_exploratory(
         "seed": SEED,
         "model": "CatBoostRegressor (fixed hyperparameters, separate from frozen V3 family)",
         "statistical_claim": "NONE: descriptive paired errors only",
+        "training_objective": "RMSE on horizon log-returns",
+        "evaluation_metric": "APE paired with same-origin persistence",
+        "diagnostic_targets_overlap": stride < horizon,
+        "independent_origin_count": None,
         "n_origins": len(records),
         "mean_paired_improvement": statistics.fmean(r["paired_improvement"] for r in records),
         "paired_records": records,
+        "model_hyperparameters": {
+            "iterations": 120,
+            "depth": 4,
+            "learning_rate": 0.03,
+            "l2_leaf_reg": 4.0,
+            "loss_function": "RMSE",
+            "random_seed": SEED,
+            "thread_count": 1,
+            "bootstrap_type": "No",
+            "random_strength": 0.0,
+            "allow_writing_files": False,
+            "verbose": False,
+        },
     }
 
 
@@ -391,6 +426,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--enable-exploratory", action="store_true")
     parser.add_argument("--input", type=Path, required=True)
+    parser.add_argument("--approved-input-root", type=Path, required=True)
+    parser.add_argument("--approved-output-root", type=Path, required=True)
+    parser.add_argument("--approved-manifest-root", type=Path, required=True)
+    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--approved-manifest-sha256", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--family", choices=tuple(WINDOWS), required=True)
     parser.add_argument("--horizon", type=int, required=True)
@@ -400,10 +440,19 @@ def main() -> None:
     args = parser.parse_args()
     if not args.enable_exploratory:
         parser.error("The --enable-exploratory opt-in flag is required")
-    output = _safe_path(args.output, suffix=".exploratory.json")
+    output = _safe_path(args.output, root=args.approved_output_root, suffix=".exploratory.json")
+    if args.approved_output_root.resolve() == args.approved_input_root.resolve():
+        parser.error("Input and output roots must be distinct")
     if output.exists():
         parser.error("Refusing to overwrite an existing artifact")
-    candles, source = load_development_slice(args.input)
+    candles, manifest, input_sha256 = load_development_slice(
+        args.input,
+        approved_root=args.approved_input_root,
+        manifest_path=args.manifest,
+        manifest_root=args.approved_manifest_root,
+        manifest_sha256=args.approved_manifest_sha256,
+        family=args.family,
+    )
     report = evaluate_exploratory(
         candles,
         family=args.family,
@@ -412,10 +461,21 @@ def main() -> None:
         stride=args.stride,
         max_folds=args.max_folds,
     )
-    report["source"] = source
-    report["input_sha256"] = hashlib.sha256(args.input.read_bytes()).hexdigest()
-    # Exclusive create; never overwrite previous or protected evidence.
-    with output.open("x", encoding="utf-8") as stream:
+    report["source"] = manifest["source"]
+    report["input_sha256"] = input_sha256
+    report["approved_manifest_sha256"] = args.approved_manifest_sha256
+    report["source_audit_sha256"] = manifest["source_audit_sha256"]
+    report["approved_dev_end_exclusive"] = manifest["approved_dev_end_exclusive"]
+    report["extraction_asof_timestamp"] = manifest["extraction_asof_timestamp"]
+    report["feature_code_sha256"] = hashlib.sha256(
+        (Path(__file__).resolve().parent / "multitimeframe_features_v3.py").read_bytes()
+    ).hexdigest()
+    report["runner_code_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    # Exclusive create prevents overwrite and O_NOFOLLOW blocks final symlinks.
+    # Filesystem permissions must also prohibit all reserved-data access.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(output, flags, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as stream:
         json.dump(report, stream, indent=2, sort_keys=True, allow_nan=False)
         stream.write("\n")
     print(f"EXPLORATORY_ONLY NO_FREEZE wrote {output}")
