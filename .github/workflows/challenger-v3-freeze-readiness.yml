@@ -1,4 +1,4 @@
-name: Challenger V3 Pre-Freeze 1W Readiness
+name: Challenger V3 Pre-Freeze Declared Family Readiness
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 jobs:
-  freeze-readiness-1w:
+  freeze-readiness-family:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -47,33 +47,35 @@ jobs:
             --input-dir artifacts/real-data \
             --output-dir artifacts/prepared
 
-      - name: Run 1W V3 development-validation tournament
+      - name: Run declared V3 development-validation family
         run: |
           mkdir -p artifacts/v3-development artifacts/v3-freeze
-          PYTHONPATH=scripts:. python scripts/run_challenger_v3_classical_development.py \
-            --data-dir artifacts/prepared \
-            --exchange bitstamp \
-            --horizon 1w \
-            --output artifacts/v3-development/classical-development-1w.json
+          for horizon in 1d 2d 3d 1w 2w 3w; do
+            PYTHONPATH=scripts:. python scripts/run_challenger_v3_classical_development.py \
+              --data-dir artifacts/prepared \
+              --exchange bitstamp \
+              --horizon "$horizon" \
+              --output "artifacts/v3-development/classical-development-$horizon.json"
+          done
 
       - name: Run corrected nested statistical diagnostics
         run: |
           PYTHONPATH=scripts:. python scripts/challenger_v3_statistical_judge.py \
             --evidence-dir artifacts/v3-development \
-            --output artifacts/v3-freeze/statistical-1w.json
+            --output artifacts/v3-freeze/statistical-declared-family.json
 
       - name: Execute pre-Fresh-OOS freeze-readiness gate
         run: |
           PYTHONPATH=scripts:. python scripts/challenger_v3_freeze_gate.py \
-            --statistical-report artifacts/v3-freeze/statistical-1w.json \
-            --output artifacts/v3-freeze/freeze-readiness-1w.json
+            --statistical-report artifacts/v3-freeze/statistical-declared-family.json \
+            --output artifacts/v3-freeze/freeze-readiness-declared-family.json
 
       - name: Assert Fresh Locked OOS remained untouched
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          p = json.loads(Path("artifacts/v3-freeze/freeze-readiness-1w.json").read_text())
+          p = json.loads(Path("artifacts/v3-freeze/freeze-readiness-declared-family.json").read_text())
           assert p["fresh_locked_oos_access"] is False
           assert p["fresh_oos_authorized"] is False
           assert p["freeze_authorized"] is False
@@ -83,10 +85,10 @@ jobs:
       - name: Upload V3 pre-freeze evidence
         uses: actions/upload-artifact@v4
         with:
-          name: challenger-v3-pre-freeze-1w
+          name: challenger-v3-pre-freeze-declared-family
           path: |
-            artifacts/v3-development/classical-development-1w.json
-            artifacts/v3-freeze/statistical-1w.json
-            artifacts/v3-freeze/freeze-readiness-1w.json
+            artifacts/v3-development/
+            artifacts/v3-freeze/statistical-declared-family.json
+            artifacts/v3-freeze/freeze-readiness-declared-family.json
           if-no-files-found: error
           retention-days: 30
