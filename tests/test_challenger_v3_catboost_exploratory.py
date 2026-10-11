@@ -48,7 +48,9 @@ def test_mature_labels_only_and_no_future_feature_injection() -> None:
     # Rows after the first target cannot affect that fold's training or features.
     first_after = _folds(candles)[0]
     assert (first_after["x"], first_after["y"], first_after["forecast_x"]) == (
-        first["x"], first["y"], first["forecast_x"]
+        first["x"],
+        first["y"],
+        first["forecast_x"],
     )
 
 
@@ -130,11 +132,7 @@ def test_fold_isolation_seed_and_descriptive_flags(monkeypatch: pytest.MonkeyPat
 def test_cost_bounds_and_immature_diagnostic_rejected() -> None:
     with pytest.raises(ValueError, match="budget"):
         exploratory.build_folds(
-            _candles(), family="weekly", horizon=2,
-            train_end=102, stride=1, max_folds=13
+            _candles(), family="weekly", horizon=2, train_end=102, stride=1, max_folds=13
         )
     with pytest.raises(ValueError, match="insufficient"):
-        exploratory.build_folds(
-            _candles(), family="weekly", horizon=2,
-            train_end=113, stride=1
-        )
+        exploratory.build_folds(_candles(), family="weekly", horizon=2, train_end=113, stride=1)
