@@ -54,7 +54,6 @@ def _index_rows(rows: object, *, label: str) -> dict[tuple[str, str], dict]:
     return indexed
 
 
-
 def _verify_holm_family(rows: dict[tuple[str, str], dict], family_size: int) -> None:
     """Independently recompute the declared Holm family without selecting models."""
     ordered = sorted(
