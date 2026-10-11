@@ -2,7 +2,12 @@ name: Challenger V3 Pre-Freeze Declared Family Readiness
 
 on:
   workflow_dispatch:
-  pull_request:
+  # On a PR event, paths filters inspect the entire PR diff and rerun the
+  # ~1h development family on every tiny docs/test commit. Push paths only
+  # inspect the new push; workflow_dispatch is retained for deliberate reruns.
+  push:
+    branches:
+      - research/v3-agent-wave-1
     paths:
       - "scripts/challenger_v3_freeze_gate.py"
       - "tests/test_challenger_v3_freeze_gate.py"
