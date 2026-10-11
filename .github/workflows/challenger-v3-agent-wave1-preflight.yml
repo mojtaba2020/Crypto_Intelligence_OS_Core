@@ -1,0 +1,61 @@
+name: Challenger V3 Agent Wave 1 Preflight
+
+on:
+  pull_request:
+    paths:
+      - "research/agent_evidence/wave1/**"
+      - "research/agent_tasks/wave1/**"
+      - ".github/workflows/challenger-v3-agent-wave1-preflight.yml"
+  push:
+    branches:
+      - "research/v3-agent-wave-1"
+    paths:
+      - "research/agent_evidence/wave1/**"
+      - "research/agent_tasks/wave1/**"
+      - ".github/workflows/challenger-v3-agent-wave1-preflight.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install project
+        run: python -m pip install -e .
+      - name: Validate pinned evidence and closed tasks
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from scripts.challenger_v3_real_agent_runtime import load_context, load_task
+
+          root = Path("research/agent_evidence/wave1")
+          manifest = root / "manifest.json"
+          context, manifest_sha = load_context(
+              manifest,
+              root,
+              ["wave1-development-context"],
+          )
+          assert len(context) == 1
+          assert context[0]["classification"] == "development_validation"
+          assert len(manifest_sha) == 64
+
+          expected = {
+              "FEATURE-01": "feature_research",
+              "STATS-01": "statistics",
+              "LEAKAGE-01": "leakage_audit",
+              "NEURAL-01": "neural_time_series",
+              "DEVIL-01": "devils_advocate",
+          }
+          for task_id, role in expected.items():
+              task = load_task(Path(f"research/agent_tasks/wave1/{task_id}.json"))
+              assert task["task_id"] == task_id
+              assert task["role"] == role
+              assert task["scope"] == "development_validation_only"
+
+          print("wave1 preflight accepted: pinned evidence + 5 closed tasks")
+          PY

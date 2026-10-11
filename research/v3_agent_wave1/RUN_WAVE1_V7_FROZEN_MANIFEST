@@ -1,0 +1,1 @@
+Execute only against the reviewed frozen manifest after all dedicated gates pass.

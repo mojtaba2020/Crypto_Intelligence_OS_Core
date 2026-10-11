@@ -11,11 +11,11 @@ import statistics
 from pathlib import Path
 
 from scripts.multitimeframe_features_v3 import WINDOWS, feature_vector, is_temporally_valid_sample
-from scripts.resample_multitimeframe_ohlcv import prepared_data_identity
 from scripts.multitimeframe_lab_v1 import SPECS
 from scripts.multitimeframe_split_v1 import chronological_split
 from scripts.multitimeframe_tournament_v1 import _known_training_origins
 from scripts.multitimeframe_tournament_v2 import _fit_candidate, _predict_candidate
+from scripts.resample_multitimeframe_ohlcv import prepared_data_identity
 
 FROZEN = {
     "1d": "boosting",

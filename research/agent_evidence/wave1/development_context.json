@@ -1,0 +1,25 @@
+{
+  "champion": "persistence",
+  "facts": [
+    "Run 40 completed the V3 development workflow; no V3 candidate is frozen or production eligible.",
+    "The 1w regime-only Elastic Net development signal is the current teacher hypothesis, not confirmatory evidence.",
+    "Teacher diagnostic used 46 walk-forward forecasts; the signal beat Persistence on about 56.5% of origins.",
+    "Teacher diagnostic mean loss improvement was about +0.455 percentage points and worst leave-one-out mean improvement about +0.334 percentage points.",
+    "Stable teacher features include trend_close_vs_sma_13, trend_sma_4_vs_13, trend_close_vs_sma_4, trend_sma_13_vs_26, vol_ratio_13_vs_26, and vol_ratio_4_vs_13.",
+    "Corrected statistical diagnostics use a studentized circular moving-block bootstrap with HAC/Bartlett studentization, a minimum of 20 diagnostic origins, and Holm multiplicity control.",
+    "Insufficient diagnostic samples are scientific non-results and remain in the Holm family conservatively.",
+    "Monthly horizons remain insufficient-history development cases.",
+    "Agent proposals are hypotheses only and must pass deterministic implementation, tests, development tournament, nested selection, corrected statistical diagnostics, and leakage/adversarial review."
+  ],
+  "fresh_locked_oos_access": false,
+  "initial_wave": {
+    "DEVIL-01": "Try to falsify the strongest 1w development signal, focusing on concentration, regime dependence, instability, and alternative explanations.",
+    "FEATURE-01": "Explain and improve the 1w trend/regime signal without coefficient transfer; propose isolated point-in-time ablations.",
+    "LEAKAGE-01": "Adversarially audit feature timestamps, labels, nested-selection boundaries, target maturity, and provenance for leakage.",
+    "NEURAL-01": "Specify exactly one bounded neural time-series challenger with train-fold-only preprocessing and deterministic evaluation; no broad architecture search.",
+    "STATS-01": "Audit corrected statistical-judge assumptions, dependence handling, multiplicity, and sample adequacy; do not change thresholds to force significance."
+  },
+  "scope": "development_validation_only",
+  "status": "CHALLENGER_V3_PRE_FREEZE",
+  "v2_locked_oos_used_for_tuning": false
+}

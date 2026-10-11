@@ -1,0 +1,80 @@
+{
+  "status": "V3_DEVELOPMENT_FAMILY_FAILURE_AUDIT_ONLY",
+  "source_evidence": {
+    "workflow_run_id": 38106402242,
+    "source_commit": "0eba70555c705b3ac43a0e783749e8b2541179e9",
+    "artifact_id": 11691222113,
+    "artifact_zip_sha256": "eecb5202dc1cbfb45e82531fb43e6655df4a5a176e23d34b1b0d0cf048addbbf",
+    "statistical_json_sha256": "3c0f08c7bc34375c9a1babb0fe2b12b3a1cafd0ba102212588393010633a2560",
+    "freeze_json_sha256": "c4bf2cfbe0c78e88e0b8a4502f495bc931d9b3a99664b3f6936a6020c56ffb90"
+  },
+  "predeclared_family_size": 24,
+  "eligible_count": 12,
+  "positive_mean_count": 8,
+  "freeze_ready_count": 0,
+  "failure_counts_by_freeze_check": {
+    "all_chronological_thirds_positive": 21,
+    "development_diagnostic_pass": 24,
+    "holm_reject": 24,
+    "inference_eligible": 12,
+    "positive_after_every_tested_origin_deletion": 20,
+    "positive_after_top_k_origin_removal": 22,
+    "positive_lower_confidence_bound": 24,
+    "positive_mean_improvement": 16,
+    "sensitivity_packet_complete": 12
+  },
+  "per_horizon": [
+    {
+      "horizon": "1d",
+      "diagnostic_origins": 21,
+      "ablation_count": 4,
+      "inference_eligible_ablation_count": 4,
+      "positive_mean_ablation_count": 1,
+      "freeze_ready_ablation_count": 0
+    },
+    {
+      "horizon": "2d",
+      "diagnostic_origins": 21,
+      "ablation_count": 4,
+      "inference_eligible_ablation_count": 4,
+      "positive_mean_ablation_count": 3,
+      "freeze_ready_ablation_count": 0
+    },
+    {
+      "horizon": "3d",
+      "diagnostic_origins": 21,
+      "ablation_count": 4,
+      "inference_eligible_ablation_count": 4,
+      "positive_mean_ablation_count": 3,
+      "freeze_ready_ablation_count": 0
+    },
+    {
+      "horizon": "1w",
+      "diagnostic_origins": 19,
+      "ablation_count": 4,
+      "inference_eligible_ablation_count": 0,
+      "positive_mean_ablation_count": 1,
+      "freeze_ready_ablation_count": 0
+    },
+    {
+      "horizon": "2w",
+      "diagnostic_origins": 18,
+      "ablation_count": 4,
+      "inference_eligible_ablation_count": 0,
+      "positive_mean_ablation_count": 0,
+      "freeze_ready_ablation_count": 0
+    },
+    {
+      "horizon": "3w",
+      "diagnostic_origins": 18,
+      "ablation_count": 4,
+      "inference_eligible_ablation_count": 0,
+      "positive_mean_ablation_count": 0,
+      "freeze_ready_ablation_count": 0
+    }
+  ],
+  "fresh_locked_oos_access": false,
+  "freeze_authorized": false,
+  "production_promotion": false,
+  "interpretation": "A passing workflow does not imply a passing scientific hypothesis. Do not adjust thresholds or select post hoc based on these results."
+}

@@ -1,0 +1,135 @@
+name: Challenger V3 Agent Wave 1 Manifest Gate
+
+on:
+  push:
+    branches:
+      - research/v3-agent-wave-1
+    paths:
+      - "research/v3_agent_wave1/**"
+      - "scripts/challenger_v3_real_agent_runtime.py"
+      - ".github/workflows/challenger-v3-agent-wave1-manifest-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  manifest-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build SHA-256 manifest and validate bounded contexts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          from scripts.challenger_v3_real_agent_runtime import load_context, load_task
+
+          root = Path("research/v3_agent_wave1").resolve()
+          evidence = root / "evidence"
+          manifest_path = root / "manifest.generated.json"
+
+          names = [
+              "teacher_diagnostic.py",
+              "statistical_judge.py",
+              "features_v3.py",
+              "nested_selection.py",
+              "feature_ablation.py",
+              "FEATURE-01-brief.md",
+              "STATS-01-brief.md",
+              "LEAKAGE-01-brief.md",
+              "NEURAL-01-brief.md",
+              "DEVIL-01-brief.md",
+          ]
+
+          artifacts = []
+          for name in names:
+              raw = (evidence / name).read_bytes()
+              artifacts.append({
+                  "id": name.rsplit(".", 1)[0].replace("_", "-"),
+                  "path": f"evidence/{name}",
+                  "classification": "development_validation",
+                  "sha256": hashlib.sha256(raw).hexdigest(),
+              })
+
+          manifest = {
+              "schema_version": 1,
+              "scope": "development_validation_only",
+              "artifacts": artifacts,
+          }
+          manifest_path.write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+
+          frozen_path = root / "manifest.json"
+          generated_bytes = manifest_path.read_bytes()
+          frozen_bytes = frozen_path.read_bytes()
+          if frozen_bytes != generated_bytes:
+              raise ValueError(
+                  "frozen manifest drift: regenerate and review manifest.json before execution"
+              )
+
+          contexts = {
+              "FEATURE-01": [
+                  "FEATURE-01-brief",
+                  "teacher-diagnostic",
+                  "features-v3",
+                  "feature-ablation",
+              ],
+              "STATS-01": [
+                  "STATS-01-brief",
+                  "statistical-judge",
+                  "nested-selection",
+              ],
+              "LEAKAGE-01": [
+                  "LEAKAGE-01-brief",
+                  "features-v3",
+                  "nested-selection",
+                  "statistical-judge",
+              ],
+              "NEURAL-01": [
+                  "NEURAL-01-brief",
+                  "features-v3",
+                  "nested-selection",
+              ],
+              "DEVIL-01": [
+                  "DEVIL-01-brief",
+                  "teacher-diagnostic",
+                  "statistical-judge",
+              ],
+          }
+
+          for task_id, artifact_ids in contexts.items():
+              task = load_task(root / "tasks" / f"{task_id}.json")
+              if task["task_id"] != task_id:
+                  raise ValueError(f"task ID mismatch: {task_id}")
+              loaded, manifest_sha = load_context(
+                  manifest_path,
+                  root,
+                  artifact_ids,
+              )
+              total = sum(item["bytes"] for item in loaded)
+              print(
+                  f"VALID {task_id}: role={task['role']} "
+                  f"context_bytes={total} manifest_sha256={manifest_sha}"
+              )
+
+          print("BEGIN_GENERATED_MANIFEST")
+          print(manifest_path.read_text(encoding="utf-8"), end="")
+          print("END_GENERATED_MANIFEST")
+          PY
+
+      - name: Upload generated manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: challenger-v3-agent-wave1-generated-manifest
+          path: research/v3_agent_wave1/manifest.generated.json
+          if-no-files-found: error
+          retention-days: 14

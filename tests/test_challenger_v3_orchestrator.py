@@ -22,11 +22,7 @@ def test_v3_plan_is_fail_closed() -> None:
 
 def test_v3_dependencies_are_ordered() -> None:
     plan = build_plan()
-    wave_of = {
-        task["id"]: index
-        for index, wave in enumerate(plan["waves"])
-        for task in wave
-    }
+    wave_of = {task["id"]: index for index, wave in enumerate(plan["waves"]) for task in wave}
     for wave in plan["waves"]:
         for task in wave:
             for dependency in task["depends_on"]:
@@ -35,10 +31,6 @@ def test_v3_dependencies_are_ordered() -> None:
 
 def test_v3_adversarial_review_precedes_readiness() -> None:
     plan = build_plan()
-    ordered = [
-        task["id"]
-        for wave in plan["waves"]
-        for task in wave
-    ]
+    ordered = [task["id"] for wave in plan["waves"] for task in wave]
     assert ordered.index("leakage_adversarial_review") < ordered.index("selection_bias_challenge")
     assert ordered.index("selection_bias_challenge") < ordered.index("v3_readiness_packet")

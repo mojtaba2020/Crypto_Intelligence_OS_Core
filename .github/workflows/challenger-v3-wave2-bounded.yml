@@ -1,0 +1,38 @@
+name: Challenger V3 Stage 6 Bounded Agent Wave 2
+on:
+  push:
+    branches: [research/v3-agent-wave-1]
+    paths: ["research/v3_agent_wave2/RUN_ONCE_V1"]
+permissions:
+  contents: read
+concurrency:
+  group: stage6-wave2-single-trigger
+  cancel-in-progress: false
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        task_id: [STATS-02, AUDIT-02, FEATURE-02]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: No-cost data, model and budget preflight
+        run: python -m scripts.challenger_v3_wave2_bounded --task-id "${{ matrix.task_id }}" --preflight-only
+        env:
+          OPENAI_MODEL: gpt-5.6
+      - name: One bounded provider call
+        run: python -m scripts.challenger_v3_wave2_bounded --task-id "${{ matrix.task_id }}"
+        env:
+          OPENAI_MODEL: gpt-5.6
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stage6-wave2-${{ matrix.task_id }}
+          path: artifacts/challenger-v3-real-agent-wave2/${{ matrix.task_id }}.json
+          if-no-files-found: error
+          retention-days: 30

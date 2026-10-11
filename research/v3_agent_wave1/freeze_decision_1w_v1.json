@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "decision_id": "challenger_v3_1w_freeze_decision_v1",
+  "decision": "NOT_READY_DO_NOT_FREEZE",
+  "scope": "development_validation_only",
+  "source": {
+    "branch": "research/v3-agent-wave-1",
+    "source_commit": "fbd102fa5c048a603af1aa3b1653cc5bef9722d8",
+    "workflow_run_id": 38105381390,
+    "artifact_id": 11689477007,
+    "artifact_name": "challenger-v3-pre-freeze-1w",
+    "artifact_sha256": "53e39dadab9406d435ab00a92cd88a50d53964db40df6c24902a689e10bf1bc0"
+  },
+  "policy": {
+    "fresh_locked_oos_access": false,
+    "fresh_oos_authorized": false,
+    "v2_locked_oos_used_for_tuning": false,
+    "freeze_authorized": false,
+    "champion_authorized": false,
+    "production_eligible": false,
+    "threshold_changes_after_observation": false
+  },
+  "predeclared_requirements": {
+    "minimum_diagnostic_origins": 20,
+    "all_freeze_readiness_checks_required": true
+  },
+  "observed": {
+    "freeze_ready_candidate_count": 0,
+    "candidate_count": 4,
+    "diagnostic_origins_per_candidate": 19,
+    "candidates": [
+      {
+        "ablation": "all_features",
+        "candidate": "huber",
+        "mean_paired_improvement": -0.011266671524316952,
+        "inference_eligible": false,
+        "freeze_ready": false
+      },
+      {
+        "ablation": "baseline",
+        "candidate": "huber",
+        "mean_paired_improvement": -0.008110398385126227,
+        "inference_eligible": false,
+        "freeze_ready": false
+      },
+      {
+        "ablation": "regime_only_delta",
+        "candidate": "elastic_net",
+        "mean_paired_improvement": 0.0045312499239129195,
+        "inference_eligible": false,
+        "freeze_ready": false
+      },
+      {
+        "ablation": "state_v31_delta",
+        "candidate": "hist_gradient_boosting_absolute",
+        "mean_paired_improvement": -0.004205400682687418,
+        "inference_eligible": false,
+        "freeze_ready": false
+      }
+    ]
+  },
+  "rationale": [
+    "The workflow executed successfully, but scientific readiness did not pass.",
+    "Every 1w candidate has 19 diagnostic origins, below the predeclared minimum of 20.",
+    "The minimum is not lowered after observing the result.",
+    "Fresh Locked OOS remains untouched. The program stays at the Stage 6-to-7 boundary until eligible development evidence exists."
+  ],
+  "next_action": "Accumulate or obtain additional pre-lock development evidence under the unchanged protocol, then rerun the same gate without changing thresholds or inspecting Fresh Locked OOS."
+}

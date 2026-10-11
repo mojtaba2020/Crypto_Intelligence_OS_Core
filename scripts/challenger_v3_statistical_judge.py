@@ -231,6 +231,117 @@ def _hac_sensitivity(diffs: Sequence[float], block_origins: int) -> dict[str, ob
     }
 
 
+def _contiguous_origin_deletion_sensitivity(
+    diffs: Sequence[float], max_block_origins: int
+) -> dict[str, object]:
+    """Adversarially delete every contiguous origin block up to a fixed maximum."""
+    values = [float(value) for value in diffs]
+    if any(not math.isfinite(value) for value in values):
+        raise ValueError("paired differences must be finite")
+    if len(values) < 2:
+        raise ValueError("at least two paired differences are required")
+    if max_block_origins <= 0 or max_block_origins >= len(values):
+        raise ValueError("deletion block maximum must leave at least one origin")
+
+    minimum_remaining_mean = math.inf
+    worst_start = -1
+    worst_block = -1
+    by_block: list[dict[str, object]] = []
+    for block in range(1, max_block_origins + 1):
+        local_minimum = math.inf
+        local_start = -1
+        for start in range(0, len(values) - block + 1):
+            remaining = values[:start] + values[start + block :]
+            remaining_mean = statistics.fmean(remaining)
+            if remaining_mean < local_minimum:
+                local_minimum = remaining_mean
+                local_start = start
+            if remaining_mean < minimum_remaining_mean:
+                minimum_remaining_mean = remaining_mean
+                worst_start = start
+                worst_block = block
+        by_block.append(
+            {
+                "deleted_block_origins": block,
+                "minimum_remaining_mean_improvement": local_minimum,
+                "worst_start_origin_position": local_start,
+            }
+        )
+
+    return {
+        "method": "contiguous_origin_deletion_sensitivity_only",
+        "observed_mean_improvement": statistics.fmean(values),
+        "maximum_deleted_block_origins": max_block_origins,
+        "minimum_remaining_mean_improvement": minimum_remaining_mean,
+        "worst_deleted_block_origins": worst_block,
+        "worst_start_origin_position": worst_start,
+        "positive_after_every_tested_deletion": minimum_remaining_mean > 0.0,
+        "tested_block_lengths": by_block,
+        "selection_rule": "never_replaces_primary_method",
+    }
+
+
+def _positive_concentration_sensitivity(
+    diffs: Sequence[float], top_k: int = 3
+) -> dict[str, object]:
+    """Measure whether apparent improvement is dominated by a few forecast origins."""
+    values = [float(value) for value in diffs]
+    if any(not math.isfinite(value) for value in values):
+        raise ValueError("paired differences must be finite")
+    if len(values) < 5:
+        raise ValueError("at least five paired differences are required for concentration analysis")
+    if top_k <= 0 or top_k >= len(values):
+        raise ValueError("top_k must leave at least one origin")
+
+    positive = [max(0.0, value) for value in values]
+    total_positive = sum(positive)
+    ranked = sorted(enumerate(values), key=lambda item: item[1], reverse=True)
+    removed = ranked[:top_k]
+    removed_positions = [index for index, _value in removed]
+    remaining = [value for index, value in enumerate(values) if index not in removed_positions]
+    top_positive = sum(max(0.0, value) for _index, value in removed)
+    top_share = top_positive / total_positive if total_positive > 0.0 else None
+
+    return {
+        "method": "positive_improvement_concentration_sensitivity_only",
+        "top_k": top_k,
+        "positive_improvement_total": total_positive,
+        "top_k_positive_share": top_share,
+        "mean_improvement": statistics.fmean(values),
+        "mean_after_removing_top_k_origins": statistics.fmean(remaining),
+        "top_k_origin_positions": removed_positions,
+        "remains_positive_after_top_k_removal": statistics.fmean(remaining) > 0.0,
+        "selection_rule": "never_replaces_primary_method",
+    }
+
+
+def _chronological_regime_sensitivity(diffs: Sequence[float]) -> dict[str, object]:
+    """Report whether improvement is directionally stable across chronological thirds."""
+    values = [float(value) for value in diffs]
+    if any(not math.isfinite(value) for value in values):
+        raise ValueError("paired differences must be finite")
+    if len(values) < 6:
+        raise ValueError("at least six paired differences are required for regime thirds")
+
+    third = len(values) // 3
+    groups = (
+        values[:third],
+        values[third : 2 * third],
+        values[2 * third :],
+    )
+    means = [statistics.fmean(group) for group in groups]
+    positive = [mean > 0.0 for mean in means]
+    return {
+        "method": "chronological_thirds_regime_sensitivity_only",
+        "chronological_third_mean_improvements": means,
+        "positive_thirds": positive,
+        "all_thirds_positive": all(positive),
+        "minimum_third_mean_improvement": min(means),
+        "maximum_third_mean_improvement": max(means),
+        "selection_rule": "never_replaces_primary_method",
+    }
+
+
 def _holm(rows: list[dict[str, object]]) -> None:
     ordered = sorted(
         rows,
@@ -270,15 +381,22 @@ def _validate_origin_records(
         raise ValueError("origin-level evidence must not be empty")
     indexes: list[int] = []
     timestamps: list[float] = []
-    timestamp_presence = []
+    target_timestamps: list[float] = []
     required_candidates = set(candidates)
     for row in records:
         if "origin_index" not in row:
             raise ValueError("origin_index is required")
         indexes.append(int(row["origin_index"]))
-        timestamp_presence.append(row.get("origin_timestamp") is not None)
-        if row.get("origin_timestamp") is not None:
-            timestamps.append(float(row["origin_timestamp"]))
+        if row.get("origin_timestamp") is None or row.get("target_timestamp") is None:
+            raise ValueError("origin_timestamp and target_timestamp are required")
+        origin_timestamp = float(row["origin_timestamp"])
+        target_timestamp = float(row["target_timestamp"])
+        if not math.isfinite(origin_timestamp) or not math.isfinite(target_timestamp):
+            raise ValueError("origin and target timestamps must be finite")
+        if target_timestamp <= origin_timestamp:
+            raise ValueError("target timestamp must be strictly after origin timestamp")
+        timestamps.append(origin_timestamp)
+        target_timestamps.append(target_timestamp)
         errors = row.get("candidate_errors")
         if not isinstance(errors, Mapping) or set(errors) != required_candidates:
             raise ValueError("candidate losses are incomplete or contain undeclared candidates")
@@ -287,10 +405,10 @@ def _validate_origin_records(
             raise ValueError("losses must be finite and non-negative")
     if indexes != sorted(indexes) or len(indexes) != len(set(indexes)):
         raise ValueError("origin indexes must be strictly chronological and unique")
-    if any(timestamp_presence) and not all(timestamp_presence):
-        raise ValueError("origin timestamps must be consistently present or absent")
-    if timestamps and (timestamps != sorted(timestamps) or len(timestamps) != len(set(timestamps))):
+    if timestamps != sorted(timestamps) or len(timestamps) != len(set(timestamps)):
         raise ValueError("origin timestamps must be strictly chronological and unique")
+    if target_timestamps != sorted(target_timestamps):
+        raise ValueError("target timestamps must be chronological")
 
 
 def _validate_dataset_identity(value: object) -> str:
@@ -383,6 +501,12 @@ def main() -> None:
                             seed + 1,  # type: ignore[arg-type]
                         ),
                         "hac": _hac_sensitivity(differences, spec.bootstrap_block_origins),  # type: ignore[arg-type]
+                        "contiguous_origin_deletion": _contiguous_origin_deletion_sensitivity(
+                            differences,
+                            spec.bootstrap_block_origins,  # type: ignore[arg-type]
+                        ),
+                        "chronological_regimes": _chronological_regime_sensitivity(differences),
+                        "positive_concentration": _positive_concentration_sensitivity(differences),
                         "policy": "predeclared_sensitivity_only_never_select_by_favorability",
                     }
                 else:

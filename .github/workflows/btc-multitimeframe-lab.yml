@@ -82,3 +82,4 @@ jobs:
           path: artifacts/multitimeframe/contract-v1.json
           if-no-files-found: error
           retention-days: 30
+

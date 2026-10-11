@@ -1,0 +1,66 @@
+{
+  "artifacts": [
+    {
+      "classification": "development_validation",
+      "id": "teacher-diagnostic",
+      "path": "evidence/teacher_diagnostic.py",
+      "sha256": "ab495717b0c255ec6540d61085fa8a31ef939a5e336167f6d9993d8383453877"
+    },
+    {
+      "classification": "development_validation",
+      "id": "statistical-judge",
+      "path": "evidence/statistical_judge.py",
+      "sha256": "d3ebd8f6ccabe903dcf24d1aa04603562dc96c50488cb75e25547de583384012"
+    },
+    {
+      "classification": "development_validation",
+      "id": "features-v3",
+      "path": "evidence/features_v3.py",
+      "sha256": "bfd9e5c8a484ec53e2a0bef6d2371aded23dd4bfa55b4edf720d83183d657b85"
+    },
+    {
+      "classification": "development_validation",
+      "id": "nested-selection",
+      "path": "evidence/nested_selection.py",
+      "sha256": "2ea41817eb4e68435ccaf36b6c3a1ebcf34b22121a132f8c712820b01de28b3a"
+    },
+    {
+      "classification": "development_validation",
+      "id": "feature-ablation",
+      "path": "evidence/feature_ablation.py",
+      "sha256": "faf159d93b526c22963b26596247421372ad19c42736537abfd559451874a82a"
+    },
+    {
+      "classification": "development_validation",
+      "id": "FEATURE-01-brief",
+      "path": "evidence/FEATURE-01-brief.md",
+      "sha256": "6f0c8811f1c74a62df5806c07588ca714b87ab71c0b641e5fbbd98243f833727"
+    },
+    {
+      "classification": "development_validation",
+      "id": "STATS-01-brief",
+      "path": "evidence/STATS-01-brief.md",
+      "sha256": "42774d1725d2385d2fedbc7547618e3c4d71f8f4be841f4bddb44cccc48c3394"
+    },
+    {
+      "classification": "development_validation",
+      "id": "LEAKAGE-01-brief",
+      "path": "evidence/LEAKAGE-01-brief.md",
+      "sha256": "7a9ad32ea62b8052046287db968e129822ed4d8b6a7861c697660b901f9cb5d2"
+    },
+    {
+      "classification": "development_validation",
+      "id": "NEURAL-01-brief",
+      "path": "evidence/NEURAL-01-brief.md",
+      "sha256": "01f6450defe4d5ddc214f78f935f7e36b353c20ec6194624c41b8b24deb7c7b6"
+    },
+    {
+      "classification": "development_validation",
+      "id": "DEVIL-01-brief",
+      "path": "evidence/DEVIL-01-brief.md",
+      "sha256": "c01bb65f5c152e6653c5ac6fbc5932cec4451700e6c5bb160c87b04f2200dc8b"
+    }
+  ],
+  "schema_version": 1,
+  "scope": "development_validation_only"
+}

@@ -29,7 +29,7 @@ MAX_CONTEXT_BYTES = 50_000
 MAX_TASK_BYTES = 8_192
 MAX_MANIFEST_BYTES = 64_000
 MAX_HTTP_RESPONSE_BYTES = 1_000_000
-MAX_OUTPUT_TOKENS = 1400
+MAX_OUTPUT_TOKENS = 4000
 MAX_STRING_CHARS = 8_000
 MAX_LIST_ITEMS = 100
 MAX_REPRODUCIBILITY_ITEMS = 50
@@ -263,11 +263,13 @@ def validate_envelope(packet: dict) -> None:
         for item in value:
             _validate_string(item, field)
     reproducibility = packet["reproducibility"]
-    if not isinstance(reproducibility, dict) or len(reproducibility) > MAX_REPRODUCIBILITY_ITEMS:
-        raise ValueError("reproducibility must be a bounded string-to-string object")
-    for key, value in reproducibility.items():
-        _validate_string(key, "reproducibility key")
-        _validate_string(value, "reproducibility value")
+    if not isinstance(reproducibility, list) or len(reproducibility) > MAX_REPRODUCIBILITY_ITEMS:
+        raise ValueError("reproducibility must be a bounded list of key/value objects")
+    for item in reproducibility:
+        if not isinstance(item, dict) or set(item) != {"key", "value"}:
+            raise ValueError("reproducibility entries must match the closed key/value schema")
+        _validate_string(item["key"], "reproducibility key")
+        _validate_string(item["value"], "reproducibility value")
     confidence = packet["confidence"]
     if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
         raise ValueError("confidence must be a number")
@@ -303,13 +305,61 @@ def _configured_model() -> str:
     return model
 
 
-def call_provider(task: dict, context: list[dict]) -> tuple[dict, str, str]:
+def _provider_json_schema() -> dict:
+    properties = {}
+    for field in sorted(PROVIDER_FIELDS):
+        if field in LIST_FIELDS:
+            properties[field] = {"type": "array", "items": {"type": "string"}}
+        elif field in FALSE_FIELDS:
+            properties[field] = {"type": "boolean", "enum": [False]}
+        elif field == "reproducibility":
+            properties[field] = {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "key": {"type": "string"},
+                        "value": {"type": "string"},
+                    },
+                    "required": ["key", "value"],
+                    "additionalProperties": False,
+                },
+                "maxItems": MAX_REPRODUCIBILITY_ITEMS,
+            }
+        elif field == "confidence":
+            properties[field] = {"type": "number", "minimum": 0, "maximum": 1}
+        elif field == "recommendation":
+            properties[field] = {"type": "string", "enum": ["continue", "reject", "audit"]}
+        else:
+            properties[field] = {"type": "string"}
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": sorted(PROVIDER_FIELDS),
+        "additionalProperties": False,
+    }
+
+
+def call_provider(task: dict, context: list[dict]) -> tuple[dict, str, str, dict]:
     key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not key:
         raise RuntimeError("missing provider secret")
     model = _configured_model()
     prompt = build_prompt(task, context)
-    body = {"model": model, "input": prompt, "max_output_tokens": MAX_OUTPUT_TOKENS, "store": False}
+    body = {
+        "model": model,
+        "input": prompt,
+        "max_output_tokens": MAX_OUTPUT_TOKENS,
+        "store": False,
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "name": "challenger_v3_research_packet",
+                "strict": True,
+                "schema": _provider_json_schema(),
+            }
+        },
+    }
     if API_URL != "https://api.openai.com/v1/responses":
         raise RuntimeError("provider URL is not the allowlisted HTTPS endpoint")
     request = urllib.request.Request(  # noqa: S310 -- exact HTTPS URL allowlisted above
@@ -322,7 +372,16 @@ def call_provider(task: dict, context: list[dict]) -> tuple[dict, str, str]:
         with urllib.request.urlopen(request, timeout=45) as response:  # noqa: S310
             raw = response.read(MAX_HTTP_RESPONSE_BYTES + 1)
     except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"provider HTTP {exc.code}") from exc
+        detail = exc.read(8_192)
+        try:
+            error_payload = json.loads(detail.decode("utf-8"), parse_constant=_reject_constant)
+            message = str(
+                error_payload.get("error", {}).get("message", "provider rejected request")
+            )
+        except (UnicodeDecodeError, json.JSONDecodeError, AttributeError):
+            message = "provider rejected request"
+        message = message.replace(key, "[REDACTED]")[:1_000]
+        raise RuntimeError(f"provider HTTP {exc.code}: {message}") from exc
     except (urllib.error.URLError, TimeoutError) as exc:
         raise RuntimeError("provider connection failed") from exc
     if len(raw) > MAX_HTTP_RESPONSE_BYTES:
@@ -333,6 +392,14 @@ def call_provider(task: dict, context: list[dict]) -> tuple[dict, str, str]:
         raise ValueError("provider HTTP response is not valid UTF-8 JSON") from exc
     if not isinstance(payload, dict):
         raise ValueError("provider HTTP response must be one JSON object")
+    status = payload.get("status")
+    if status == "incomplete":
+        details = payload.get("incomplete_details")
+        reason = details.get("reason") if isinstance(details, dict) else None
+        raise ValueError(f"provider response incomplete: {reason or 'unknown reason'}")
+    if status not in {None, "completed"}:
+        raise ValueError(f"provider response status is not completed: {status}")
+
     text = extract_output_text(payload)
     try:
         packet = json.loads(text, parse_constant=_reject_constant)
@@ -341,7 +408,18 @@ def call_provider(task: dict, context: list[dict]) -> tuple[dict, str, str]:
     if not isinstance(packet, dict):
         raise ValueError("provider output must be one JSON object")
     validate_envelope(packet)
-    return packet, model, _sha256(prompt.encode("utf-8"))
+    usage_raw = payload.get("usage")
+    if not isinstance(usage_raw, dict):
+        raise ValueError("provider usage metadata is missing")
+    usage = {}
+    for label in ("input_tokens", "output_tokens", "total_tokens"):
+        value = usage_raw.get(label)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"provider usage {label} must be a non-negative integer")
+        usage[label] = value
+    if usage["total_tokens"] < usage["input_tokens"] + usage["output_tokens"]:
+        raise ValueError("provider usage total_tokens is inconsistent")
+    return packet, model, _sha256(prompt.encode("utf-8")), usage
 
 
 def _git_commit() -> str:
@@ -370,6 +448,7 @@ def build_audited_packet(
     manifest_sha256: str,
     model: str,
     prompt_sha256: str,
+    usage: dict,
 ) -> dict:
     identities = [
         {key: item[key] for key in ("id", "path", "classification", "sha256", "bytes")}
@@ -390,6 +469,7 @@ def build_audited_packet(
         "provider_model": model,
         "prompt_sha256": prompt_sha256,
         "validation_result": "accepted",
+        "provider_usage": usage,
         **provider_packet,
     }
 
@@ -459,9 +539,9 @@ def run(
             raise FileExistsError("output destination already exists")
         task = load_task(task_path)
         context, manifest_sha256 = load_context(manifest_path, evidence_root, artifact_ids)
-        provider_packet, model, prompt_sha256 = call_provider(task, context)
+        provider_packet, model, prompt_sha256, usage = call_provider(task, context)
         packet = build_audited_packet(
-            provider_packet, task, context, manifest_sha256, model, prompt_sha256
+            provider_packet, task, context, manifest_sha256, model, prompt_sha256, usage
         )
         publish_packet(packet, root, output_name)
     except (
