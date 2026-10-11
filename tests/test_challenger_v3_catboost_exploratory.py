@@ -150,9 +150,7 @@ def test_parent_symlinks_refused_for_input_and_output(tmp_path: Path) -> None:
     alias.symlink_to(inner, target_is_directory=True)
     for suffix in (".development.json", ".exploratory.json"):
         with pytest.raises(ValueError, match="Symlink"):
-            exploratory._safe_path(
-                alias / ("fixture" + suffix), root=tmp_path, suffix=suffix
-            )
+            exploratory._safe_path(alias / ("fixture" + suffix), root=tmp_path, suffix=suffix)
 
 
 def test_inconsistent_source_counts_rejected_even_when_complete(tmp_path: Path) -> None:
@@ -196,6 +194,7 @@ def test_first_future_bar_does_not_affect_features() -> None:
         after["forecast_x"],
     )
     assert before["target_maturity_timestamp"] == after["target_maturity_timestamp"]
+
 
 def test_catboost_missing_dependency_is_actionable(monkeypatch: pytest.MonkeyPatch) -> None:
     def missing(_name: str) -> None:
