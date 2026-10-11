@@ -56,13 +56,85 @@ This proposal is not a retrospective registration of that family.
    approve the prospective plan, manifest hash, costs and blinding before
    any new evaluation. No automated merge, external expense or trading.
 
-## Illustrative usage AFTER boundary audit
+## Operator-controlled sandbox and manifest contract
+
+**The CLI now fails closed until all three explicit roots and a pinned
+operator-audited manifest exist.** The roots must be absolute existing real
+directories with no symlinked ancestors. Keep the input root and manifest root
+read-only, and the output root separately writable; OS permissions (or a
+container mount namespace) must physically deny any access to the reserved
+Fresh Locked OOS dataset. Path words and an operator-provided hash are not
+a security boundary against a malicious operator or race-prone filesystem.
+Never set any of these roots to the full project repository or a broadly
+accessible home directory.
+
+The operator-audited manifest is a JSON object with **exactly** these keys:
+
+- scope: development_validation_only
+- source: immutable exchange/pair/timeframe identity, matching the data slice
+- family: daily, weekly, or monthly
+- slice_sha256: lowercase SHA-256 of the exact development JSON bytes
+- source_interval_seconds: 3600 or 86400, matching the original provider audit
+- first_open_timestamp, last_open_timestamp: canonical UTC *opening* times
+- approved_dev_end_exclusive: audited exclusive availability boundary
+- extraction_asof_timestamp: last available UTC extraction time
+- source_audit_sha256: 64-hex SHA-256 of an independently preserved source audit
+
+A reviewer must independently examine the raw source provenance, certify that
+the physically extracted slice excludes all reserved windows, and record the
+manifest SHA-256 **outside the input root** before authorizing any run. The
+script validates the supplied digest, counts, alignment and cutoff but **cannot
+prove that this review actually occurred**. Do not self-approve a manifest
+using the historical observed diagnostics as independent new evidence.
+
+Every development candle must include exact complete OHLCV, a canonical UTC
+bar-open timestamp, is_complete=true, and matching source_bars and
+expected_source_bars equal to the number of source intervals in the actual
+daily/weekly/monthly calendar period. No interpolation or source swapping.
+A forecast that uses origin bar t's close is first available at the bar's
+**end**, not at origin_timestamp (which denotes its opening). Report the
+separate forecast availability and target maturity timestamps.
+
+Both source and audit manifest are read and hashed from exactly one byte
+buffer each, with symlinked parents refused. The output is created once
+with exclusive permissions. Reports include code/data/manifest hashes,
+runtime version, model settings and paired forecast/actual records. Any
+unresolved provenance question is a NO-RUN blocker.
+
+## Illustrative usage, AFTER out-of-band source audit
+
+The values and roots below are placeholders: there is no approved actual
+dataset or trusted manifest currently available for this PR.
 
     python scripts/challenger_v3_catboost_exploratory.py \
       --enable-exploratory \
-      --input /safe/research/btc_weekly.development.json \
-      --output /safe/research/catboost_weekly.exploratory.json \
+      --approved-input-root /research/approved-dev-input \
+      --input /research/approved-dev-input/btc_weekly.development.json \
+      --approved-manifest-root /research/read-only-approved-manifests \
+      --manifest /research/read-only-approved-manifests/weekly.audit.json \
+      --approved-manifest-sha256 <approved-external-sha256> \
+      --approved-output-root /research/only-exploratory-outputs \
+      --output /research/only-exploratory-outputs/catboost_weekly.exploratory.json \
       --family weekly --horizon 1 --train-end 100 --stride 4 --max-folds 8
 
-The values 100 and 4 are examples, not chosen data-dependent settings.
-They must be prospectively frozen before any new independent analysis.
+The placeholder boundary, stride and family must be prospectively frozen
+before inspecting any genuinely independent outcomes. This runner is
+**descriptive only**, caps evaluation at 12 folds (below the preliminary
+20-independent-origin inferential threshold), and cannot authorize Stage 7
+Freeze. Overlapping diagnostic targets are identified but not statistically
+corrected. Whole-input continuity checks conservatively reject any slice with
+a gap, including unrelated past gaps; any later change to eligibility must
+be preregistered as a new experiment, never optimized post-hoc.
+
+## Optional real-CatBoost integration check
+
+For an *isolated, voluntary* synthetic-only smoke run, install a pinned
+research-only CatBoost dependency (tested locally with catboost==1.2.8 on
+Python 3.13). No change to pyproject.toml core dependencies; CI unit tests
+mock the estimator by design. A standalone synthetic integration check must
+verify the actual constructor, deterministic repeat runs, file suppression
+and wall-clock time before research runs. Estimated work is capped at 12 ×
+120 trees and one CPU thread, but this is not a measured runtime for real
+data; no paid provider should be accessed.
+
+**Original Stage-6 observed 24-family remains scientific NO-GO.**
