@@ -445,6 +445,11 @@ def main() -> None:
     output = _safe_path(args.output, root=args.approved_output_root, suffix=".exploratory.json")
     if args.approved_output_root.resolve() == args.approved_input_root.resolve():
         parser.error("Input and output roots must be distinct")
+    if args.approved_manifest_root.resolve() in (
+        args.approved_input_root.resolve(),
+        args.approved_output_root.resolve(),
+    ):
+        parser.error("Operator-approved audit manifest must be kept in a separate root")
     if output.exists():
         parser.error("Refusing to overwrite an existing artifact")
     candles, manifest, input_sha256 = load_development_slice(
@@ -473,6 +478,9 @@ def main() -> None:
         (Path(__file__).resolve().parent / "multitimeframe_features_v3.py").read_bytes()
     ).hexdigest()
     report["runner_code_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    report["python_version"] = platform.python_version()
+    report["catboost_version"] = importlib.metadata.version("catboost")
+    report["source_manifest_role"] = "operator-approved assertion; not independent evidence"
     # Exclusive create prevents overwrite and O_NOFOLLOW blocks final symlinks.
     # Filesystem permissions must also prohibit all reserved-data access.
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
