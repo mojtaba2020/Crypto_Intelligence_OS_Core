@@ -1,0 +1,88 @@
+name: Challenger V3 Pre-Freeze 1W Readiness
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/challenger_v3_freeze_gate.py"
+      - "scripts/challenger_v3_statistical_judge.py"
+      - "scripts/run_challenger_v3_classical_development.py"
+      - "scripts/multitimeframe_tournament_v2.py"
+      - "scripts/multitimeframe_features_v3.py"
+      - ".github/workflows/challenger-v3-freeze-readiness.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  freeze-readiness-1w:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install research dependencies
+        run: python -m pip install -e ".[research]"
+
+      - name: Fetch real BTC/USD history
+        run: |
+          python scripts/fetch_multitimeframe_exchange_audit_v1.py \
+            --start "2011-08-18T00:00:00+00:00" \
+            --end "2026-09-29T00:00:00+00:00" \
+            --output-dir artifacts/real-data
+
+      - name: Build gap-safe point-in-time datasets
+        run: |
+          PYTHONPATH=. python scripts/prepare_multitimeframe_real_data_v1.py \
+            --input-dir artifacts/real-data \
+            --output-dir artifacts/prepared
+
+      - name: Run 1W V3 development-validation tournament
+        run: |
+          mkdir -p artifacts/v3-development artifacts/v3-freeze
+          PYTHONPATH=scripts:. python scripts/run_challenger_v3_classical_development.py \
+            --data-dir artifacts/prepared \
+            --exchange bitstamp \
+            --horizon 1w \
+            --output artifacts/v3-development/classical-development-1w.json
+
+      - name: Run corrected nested statistical diagnostics
+        run: |
+          PYTHONPATH=scripts:. python scripts/challenger_v3_statistical_judge.py \
+            --evidence-dir artifacts/v3-development \
+            --output artifacts/v3-freeze/statistical-1w.json
+
+      - name: Execute pre-Fresh-OOS freeze-readiness gate
+        run: |
+          PYTHONPATH=scripts:. python scripts/challenger_v3_freeze_gate.py \
+            --statistical-report artifacts/v3-freeze/statistical-1w.json \
+            --output artifacts/v3-freeze/freeze-readiness-1w.json
+
+      - name: Assert Fresh Locked OOS remained untouched
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path("artifacts/v3-freeze/freeze-readiness-1w.json").read_text())
+          assert p["fresh_locked_oos_access"] is False
+          assert p["fresh_oos_authorized"] is False
+          assert p["freeze_authorized"] is False
+          print("Fresh Locked OOS untouched; readiness is advisory only.")
+          PY
+
+      - name: Upload V3 pre-freeze evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: challenger-v3-pre-freeze-1w
+          path: |
+            artifacts/v3-development/classical-development-1w.json
+            artifacts/v3-freeze/statistical-1w.json
+            artifacts/v3-freeze/freeze-readiness-1w.json
+          if-no-files-found: error
+          retention-days: 30
