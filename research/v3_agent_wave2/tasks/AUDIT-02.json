@@ -1,0 +1,5 @@
+{
+  "task_id": "AUDIT-02",
+  "role": "leakage_audit",
+  "scope": "development_validation_only"
+}

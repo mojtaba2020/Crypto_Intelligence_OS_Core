@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "scope": "development_validation_only",
+  "artifacts": [
+    {
+      "id": "wave2-context",
+      "path": "evidence/brief.txt",
+      "classification": "development_validation",
+      "sha256": "cbd99ead14d637b8be4bbe01f814002245ecbe271a4bca151b366c196433953d"
+    }
+  ]
+}
