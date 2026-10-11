@@ -51,8 +51,12 @@ def main() -> int:
         return 0
     runtime.MAX_OUTPUT_TOKENS = MAX_OUTPUT_TOKENS
     return runtime.run(
-        task, manifest, folder, [EVIDENCE_ID],
-        root / "artifacts/challenger-v3-real-agent-wave2", f"{args.task_id}.json"
+        task,
+        manifest,
+        folder,
+        [EVIDENCE_ID],
+        root / "artifacts/challenger-v3-real-agent-wave2",
+        f"{args.task_id}.json",
     )
 
 
