@@ -180,7 +180,7 @@ def test_daily_and_monthly_calendar_reject_bad_alignment() -> None:
     assert exploratory._canonical_open(1_704_067_200, "monthly")
     assert not exploratory._canonical_open(1_704_067_201, "daily")
     assert not exploratory._canonical_open(1_704_067_201, "weekly")
-    assert not exploratory._canonical_open(1_706_745_600, "monthly")
+    assert not exploratory._canonical_open(1_706_832_000, "monthly")
 
 
 def test_first_future_bar_does_not_affect_features() -> None:
