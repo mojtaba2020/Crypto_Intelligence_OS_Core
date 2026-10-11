@@ -8,7 +8,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
 from scripts import challenger_v3_catboost_exploratory as exploratory
 
 
