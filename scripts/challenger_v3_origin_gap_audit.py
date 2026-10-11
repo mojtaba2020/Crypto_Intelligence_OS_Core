@@ -12,6 +12,7 @@ import json
 import math
 import statistics
 from datetime import UTC, datetime
+from itertools import pairwise
 from pathlib import Path
 
 try:
@@ -49,7 +50,7 @@ def _calendar(records: list[dict], horizon: str) -> tuple[list[int], list[int], 
         targets.append(target)
         indexes.append(index)
     if not origins or any(
-        b <= a for values in (origins, indexes, targets) for a, b in zip(values, values[1:])
+        b <= a for values in (origins, indexes, targets) for a, b in pairwise(values)
     ):
         raise ValueError(f"nonchronological origin calendar for {horizon}")
     return origins, targets, indexes
@@ -106,7 +107,7 @@ def audit_origin_gaps(development_dir: Path, statistical_report: Path) -> dict:
         reference = ablations[ABLATIONS[0]]["origin_level_paired_losses"]
         origins, targets, indexes = _calendar(reference, horizon)
         gaps = []
-        for i, (before, after) in enumerate(zip(origins, origins[1:])):
+        for i, (before, after) in enumerate(pairwise(origins)):
             seconds = after - before
             if seconds != (indexes[i + 1] - indexes[i]) * bar_seconds:
                 raise ValueError(f"index/calendar mismatch for {horizon}")

@@ -31,7 +31,9 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path]:
             {
                 "origin_index": 100 + i * spec.evaluation_step_bars,
                 "origin_timestamp": start + i * spec.evaluation_step_bars * bar,
-                "target_timestamp": start + (i * spec.evaluation_step_bars + spec.horizon_bars) * bar,
+                "target_timestamp": (
+                    start + (i * spec.evaluation_step_bars + spec.horizon_bars) * bar
+                ),
                 "persistence_error": 0.12,
                 "candidate_errors": {"elastic_net": 0.11},
             }
