@@ -49,6 +49,9 @@ def _reports():
                     **base,
                     "hypothesis_family_id": HYPOTHESIS_FAMILY_ID,
                     "hypothesis_family_size": size,
+                    "dataset_sha256": "a" * 64,
+                    "raw_p_value": 1.0,
+                    "one_sided_lower_confidence_bound_95": 0.0,
                     "diagnostic_sample_count": 21,
                     "inference_eligible": True,
                     "diagnostic_pass": False,
@@ -68,6 +71,20 @@ def _reports():
                     "freeze_ready": False,
                 }
             )
+    for rank, row in enumerate(
+        sorted(
+            statistical["results"],
+            key=lambda value: (
+                value["raw_p_value"],
+                value["horizon"],
+                value["ablation"],
+            ),
+        ),
+        1,
+    ):
+        row["holm_rank"] = rank
+        row["holm_threshold"] = 0.05 / (size - rank + 1)
+        row["holm_adjusted_p_value"] = 1.0
     return statistical, freeze
 
 
@@ -130,4 +147,41 @@ def test_audit_rejects_locked_oos_use():
     statistical, freeze = _reports()
     freeze["fresh_locked_oos_access"] = True
     with pytest.raises(ValueError, match="Fresh Locked OOS"):
+        audit_failures(statistical, freeze)
+
+
+def test_audit_recomputes_holm_adjustment_instead_of_trusting_report():
+    statistical, freeze = _reports()
+    statistical["results"][0]["holm_adjusted_p_value"] = 0.01
+    with pytest.raises(ValueError, match="Holm-adjusted statistics inconsistent"):
+        audit_failures(statistical, freeze)
+
+
+def test_audit_rejects_forged_holm_rejection():
+    statistical, freeze = _reports()
+    statistical["results"][0]["holm_reject"] = True
+    freeze["results"][0]["checks"]["holm_reject"] = True
+    with pytest.raises(ValueError, match="Holm-adjusted statistics inconsistent"):
+        audit_failures(statistical, freeze)
+
+
+def test_audit_rejects_nonfinite_p_value():
+    statistical, freeze = _reports()
+    statistical["results"][0]["raw_p_value"] = float("nan")
+    with pytest.raises(ValueError, match="invalid Holm raw p-value"):
+        audit_failures(statistical, freeze)
+
+
+def test_audit_rejects_false_diagnostic_pass():
+    statistical, freeze = _reports()
+    statistical["results"][0]["diagnostic_pass"] = True
+    freeze["results"][0]["checks"]["development_diagnostic_pass"] = True
+    with pytest.raises(ValueError, match="diagnostic pass contradicts"):
+        audit_failures(statistical, freeze)
+
+
+def test_audit_rejects_inconsistent_dataset_digest_in_same_horizon():
+    statistical, freeze = _reports()
+    statistical["results"][0]["dataset_sha256"] = "b" * 64
+    with pytest.raises(ValueError, match="inconsistent dataset identity"):
         audit_failures(statistical, freeze)
