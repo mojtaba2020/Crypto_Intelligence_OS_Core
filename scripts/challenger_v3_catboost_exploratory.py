@@ -76,9 +76,13 @@ def _validate_candles(candles: list[dict[str, Any]], family: str) -> None:
             if not math.isfinite(value):
                 raise ValueError(f"Nonfinite candle {name}")
         opening, high, low, close = (float(row[k]) for k in ("open", "high", "low", "close"))
-        if low <= 0 or min(opening, close) <= 0 or high < max(opening, close) or low > min(
-            opening, close
-        ) or float(row["volume"]) < 0:
+        if (
+            low <= 0
+            or min(opening, close) <= 0
+            or high < max(opening, close)
+            or low > min(opening, close)
+            or float(row["volume"]) < 0
+        ):
             raise ValueError("Invalid OHLCV bounds")
 
 
@@ -193,8 +197,12 @@ def evaluate_exploratory(
     max_folds: int = MAX_FOLDS,
 ) -> dict[str, Any]:
     folds = build_folds(
-        candles, family=family, horizon=horizon, train_end=train_end,
-        stride=stride, max_folds=max_folds,
+        candles,
+        family=family,
+        horizon=horizon,
+        train_end=train_end,
+        stride=stride,
+        max_folds=max_folds,
     )
     records = []
     for fold in folds:
@@ -259,8 +267,12 @@ def main() -> None:
         parser.error("Refusing to overwrite an existing artifact")
     candles, source = load_development_slice(args.input)
     report = evaluate_exploratory(
-        candles, family=args.family, horizon=args.horizon, train_end=args.train_end,
-        stride=args.stride, max_folds=args.max_folds,
+        candles,
+        family=args.family,
+        horizon=args.horizon,
+        train_end=args.train_end,
+        stride=args.stride,
+        max_folds=args.max_folds,
     )
     report["source"] = source
     report["input_sha256"] = hashlib.sha256(args.input.read_bytes()).hexdigest()
