@@ -128,9 +128,9 @@ def test_reject_mismatched_ablation_calendar(tmp_path):
     root, stats = _fixture(tmp_path)
     path = root / "classical-development-1w.json"
     data = json.loads(path.read_text())
-    data["results"]["1w"]["ablation_metrics"][ABLATIONS[1]][
-        "origin_level_paired_losses"
-    ][0]["origin_timestamp"] += 86_400
+    data["results"]["1w"]["ablation_metrics"][ABLATIONS[1]]["origin_level_paired_losses"][0][
+        "origin_timestamp"
+    ] += 86_400
     _save(path, data)
     with pytest.raises(ValueError, match="inconsistent ablation"):
         audit_origin_gaps(root, stats)
