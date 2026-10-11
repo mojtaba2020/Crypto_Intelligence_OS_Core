@@ -125,9 +125,7 @@ def _canonical_open(open_timestamp: int, family: str) -> bool:
     return True
 
 
-def _approved_manifest(
-    path: Path, root: Path, digest: str, family: str
-) -> dict[str, Any]:
+def _approved_manifest(path: Path, root: Path, digest: str, family: str) -> dict[str, Any]:
     path = _safe_path(path, root=root, suffix=".audit.json")
     raw = _read_bounded(path, 40_000)
     if len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
@@ -141,8 +139,10 @@ def _approved_manifest(
         raise ValueError("Manifest does not authorize requested data scope/family")
     for name in ("slice_sha256", "source_audit_sha256"):
         val = manifest[name]
-        if not isinstance(val, str) or len(val) != 64 or any(
-            c not in "0123456789abcdef" for c in val
+        if (
+            not isinstance(val, str)
+            or len(val) != 64
+            or any(c not in "0123456789abcdef" for c in val)
         ):
             raise ValueError("Missing pinned data provenance digest")
     if not isinstance(manifest["source"], str) or not manifest["source"].strip():
@@ -159,12 +159,14 @@ def _approved_manifest(
     if manifest["source_interval_seconds"] not in (3600, 86400):
         raise ValueError("Source interval must be approved hourly or daily")
     if not (
-        manifest["first_open_timestamp"] <= manifest["last_open_timestamp"]
+        manifest["first_open_timestamp"]
+        <= manifest["last_open_timestamp"]
         < manifest["approved_dev_end_exclusive"]
         <= manifest["extraction_asof_timestamp"]
     ):
         raise ValueError("Inconsistent manifest timestamps")
     return manifest
+
 
 def _validate_candles(
     candles: list[dict[str, Any]], family: str, source_interval_seconds: int = 3600
@@ -244,13 +246,12 @@ def load_development_slice(
     if (
         int(candles[0]["timestamp"]) != manifest["first_open_timestamp"]
         or int(candles[-1]["timestamp"]) != manifest["last_open_timestamp"]
-        or _bar_end(int(candles[-1]["timestamp"]), family)
-        > manifest["approved_dev_end_exclusive"]
-        or _bar_end(int(candles[-1]["timestamp"]), family)
-        > manifest["extraction_asof_timestamp"]
+        or _bar_end(int(candles[-1]["timestamp"]), family) > manifest["approved_dev_end_exclusive"]
+        or _bar_end(int(candles[-1]["timestamp"]), family) > manifest["extraction_asof_timestamp"]
     ):
         raise ValueError("Candle availability exceeds audited boundary")
     return candles, manifest, input_sha256
+
 
 def build_folds(
     candles: list[dict[str, Any]],
