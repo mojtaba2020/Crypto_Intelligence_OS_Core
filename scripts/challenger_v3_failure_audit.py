@@ -67,7 +67,12 @@ def audit_failures(statistical: dict, freeze: dict) -> dict:
             raise ValueError(f"{name} must not tune on V2 locked OOS")
     if statistical.get("production_promotion") is not False:
         raise ValueError("statistical report must not allow production promotion")
-    for forbidden in ("freeze_authorized", "fresh_oos_authorized", "champion_authorized", "production_eligible"):
+    for forbidden in (
+        "freeze_authorized",
+        "fresh_oos_authorized",
+        "champion_authorized",
+        "production_eligible",
+    ):
         if freeze.get(forbidden) is not False:
             raise ValueError(f"freeze packet must not authorize {forbidden}")
     if statistical.get("freeze_authorized") is not False:
