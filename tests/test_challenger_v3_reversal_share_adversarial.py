@@ -54,13 +54,8 @@ def test_sliding_window_matches_independent_formula_oracle(origin: int) -> None:
     bars = _fixture()
     returns = [math.log(CLOSES[j] / CLOSES[j - 1]) for j in range(1, len(CLOSES))]
     weights = [min(VOLUMES[i], VOLUMES[i - 1]) for i in range(origin - 6, origin + 1)]
-    indicators = [
-        float(returns[i - 1] * returns[i - 2] < 0)
-        for i in range(origin - 6, origin + 1)
-    ]
-    expected = sum(w * sign for w, sign in zip(weights, indicators, strict=True)) / sum(
-        weights
-    )
+    indicators = [float(returns[i - 1] * returns[i - 2] < 0) for i in range(origin - 6, origin + 1)]
+    expected = sum(w * sign for w, sign in zip(weights, indicators, strict=True)) / sum(weights)
     assert _value(bars, origin) == pytest.approx(expected, abs=1e-14)
 
 
