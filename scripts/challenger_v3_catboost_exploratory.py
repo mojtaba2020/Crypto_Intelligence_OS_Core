@@ -1,0 +1,523 @@
+#!/usr/bin/env python3
+"""Opt-in, development-only CatBoost research outside the frozen V3 family.
+
+This is NOT evidence of statistical significance, champion status or permission
+for a locked-OOS read. Only pre-extracted development/validation slices are allowed.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import importlib
+import importlib.metadata
+import json
+import math
+import os
+import platform
+import statistics
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+try:
+    from scripts.multitimeframe_features_v3 import (
+        WINDOWS,
+        _next_period_timestamp,
+        feature_vector,
+        is_temporally_valid_sample,
+    )
+except ModuleNotFoundError:  # direct execution from scripts/
+    from multitimeframe_features_v3 import (
+        WINDOWS,
+        _next_period_timestamp,
+        feature_vector,
+        is_temporally_valid_sample,
+    )
+
+SCOPE = "development_validation_only"
+SEED = 20261012
+MAX_FOLDS = 12
+MAX_TRAIN_ROWS = 256
+MIN_TRAIN_ROWS = 40
+FORBIDDEN_PATH_PARTS = ("locked", "oos", "production", "fresh")
+
+
+MAX_INPUT_BYTES = 10_000_000
+MANIFEST_FIELDS = {
+    "scope",
+    "source",
+    "family",
+    "slice_sha256",
+    "source_interval_seconds",
+    "first_open_timestamp",
+    "last_open_timestamp",
+    "approved_dev_end_exclusive",
+    "extraction_asof_timestamp",
+    "source_audit_sha256",
+}
+
+
+def _safe_path(path: Path, *, root: Path, suffix: str) -> Path:
+    """Contain a non-symlinked path beneath an explicitly approved root."""
+    if not path.is_absolute() or not root.is_absolute() or not root.is_dir():
+        raise ValueError("Paths must be absolute, with an existing approved root")
+    if ".." in path.parts or not path.name.endswith(suffix):
+        raise ValueError("Traversal or invalid file suffix")
+    for item in (root, path):
+        current = Path(item.anchor)
+        for part in item.parts[1:]:
+            current /= part
+            if current.is_symlink():
+                raise ValueError("Symlinked path or parent directory is forbidden")
+    approved_root = root.resolve(strict=True)
+    resolved = path.resolve(strict=False)
+    if not resolved.is_relative_to(approved_root) or resolved == approved_root:
+        raise ValueError("Path is outside the approved root")
+    if not resolved.parent.is_dir():
+        raise ValueError("Parent directory does not exist")
+    relative = resolved.relative_to(approved_root)
+    if any(word in part.lower() for part in relative.parts for word in FORBIDDEN_PATH_PARTS):
+        raise ValueError("Reserved/locked/production paths are forbidden")
+    return resolved
+
+
+def _isolated_roots(*roots: Path) -> None:
+    """Reject equal or nested roots, including resolved aliases, before file access.
+
+    This is an additional guard, not a replacement for read-only mounts and
+    inaccessible reserved datasets enforced outside this Python process.
+    """
+    resolved = []
+    for root in roots:
+        if not root.is_absolute() or not root.is_dir():
+            raise ValueError("Every approved root must be an existing absolute directory")
+        # Reuse the established path safety check to reject symlinked parents.
+        _safe_path(root / "boundary-check.development.json", root=root, suffix=".development.json")
+        resolved.append(root.resolve(strict=True))
+    for i, left in enumerate(resolved):
+        for right in resolved[i + 1 :]:
+            if left == right or left.is_relative_to(right) or right.is_relative_to(left):
+                raise ValueError("Approved roots must be pairwise disjoint (no nesting)")
+
+
+def _read_bounded(path: Path, limit: int) -> bytes:
+    """Read precisely one regular file buffer, without following final symlinks."""
+    import stat
+
+    # O_NONBLOCK prevents a FIFO/socket/device from hanging before fstat can
+    # reject its descriptor. Keep O_NOFOLLOW to refuse final symlinks.
+    descriptor = os.open(
+        path,
+        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0),
+    )
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise ValueError("Not a regular file")
+        content = bytearray()
+        while len(content) <= limit:
+            part = os.read(descriptor, min(65_536, limit + 1 - len(content)))
+            if not part:
+                break
+            content.extend(part)
+        if len(content) > limit:
+            raise ValueError("Input file exceeds size limit")
+        return bytes(content)
+    finally:
+        os.close(descriptor)
+
+
+def _parse_json(raw: bytes) -> Any:
+    return json.loads(
+        raw.decode("utf-8"),
+        parse_constant=lambda _: (_ for _ in ()).throw(ValueError("Nonfinite JSON")),
+    )
+
+
+def _bar_end(open_timestamp: int, family: str) -> int:
+    return _next_period_timestamp(open_timestamp, family)
+
+
+def _canonical_open(open_timestamp: int, family: str) -> bool:
+    date = datetime.fromtimestamp(open_timestamp, tz=UTC)
+    if date.hour or date.minute or date.second or date.microsecond:
+        return False
+    if family == "weekly":
+        return date.weekday() == 0
+    if family == "monthly":
+        return date.day == 1
+    return True
+
+
+def _approved_manifest(path: Path, root: Path, digest: str, family: str) -> dict[str, Any]:
+    path = _safe_path(path, root=root, suffix=".audit.json")
+    raw = _read_bounded(path, 40_000)
+    if len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+        raise ValueError("A pinned lowercase audit manifest SHA-256 is required")
+    if hashlib.sha256(raw).hexdigest() != digest:
+        raise ValueError("Audit manifest SHA-256 mismatch")
+    manifest = _parse_json(raw)
+    if not isinstance(manifest, dict) or set(manifest) != MANIFEST_FIELDS:
+        raise ValueError("Invalid closed-schema audit manifest")
+    if manifest["scope"] != SCOPE or manifest["family"] != family:
+        raise ValueError("Manifest does not authorize requested data scope/family")
+    for name in ("slice_sha256", "source_audit_sha256"):
+        val = manifest[name]
+        if (
+            not isinstance(val, str)
+            or len(val) != 64
+            or any(c not in "0123456789abcdef" for c in val)
+        ):
+            raise ValueError("Missing pinned data provenance digest")
+    if not isinstance(manifest["source"], str) or not manifest["source"].strip():
+        raise ValueError("Missing audited source identity")
+    for name in (
+        "source_interval_seconds",
+        "first_open_timestamp",
+        "last_open_timestamp",
+        "approved_dev_end_exclusive",
+        "extraction_asof_timestamp",
+    ):
+        if type(manifest[name]) is not int or manifest[name] <= 0:
+            raise ValueError("Invalid audited data boundary")
+    if manifest["source_interval_seconds"] not in (3600, 86400):
+        raise ValueError("Source interval must be approved hourly or daily")
+    if not (
+        manifest["first_open_timestamp"]
+        <= manifest["last_open_timestamp"]
+        < manifest["approved_dev_end_exclusive"]
+        <= manifest["extraction_asof_timestamp"]
+    ):
+        raise ValueError("Inconsistent manifest timestamps")
+    return manifest
+
+
+def _validate_candles(
+    candles: list[dict[str, Any]], family: str, source_interval_seconds: int = 3600
+) -> None:
+    if family not in WINDOWS:
+        raise ValueError("Unsupported time family")
+    if source_interval_seconds not in (3600, 86400):
+        raise ValueError("Unsupported source interval")
+    if len(candles) <= max(WINDOWS[family]) + MIN_TRAIN_ROWS + 1:
+        raise ValueError("Insufficient development-only candles")
+    last_timestamp: int | None = None
+    for row in candles:
+        if not isinstance(row, dict) or row.get("is_complete") is not True:
+            raise ValueError("Incomplete candles forbidden: never interpolate or backfill")
+        stamp = row.get("timestamp")
+        if type(stamp) not in (int, float) or not math.isfinite(stamp) or int(stamp) != stamp:
+            raise ValueError("Every candle requires a valid integer timestamp")
+        timestamp = int(stamp)
+        if not _canonical_open(timestamp, family):
+            raise ValueError("Noncanonical UTC bar-opening calendar")
+        if last_timestamp is not None and timestamp != _bar_end(last_timestamp, family):
+            raise ValueError("Noncontiguous candle calendar: no interpolation allowed")
+        last_timestamp = timestamp
+        duration = _bar_end(timestamp, family) - timestamp
+        if duration % source_interval_seconds:
+            raise ValueError("Source interval does not divide candle duration")
+        expected = duration // source_interval_seconds
+        if (
+            type(row.get("source_bars")) is not int
+            or type(row.get("expected_source_bars")) is not int
+            or row["source_bars"] != expected
+            or row["expected_source_bars"] != expected
+        ):
+            raise ValueError("Source-bars completeness evidence mismatch")
+        for name in ("open", "high", "low", "close", "volume"):
+            value = row.get(name)
+            if type(value) not in (float, int) or not math.isfinite(value):
+                raise ValueError(f"Nonfinite or invalid candle {name}")
+        opening, high, low, close = (float(row[k]) for k in ("open", "high", "low", "close"))
+        if (
+            low <= 0
+            or min(opening, close) <= 0
+            or high < max(opening, close)
+            or low > min(opening, close)
+            or float(row["volume"]) < 0
+        ):
+            raise ValueError("Invalid OHLCV bounds")
+
+
+def load_development_slice(
+    path: Path,
+    *,
+    approved_root: Path,
+    manifest_path: Path,
+    manifest_root: Path,
+    manifest_sha256: str,
+    family: str,
+) -> tuple[list[dict[str, Any]], dict[str, Any], str]:
+    """Load exact pinned bytes; scope claims are NOT independent provenance proof."""
+    manifest = _approved_manifest(manifest_path, manifest_root, manifest_sha256, family)
+    path = _safe_path(path, root=approved_root, suffix=".development.json")
+    raw = _read_bounded(path, MAX_INPUT_BYTES)
+    input_sha256 = hashlib.sha256(raw).hexdigest()
+    if input_sha256 != manifest["slice_sha256"]:
+        raise ValueError("Development slice SHA-256 does not match audit manifest")
+    payload = _parse_json(raw)
+    if not isinstance(payload, dict) or set(payload) != {"scope", "source", "candles"}:
+        raise ValueError("Expected closed-schema development-slice payload")
+    if payload["scope"] != SCOPE:
+        raise ValueError("Fresh Locked OOS or other non-development scope is forbidden")
+    if payload["source"] != manifest["source"]:
+        raise ValueError("Development source differs from approved manifest")
+    candles = payload["candles"]
+    if not isinstance(candles, list) or not all(isinstance(item, dict) for item in candles):
+        raise ValueError("Development candles must be a list of objects")
+    _validate_candles(candles, family, manifest["source_interval_seconds"])
+    if (
+        int(candles[0]["timestamp"]) != manifest["first_open_timestamp"]
+        or int(candles[-1]["timestamp"]) != manifest["last_open_timestamp"]
+        or _bar_end(int(candles[-1]["timestamp"]), family) > manifest["approved_dev_end_exclusive"]
+        or _bar_end(int(candles[-1]["timestamp"]), family) > manifest["extraction_asof_timestamp"]
+    ):
+        raise ValueError("Candle availability exceeds audited boundary")
+    return candles, manifest, input_sha256
+
+
+def build_folds(
+    candles: list[dict[str, Any]],
+    *,
+    family: str,
+    horizon: int,
+    train_end: int,
+    stride: int,
+    source_interval_seconds: int,
+    max_folds: int = MAX_FOLDS,
+) -> list[dict[str, Any]]:
+    """Construct point-in-time folds with audited source cadence and mature labels."""
+    _validate_candles(candles, family, source_interval_seconds)
+    if not 1 <= horizon <= 36 or stride <= 0 or not 1 <= max_folds <= MAX_FOLDS:
+        raise ValueError("Horizon, stride or fold budget out of bounds")
+    longest = max(WINDOWS[family])
+    if train_end < longest + horizon + MIN_TRAIN_ROWS or train_end + horizon >= len(candles):
+        raise ValueError("Training boundary or diagnostic segment is insufficient")
+    origins = list(range(train_end, len(candles) - horizon, stride))[:max_folds]
+    folds = []
+    for origin in origins:
+        if not is_temporally_valid_sample(candles, family, origin, horizon):
+            raise ValueError("Diagnostic forecast has missing/incomplete feature or target bars")
+        train_origins = []
+        for i in range(origin - horizon, longest - 1, -1):
+            if is_temporally_valid_sample(candles, family, i, horizon):
+                train_origins.append(i)
+            if len(train_origins) == MAX_TRAIN_ROWS:
+                break
+        train_origins.reverse()
+        if len(train_origins) < MIN_TRAIN_ROWS:
+            raise ValueError("Insufficient mature and gap-safe training labels")
+        if any(i + horizon > origin for i in train_origins):
+            raise RuntimeError("Immature target leakage detected")
+        x = [feature_vector(candles, i, family) for i in train_origins]
+        y = [
+            math.log(float(candles[i + horizon]["close"]) / float(candles[i]["close"]))
+            for i in train_origins
+        ]
+        forecast_x = feature_vector(candles, origin, family)
+        if any(not math.isfinite(v) for row in [*x, forecast_x] for v in row):
+            raise ValueError("Nonfinite features")
+        folds.append(
+            {
+                "origin": origin,
+                "last_train_target_index": max(train_origins) + horizon,
+                "last_train_target_maturity_timestamp": _bar_end(
+                    int(candles[max(train_origins) + horizon]["timestamp"]), family
+                ),
+                "forecast_available_timestamp": _bar_end(int(candles[origin]["timestamp"]), family),
+                "target_maturity_timestamp": _bar_end(
+                    int(candles[origin + horizon]["timestamp"]), family
+                ),
+                "x": x,
+                "y": y,
+                "forecast_x": forecast_x,
+            }
+        )
+    if not folds:
+        raise ValueError("No eligible exploratory forecast origins")
+    return folds
+
+
+def _new_estimator() -> Any:
+    try:
+        module = importlib.import_module("catboost")
+    except ImportError as exc:
+        raise RuntimeError(
+            "Optional CatBoost is not installed. Install catboost in an isolated "
+            "research environment; do not change production dependencies."
+        ) from exc
+    return module.CatBoostRegressor(
+        iterations=120,
+        depth=4,
+        learning_rate=0.03,
+        l2_leaf_reg=4.0,
+        loss_function="RMSE",
+        random_seed=SEED,
+        thread_count=1,
+        bootstrap_type="No",
+        random_strength=0.0,
+        allow_writing_files=False,
+        verbose=False,
+    )
+
+
+def evaluate_exploratory(
+    candles: list[dict[str, Any]],
+    *,
+    family: str,
+    horizon: int,
+    train_end: int,
+    stride: int,
+    source_interval_seconds: int,
+    max_folds: int = MAX_FOLDS,
+) -> dict[str, Any]:
+    folds = build_folds(
+        candles,
+        family=family,
+        horizon=horizon,
+        train_end=train_end,
+        stride=stride,
+        source_interval_seconds=source_interval_seconds,
+        max_folds=max_folds,
+    )
+    records = []
+    for fold in folds:
+        # A fresh model on every fold; no global transforms or fitted state.
+        model = _new_estimator()
+        model.fit(fold["x"], fold["y"])
+        predicted_return = float(model.predict([fold["forecast_x"]])[0])
+        if not math.isfinite(predicted_return) or abs(predicted_return) > 20:
+            raise ValueError("Nonfinite or unbounded exploratory prediction")
+        origin = int(fold["origin"])
+        actual = float(candles[origin + horizon]["close"])
+        persistent = float(candles[origin]["close"])
+        forecast = persistent * math.exp(predicted_return)
+        persistence_ape = abs(persistent - actual) / actual
+        catboost_ape = abs(forecast - actual) / actual
+        records.append(
+            {
+                "origin_index": origin,
+                "origin_timestamp": candles[origin]["timestamp"],
+                "last_train_target_index": fold["last_train_target_index"],
+                "last_train_target_maturity_timestamp": fold[
+                    "last_train_target_maturity_timestamp"
+                ],
+                "forecast_available_timestamp": fold["forecast_available_timestamp"],
+                "target_maturity_timestamp": fold["target_maturity_timestamp"],
+                "training_rows": len(fold["y"]),
+                "predicted_log_return": predicted_return,
+                "predicted_close": forecast,
+                "persistence_close": persistent,
+                "actual_close": actual,
+                "persistence_ape": persistence_ape,
+                "catboost_ape": catboost_ape,
+                "paired_improvement": persistence_ape - catboost_ape,
+            }
+        )
+    return {
+        "status": "EXPLORATORY_ONLY",
+        "freeze": "NO_FREEZE",
+        "scope": SCOPE,
+        "fresh_locked_oos_access": False,
+        "v2_locked_oos_used_for_tuning": False,
+        "production_promotion": False,
+        "family": family,
+        "horizon_bars": horizon,
+        "source_interval_seconds": source_interval_seconds,
+        "train_end": train_end,
+        "stride": stride,
+        "seed": SEED,
+        "model": "CatBoostRegressor (fixed hyperparameters, separate from frozen V3 family)",
+        "statistical_claim": "NONE: descriptive paired errors only",
+        "training_objective": "RMSE on horizon log-returns",
+        "evaluation_metric": "APE paired with same-origin persistence",
+        "diagnostic_targets_overlap": stride < horizon,
+        "independent_origin_count": None,
+        "n_origins": len(records),
+        "mean_paired_improvement": statistics.fmean(r["paired_improvement"] for r in records),
+        "paired_records": records,
+        "model_hyperparameters": {
+            "iterations": 120,
+            "depth": 4,
+            "learning_rate": 0.03,
+            "l2_leaf_reg": 4.0,
+            "loss_function": "RMSE",
+            "random_seed": SEED,
+            "thread_count": 1,
+            "bootstrap_type": "No",
+            "random_strength": 0.0,
+            "allow_writing_files": False,
+            "verbose": False,
+        },
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--enable-exploratory", action="store_true")
+    parser.add_argument("--input", type=Path, required=True)
+    parser.add_argument("--approved-input-root", type=Path, required=True)
+    parser.add_argument("--approved-output-root", type=Path, required=True)
+    parser.add_argument("--approved-manifest-root", type=Path, required=True)
+    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--approved-manifest-sha256", required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--family", choices=tuple(WINDOWS), required=True)
+    parser.add_argument("--horizon", type=int, required=True)
+    parser.add_argument("--train-end", type=int, required=True)
+    parser.add_argument("--stride", type=int, required=True)
+    parser.add_argument("--max-folds", type=int, default=MAX_FOLDS)
+    args = parser.parse_args()
+    if not args.enable_exploratory:
+        parser.error("The --enable-exploratory opt-in flag is required")
+    output = _safe_path(args.output, root=args.approved_output_root, suffix=".exploratory.json")
+    _isolated_roots(
+        args.approved_input_root,
+        args.approved_output_root,
+        args.approved_manifest_root,
+    )
+    if output.exists():
+        parser.error("Refusing to overwrite an existing artifact")
+    candles, manifest, input_sha256 = load_development_slice(
+        args.input,
+        approved_root=args.approved_input_root,
+        manifest_path=args.manifest,
+        manifest_root=args.approved_manifest_root,
+        manifest_sha256=args.approved_manifest_sha256,
+        family=args.family,
+    )
+    report = evaluate_exploratory(
+        candles,
+        family=args.family,
+        horizon=args.horizon,
+        train_end=args.train_end,
+        stride=args.stride,
+        source_interval_seconds=manifest["source_interval_seconds"],
+        max_folds=args.max_folds,
+    )
+    report["source"] = manifest["source"]
+    report["input_sha256"] = input_sha256
+    report["approved_manifest_sha256"] = args.approved_manifest_sha256
+    report["source_audit_sha256"] = manifest["source_audit_sha256"]
+    report["approved_dev_end_exclusive"] = manifest["approved_dev_end_exclusive"]
+    report["extraction_asof_timestamp"] = manifest["extraction_asof_timestamp"]
+    report["feature_code_sha256"] = hashlib.sha256(
+        (Path(__file__).resolve().parent / "multitimeframe_features_v3.py").read_bytes()
+    ).hexdigest()
+    report["runner_code_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    report["python_version"] = platform.python_version()
+    report["catboost_version"] = importlib.metadata.version("catboost")
+    report["source_manifest_role"] = "operator-approved assertion; not independent evidence"
+    # Exclusive create prevents overwrite and O_NOFOLLOW blocks final symlinks.
+    # Filesystem permissions must also prohibit all reserved-data access.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(output, flags, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as stream:
+        json.dump(report, stream, indent=2, sort_keys=True, allow_nan=False)
+        stream.write("\n")
+    print(f"EXPLORATORY_ONLY NO_FREEZE wrote {output}")
+
+
+if __name__ == "__main__":
+    main()
