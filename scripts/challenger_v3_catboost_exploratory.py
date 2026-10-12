@@ -82,11 +82,35 @@ def _safe_path(path: Path, *, root: Path, suffix: str) -> Path:
     return resolved
 
 
+def _isolated_roots(*roots: Path) -> None:
+    """Reject equal or nested roots, including resolved aliases, before file access.
+
+    This is an additional guard, not a replacement for read-only mounts and
+    inaccessible reserved datasets enforced outside this Python process.
+    """
+    resolved = []
+    for root in roots:
+        if not root.is_absolute() or not root.is_dir():
+            raise ValueError("Every approved root must be an existing absolute directory")
+        # Reuse the established path safety check to reject symlinked parents.
+        _safe_path(root / "boundary-check.development.json", root=root, suffix=".development.json")
+        resolved.append(root.resolve(strict=True))
+    for i, left in enumerate(resolved):
+        for right in resolved[i + 1 :]:
+            if left == right or left.is_relative_to(right) or right.is_relative_to(left):
+                raise ValueError("Approved roots must be pairwise disjoint (no nesting)")
+
+
 def _read_bounded(path: Path, limit: int) -> bytes:
     """Read precisely one regular file buffer, without following final symlinks."""
     import stat
 
-    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    # O_NONBLOCK prevents a FIFO/socket/device from hanging before fstat can
+    # reject its descriptor. Keep O_NOFOLLOW to refuse final symlinks.
+    descriptor = os.open(
+        path,
+        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0),
+    )
     try:
         if not stat.S_ISREG(os.fstat(descriptor).st_mode):
             raise ValueError("Not a regular file")
@@ -260,10 +284,11 @@ def build_folds(
     horizon: int,
     train_end: int,
     stride: int,
+    source_interval_seconds: int,
     max_folds: int = MAX_FOLDS,
 ) -> list[dict[str, Any]]:
-    """Construct point-in-time folds with labels mature by each forecast origin."""
-    _validate_candles(candles, family)
+    """Construct point-in-time folds with audited source cadence and mature labels."""
+    _validate_candles(candles, family, source_interval_seconds)
     if not 1 <= horizon <= 36 or stride <= 0 or not 1 <= max_folds <= MAX_FOLDS:
         raise ValueError("Horizon, stride or fold budget out of bounds")
     longest = max(WINDOWS[family])
@@ -344,6 +369,7 @@ def evaluate_exploratory(
     horizon: int,
     train_end: int,
     stride: int,
+    source_interval_seconds: int,
     max_folds: int = MAX_FOLDS,
 ) -> dict[str, Any]:
     folds = build_folds(
@@ -352,6 +378,7 @@ def evaluate_exploratory(
         horizon=horizon,
         train_end=train_end,
         stride=stride,
+        source_interval_seconds=source_interval_seconds,
         max_folds=max_folds,
     )
     records = []
@@ -397,6 +424,7 @@ def evaluate_exploratory(
         "production_promotion": False,
         "family": family,
         "horizon_bars": horizon,
+        "source_interval_seconds": source_interval_seconds,
         "train_end": train_end,
         "stride": stride,
         "seed": SEED,
@@ -444,13 +472,11 @@ def main() -> None:
     if not args.enable_exploratory:
         parser.error("The --enable-exploratory opt-in flag is required")
     output = _safe_path(args.output, root=args.approved_output_root, suffix=".exploratory.json")
-    if args.approved_output_root.resolve() == args.approved_input_root.resolve():
-        parser.error("Input and output roots must be distinct")
-    if args.approved_manifest_root.resolve() in (
-        args.approved_input_root.resolve(),
-        args.approved_output_root.resolve(),
-    ):
-        parser.error("Operator-approved audit manifest must be kept in a separate root")
+    _isolated_roots(
+        args.approved_input_root,
+        args.approved_output_root,
+        args.approved_manifest_root,
+    )
     if output.exists():
         parser.error("Refusing to overwrite an existing artifact")
     candles, manifest, input_sha256 = load_development_slice(
@@ -467,6 +493,7 @@ def main() -> None:
         horizon=args.horizon,
         train_end=args.train_end,
         stride=args.stride,
+        source_interval_seconds=manifest["source_interval_seconds"],
         max_folds=args.max_folds,
     )
     report["source"] = manifest["source"]
