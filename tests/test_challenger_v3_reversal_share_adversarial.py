@@ -69,6 +69,7 @@ def test_origin_close_is_used_not_treated_as_future() -> None:
     initial = _value(bars, 8)
     # A zero return at the current closed bar removes its last reversal.
     bars[8]["close"] = bars[7]["close"]
+    bars[8]["low"] = float(bars[8]["close"]) * 0.98
     assert _value(bars, 8) < initial
 
 
