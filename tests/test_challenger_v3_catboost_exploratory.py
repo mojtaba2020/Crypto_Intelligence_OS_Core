@@ -378,7 +378,8 @@ def test_fifo_input_rejected_without_blocking(tmp_path: Path) -> None:
         "else:\n"
         "    raise SystemExit(3)\n"
     )
-    result = subprocess.run(
+    # Trusted sys.executable, literal inline test program, temporary FIFO, fixed timeout.
+    result = subprocess.run(  # noqa: S603
         [sys.executable, "-c", script, str(fifo)],
         check=False,
         capture_output=True,
