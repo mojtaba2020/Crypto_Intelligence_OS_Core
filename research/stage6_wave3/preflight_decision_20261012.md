@@ -45,6 +45,34 @@ near-ULP windows match an independent comparison-based reversal oracle.
 Independent **post-fix** CodeX review is still required for synthetic
 engineering GO; this is a correction, not a GO claim.
 
+## Integer precision correction after the second independent NO-GO (2026-10-13)
+
+An independent Codex review of the previous numerical-fix head
+`4bdc80126da5595755cf95d952f95ddf2efadb98` found **P2 / NO-GO**
+for this **isolated synthetic preflight**. The original code accepted integer
+prices but converted them into floating-point before the sign comparison.
+For `a = 2**53`, `b = a + 1`, `float(a) == float(b)`, making seven
+true alternating price reversals falsely produce a zero share.
+
+The revised validator retains the original exact integer/finite-float values
+during OHLC bounds checking and close-order comparisons. It rejects bool and
+non-finite floats. Volume weights are accumulated with exact rational
+arithmetic (`fractions.Fraction`) to avoid silent large-integer rounding,
+overflow from float conversion, or weight cancellation. Only the final
+bounded dimensionless fraction is converted into the public float result.
+
+New synthetic regression coverage includes the original `2**53 + 1`
+counterexample, ties and mixed int/float price windows, enormous integer
+prices/volumes, invalid OHLC boundaries one integer apart, boolean/inf
+rejection, and 256 deterministic mixed-numeric windows with an independent
+rational weighted-oracle. These tests do not verify any dataset, feature
+accuracy, source provenance or physical filesystem isolation.
+
+**A green CI result alone remains insufficient for software GO.** Obtain
+a *new* independent adversarial Codex review on the final post-fix commit.
+Neither software signoff nor real-data readiness is presumed here. Stage-6
+scientific **NO-GO / NO_FREEZE / 0 of 24** remains unchanged.
+
 ## What this branch actually introduces
 
 - A **pure** deterministic Python function for the one fixed FEATURE-03
