@@ -6,7 +6,6 @@ import copy
 import math
 
 import pytest
-
 from scripts.challenger_v3_reversal_share_preflight import (
     daily_volume_supported_reversal_share,
 )
