@@ -87,6 +87,20 @@ script validates the supplied digest, counts, alignment and cutoff but **cannot
 prove that this review actually occurred**. Do not self-approve a manifest
 using the historical observed diagnostics as independent new evidence.
 
+A weekly prepared series can be backed by either audited hourly source bars
+(168 per seven-day UTC week) or audited daily source bars (7 per week).
+The exact source_interval_seconds from the approved manifest is propagated
+into fold construction and repeated validation; the runner never silently
+defaults a daily-source slice back to 3600 seconds. Full synthetic CLI
+regressions cover both approved source cadences.
+
+The three approved roots must be **pairwise disjoint**, not merely unequal:
+neither input, output, nor manifest root may be an ancestor or descendant of
+another. A nonblocking open plus regular-file fstat rejects FIFO/device input
+without waiting for a writer. Those are defensive checks, **not** replacements
+for OS mount/permission isolation, safe trusted manifests and race-safe
+filesystem policy.
+
 Every development candle must include exact complete OHLCV, a canonical UTC
 bar-open timestamp, is_complete=true, and matching source_bars and
 expected_source_bars equal to the number of source intervals in the actual
