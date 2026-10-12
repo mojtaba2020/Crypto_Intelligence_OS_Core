@@ -5,6 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
+import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -34,7 +37,13 @@ def _candles(n: int = 114) -> list[dict[str, object]]:
 
 def _folds(rows: list[dict[str, object]]) -> list[dict[str, object]]:
     return exploratory.build_folds(
-        rows, family="weekly", horizon=2, train_end=102, stride=3, max_folds=3
+        rows,
+        family="weekly",
+        horizon=2,
+        train_end=102,
+        stride=3,
+        source_interval_seconds=3600,
+        max_folds=3
     )
 
 
@@ -230,7 +239,14 @@ def test_fold_isolation_seed_and_descriptive_flags(monkeypatch: pytest.MonkeyPat
         "import_module",
         lambda _: SimpleNamespace(CatBoostRegressor=FakeCatBoost),
     )
-    kw = {"family": "weekly", "horizon": 2, "train_end": 102, "stride": 3, "max_folds": 3}
+    kw = {
+        "family": "weekly",
+        "horizon": 2,
+        "train_end": 102,
+        "stride": 3,
+        "source_interval_seconds": 3600,
+        "max_folds": 3,
+    }
     first = exploratory.evaluate_exploratory(_candles(), **kw)
     second = exploratory.evaluate_exploratory(_candles(), **kw)
     assert first == second
@@ -246,7 +262,129 @@ def test_fold_isolation_seed_and_descriptive_flags(monkeypatch: pytest.MonkeyPat
 def test_cost_bounds_and_immature_diagnostic_rejected() -> None:
     with pytest.raises(ValueError, match="budget"):
         exploratory.build_folds(
-            _candles(), family="weekly", horizon=2, train_end=102, stride=1, max_folds=13
+            _candles(), family="weekly", horizon=2, train_end=102, stride=1,
+            source_interval_seconds=3600, max_folds=13
         )
     with pytest.raises(ValueError, match="insufficient"):
-        exploratory.build_folds(_candles(), family="weekly", horizon=2, train_end=113, stride=1)
+        exploratory.build_folds(_candles(), family="weekly", horizon=2, train_end=113, stride=1,
+            source_interval_seconds=3600)
+
+
+@pytest.mark.parametrize(
+    ("source_interval", "expected_bars"), [(3600, 168), (86400, 7)]
+)
+def test_audited_source_cadence_propagates_from_loader_to_full_cli(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    source_interval: int,
+    expected_bars: int,
+) -> None:
+    """Real parser/loader/folds/output; synthetic data and stubbed estimator only."""
+    input_root = tmp_path / "input"
+    manifest_root = tmp_path / "manifests"
+    output_root = tmp_path / "outputs"
+    for root in (input_root, manifest_root, output_root):
+        root.mkdir()
+    path, manifest_path, _ = _write_approved_slice(input_root)
+    payload = json.loads(path.read_text())
+    for row in payload["candles"]:
+        row["source_bars"] = expected_bars
+        row["expected_source_bars"] = expected_bars
+    input_bytes = json.dumps(payload).encode()
+    path.write_bytes(input_bytes)
+    manifest = json.loads(manifest_path.read_text())
+    manifest["source_interval_seconds"] = source_interval
+    manifest["slice_sha256"] = hashlib.sha256(input_bytes).hexdigest()
+    manifest_path = manifest_path.replace(manifest_root / "operator.audit.json")
+    manifest_bytes = json.dumps(manifest).encode()
+    manifest_path.write_bytes(manifest_bytes)
+    pinned_hash = hashlib.sha256(manifest_bytes).hexdigest()
+
+    class StubEstimator:
+        def fit(self, x: list[list[float]], y: list[float]) -> None:
+            assert len(x) == len(y)
+
+        def predict(self, rows: list[list[float]]) -> list[float]:
+            return [0.0] * len(rows)
+
+    monkeypatch.setattr(exploratory, "_new_estimator", StubEstimator)
+    monkeypatch.setattr(exploratory.importlib.metadata, "version", lambda _: "stub-only")
+    output_path = output_root / "synthetic.exploratory.json"
+    argv = [
+        "catboost-lane",
+        "--enable-exploratory",
+        "--approved-input-root", str(input_root),
+        "--approved-output-root", str(output_root),
+        "--approved-manifest-root", str(manifest_root),
+        "--input", str(path),
+        "--manifest", str(manifest_path),
+        "--approved-manifest-sha256", pinned_hash,
+        "--output", str(output_path),
+        "--family", "weekly",
+        "--horizon", "2",
+        "--train-end", "102",
+        "--stride", "3",
+        "--max-folds", "3",
+    ]
+    monkeypatch.setattr(sys, "argv", argv)
+    exploratory.main()
+    result = json.loads(output_path.read_text())
+    assert result["source_interval_seconds"] == source_interval
+    assert result["input_sha256"] == manifest["slice_sha256"]
+    assert result["n_origins"] == 3
+    assert result["freeze"] == "NO_FREEZE"
+    assert result["catboost_version"] == "stub-only"
+    with pytest.raises(SystemExit):
+        exploratory.main()  # O_EXCL/output-preservation guard
+
+
+@pytest.mark.parametrize(
+    ("parent", "child"), [(0, 1), (1, 0), (0, 2), (2, 0), (1, 2), (2, 1)]
+)
+def test_every_pair_of_nested_approved_roots_is_rejected(
+    tmp_path: Path, parent: int, child: int
+) -> None:
+    roots = [tmp_path / "input", tmp_path / "output", tmp_path / "manifest"]
+    roots[child] = roots[parent] / "nested"
+    for root in roots:
+        root.mkdir(parents=True, exist_ok=True)
+    with pytest.raises(ValueError, match="pairwise disjoint"):
+        exploratory._isolated_roots(*roots)
+
+
+def test_separate_sibling_roots_are_accepted(tmp_path: Path) -> None:
+    roots = [tmp_path / name for name in ("input", "output", "manifest")]
+    for root in roots:
+        root.mkdir()
+    exploratory._isolated_roots(*roots)
+
+
+@pytest.mark.skipif(
+    not hasattr(os, "mkfifo") or not hasattr(os, "O_NONBLOCK"),
+    reason="POSIX FIFO support needed",
+)
+def test_fifo_input_rejected_without_blocking(tmp_path: Path) -> None:
+    """A regression to blocking os.open must fail by subprocess timeout."""
+    fifo = tmp_path / "synthetic-pipe"
+    os.mkfifo(fifo)
+    script = (
+        "import sys\n"
+        "from pathlib import Path\n"
+        "from scripts import challenger_v3_catboost_exploratory as lane\n"
+        "try:\n"
+        "    lane._read_bounded(Path(sys.argv[1]), 100)\n"
+        "except ValueError:\n"
+        "    print('rejected')\n"
+        "else:\n"
+        "    raise SystemExit(3)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script, str(fifo)],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=5,
+        cwd=Path(__file__).resolve().parents[1],
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "rejected"
