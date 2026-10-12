@@ -93,7 +93,8 @@ def test_tiny_price_changes_with_nonuniform_volume_match_comparison_oracle() -> 
 
 
 def test_256_seeded_near_ulp_windows_against_direct_price_order_oracle() -> None:
-    rng = random.Random(20261013)
+    # Deterministic synthetic fixture only: no secrets or security-sensitive randomness.
+    rng = random.Random(20261013)  # noqa: S311
     center = 100.0
     levels = [
         math.nextafter(center, -math.inf),
