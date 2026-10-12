@@ -21,6 +21,30 @@ protected persistence baseline, and reserved Fresh Locked OOS unchanged.
 - These are distinct *proposals* made independently. They do NOT form a
   mutually approved prospective hypothesis or valid evidence of accuracy.
 
+## Numerical-correctness correction after independent review (2026-10-13)
+
+An independent Codex review of head `bcfb562a10a3db99221c14031d12bed98f4901f6`
+reported **P2 / NO-GO for the isolated synthetic preflight**: subtracting
+separately rounded `log(C_i)` values can produce a false zero for distinct
+adjacent floating-point closes. The original ordinary-price test suite (536
+passing full-suite tests at that prior head) did not catch this issue.
+
+The subsequent code correction determines the strict direction of each
+mathematical log-return by direct ordering of previously validated positive
+closes: `C_i > C_(i-1)` (up), `C_i < C_(i-1)` (down), equality (zero).
+The logarithm is strictly increasing for positive prices, so this preserves
+the exact **sign** needed by `1(r_i*r_(i-1)<0)` without subtracting rounded
+logarithms. No return magnitudes are used or approximated. The rest of the
+frozen weighting definition and bounds remain unchanged.
+
+The new synthetic numeric suite asserts alternating one-ULP prices really
+produce seven reversals (including small/large magnitudes), exact ties never
+count as reversals, uneven volume weights remain correct, and 256 seeded
+near-ULP windows match an independent comparison-based reversal oracle.
+**These tests cannot establish market-data provenance or performance.**
+Independent **post-fix** CodeX review is still required for synthetic
+engineering GO; this is a correction, not a GO claim.
+
 ## What this branch actually introduces
 
 - A **pure** deterministic Python function for the one fixed FEATURE-03
