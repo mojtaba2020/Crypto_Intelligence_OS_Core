@@ -66,6 +66,15 @@ def test_known_five_of_seven_reversals() -> None:
     assert _feature(rows) == pytest.approx(5 / 7)
 
 
+def test_nonuniform_volumes_change_the_weighted_reversal_share() -> None:
+    rows = _rows([100, 110, 99, 108, 100, 100, 99, 102, 101])
+    for row, volume in zip(rows, [1, 1, 1, 2, 2, 2, 10, 10, 10], strict=True):
+        row["volume"] = float(volume)
+    # Five reversing adjacent-return pairs, weighted (1+1+2+10+10)
+    # out of all seven pairs (1+1+2+2+2+10+10).
+    assert _feature(rows) == pytest.approx(6 / 7)
+
+
 def test_future_mutations_are_ignored_even_at_next_bar() -> None:
     rows = _rows()
     before = _feature(rows)
