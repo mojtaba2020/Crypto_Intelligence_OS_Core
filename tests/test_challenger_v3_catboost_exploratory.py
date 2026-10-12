@@ -43,7 +43,7 @@ def _folds(rows: list[dict[str, object]]) -> list[dict[str, object]]:
         train_end=102,
         stride=3,
         source_interval_seconds=3600,
-        max_folds=3
+        max_folds=3,
     )
 
 
@@ -262,17 +262,26 @@ def test_fold_isolation_seed_and_descriptive_flags(monkeypatch: pytest.MonkeyPat
 def test_cost_bounds_and_immature_diagnostic_rejected() -> None:
     with pytest.raises(ValueError, match="budget"):
         exploratory.build_folds(
-            _candles(), family="weekly", horizon=2, train_end=102, stride=1,
-            source_interval_seconds=3600, max_folds=13
+            _candles(),
+            family="weekly",
+            horizon=2,
+            train_end=102,
+            stride=1,
+            source_interval_seconds=3600,
+            max_folds=13,
         )
     with pytest.raises(ValueError, match="insufficient"):
-        exploratory.build_folds(_candles(), family="weekly", horizon=2, train_end=113, stride=1,
-            source_interval_seconds=3600)
+        exploratory.build_folds(
+            _candles(),
+            family="weekly",
+            horizon=2,
+            train_end=113,
+            stride=1,
+            source_interval_seconds=3600,
+        )
 
 
-@pytest.mark.parametrize(
-    ("source_interval", "expected_bars"), [(3600, 168), (86400, 7)]
-)
+@pytest.mark.parametrize(("source_interval", "expected_bars"), [(3600, 168), (86400, 7)])
 def test_audited_source_cadence_propagates_from_loader_to_full_cli(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -313,18 +322,30 @@ def test_audited_source_cadence_propagates_from_loader_to_full_cli(
     argv = [
         "catboost-lane",
         "--enable-exploratory",
-        "--approved-input-root", str(input_root),
-        "--approved-output-root", str(output_root),
-        "--approved-manifest-root", str(manifest_root),
-        "--input", str(path),
-        "--manifest", str(manifest_path),
-        "--approved-manifest-sha256", pinned_hash,
-        "--output", str(output_path),
-        "--family", "weekly",
-        "--horizon", "2",
-        "--train-end", "102",
-        "--stride", "3",
-        "--max-folds", "3",
+        "--approved-input-root",
+        str(input_root),
+        "--approved-output-root",
+        str(output_root),
+        "--approved-manifest-root",
+        str(manifest_root),
+        "--input",
+        str(path),
+        "--manifest",
+        str(manifest_path),
+        "--approved-manifest-sha256",
+        pinned_hash,
+        "--output",
+        str(output_path),
+        "--family",
+        "weekly",
+        "--horizon",
+        "2",
+        "--train-end",
+        "102",
+        "--stride",
+        "3",
+        "--max-folds",
+        "3",
     ]
     monkeypatch.setattr(sys, "argv", argv)
     exploratory.main()
@@ -338,9 +359,7 @@ def test_audited_source_cadence_propagates_from_loader_to_full_cli(
         exploratory.main()  # O_EXCL/output-preservation guard
 
 
-@pytest.mark.parametrize(
-    ("parent", "child"), [(0, 1), (1, 0), (0, 2), (2, 0), (1, 2), (2, 1)]
-)
+@pytest.mark.parametrize(("parent", "child"), [(0, 1), (1, 0), (0, 2), (2, 0), (1, 2), (2, 1)])
 def test_every_pair_of_nested_approved_roots_is_rejected(
     tmp_path: Path, parent: int, child: int
 ) -> None:
