@@ -101,14 +101,29 @@ def daily_volume_supported_reversal_share(
         closes.append(prices["close"])
         volumes.append(prices["volume"])
 
-    returns = [math.log(closes[i]) - math.log(closes[i - 1]) for i in range(1, LOOKBACK_BARS)]
+    # log(x) is strictly increasing for positive x, but computing
+    # log(close_now) - log(close_before) can round genuine one-ULP changes
+    # to zero. Compare validated closes directly to retain the exact sign
+    # of the mathematical log-return, including strict-zero semantics.
+    directions: list[int] = []
+    for current, previous in zip(closes[1:], closes[:-1], strict=True):
+        if current > previous:
+            directions.append(1)
+        elif current < previous:
+            directions.append(-1)
+        else:
+            directions.append(0)
+
     weighted_reversals: list[float] = []
     weights: list[float] = []
-    # i=2 needs adjacent returns ending at i-1 and i; last ends at i=8.
+    # i=2 needs adjacent return signs ending at i-1 and i; last ends at i=8.
     for i in range(2, LOOKBACK_BARS):
         weight = min(volumes[i], volumes[i - 1])
         weights.append(weight)
-        weighted_reversals.append(weight if returns[i - 1] * returns[i - 2] < 0 else 0.0)
+        reversed_direction = (
+            directions[i - 1] != 0 and directions[i - 1] == -directions[i - 2]
+        )
+        weighted_reversals.append(weight if reversed_direction else 0.0)
     if len(weights) != REVERSAL_COMPARISONS:
         raise RuntimeError("Reversal feature window unexpectedly changed")
     denominator = math.fsum(weights)
