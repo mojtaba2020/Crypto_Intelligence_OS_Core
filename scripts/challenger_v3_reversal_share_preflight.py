@@ -60,10 +60,7 @@ def daily_volume_supported_reversal_share(
             type(opening) is not int
             or opening < 0
             or opening % SECONDS_PER_DAY
-            or (
-                previous_open is not None
-                and opening != previous_open + SECONDS_PER_DAY
-            )
+            or (previous_open is not None and opening != previous_open + SECONDS_PER_DAY)
         ):
             raise ValueError("Noncanonical, duplicated or missing UTC daily bar")
         previous_open = opening
@@ -104,10 +101,7 @@ def daily_volume_supported_reversal_share(
         closes.append(prices["close"])
         volumes.append(prices["volume"])
 
-    returns = [
-        math.log(closes[i]) - math.log(closes[i - 1])
-        for i in range(1, LOOKBACK_BARS)
-    ]
+    returns = [math.log(closes[i]) - math.log(closes[i - 1]) for i in range(1, LOOKBACK_BARS)]
     weighted_reversals: list[float] = []
     weights: list[float] = []
     # i=2 needs adjacent returns ending at i-1 and i; last ends at i=8.
