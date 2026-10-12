@@ -120,9 +120,7 @@ def daily_volume_supported_reversal_share(
     for i in range(2, LOOKBACK_BARS):
         weight = min(volumes[i], volumes[i - 1])
         weights.append(weight)
-        reversed_direction = (
-            directions[i - 1] != 0 and directions[i - 1] == -directions[i - 2]
-        )
+        reversed_direction = directions[i - 1] != 0 and directions[i - 1] == -directions[i - 2]
         weighted_reversals.append(weight if reversed_direction else 0.0)
     if len(weights) != REVERSAL_COMPARISONS:
         raise RuntimeError("Reversal feature window unexpectedly changed")
