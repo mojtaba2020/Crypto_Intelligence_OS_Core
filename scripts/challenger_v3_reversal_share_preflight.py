@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping, Sequence
+from fractions import Fraction
 
 SECONDS_PER_DAY = 86_400
 LOOKBACK_BARS = 9
@@ -47,8 +48,10 @@ def daily_volume_supported_reversal_share(
     if len(window) != LOOKBACK_BARS:
         raise ValueError("Incomplete nine-bar history")
 
-    closes: list[float] = []
-    volumes: list[float] = []
+    # Keep validated integer prices as integers: float(2**53 + 1) loses
+    # the increment and can turn a genuine reversal into an exact tie.
+    closes: list[int | float] = []
+    volumes: list[int | float] = []
     previous_open: int | None = None
     approved_volume_unit: str | None = None
     for row in window:
@@ -85,12 +88,15 @@ def daily_volume_supported_reversal_share(
         elif unit != approved_volume_unit:
             raise ValueError("Inconsistent volume-unit identity")
 
-        prices: dict[str, float] = {}
+        prices: dict[str, int | float] = {}
         for key in ("open", "high", "low", "close", "volume"):
             value = row.get(key)
-            if type(value) not in (int, float) or not math.isfinite(value):
+            if not isinstance(value, (int, float)) or type(value) not in (int, float):
                 raise ValueError("Nonfinite or invalid OHLCV")
-            prices[key] = float(value)
+            # Every int is finite, including those too large to cast to float.
+            if isinstance(value, float) and not math.isfinite(value):
+                raise ValueError("Nonfinite or invalid OHLCV")
+            prices[key] = value
         if (
             min(prices["open"], prices["low"], prices["close"]) <= 0
             or prices["high"] < max(prices["open"], prices["close"])
@@ -114,21 +120,24 @@ def daily_volume_supported_reversal_share(
         else:
             directions.append(0)
 
-    weighted_reversals: list[float] = []
-    weights: list[float] = []
+    # Preserve exact nonnegative integer and binary-float volume weights too:
+    # min and Fraction do not round large integer volumes to float first.
+    numerator = Fraction(0)
+    denominator = Fraction(0)
+    comparisons = 0
     # i=2 needs adjacent return signs ending at i-1 and i; last ends at i=8.
     for i in range(2, LOOKBACK_BARS):
-        weight = min(volumes[i], volumes[i - 1])
-        weights.append(weight)
+        weight = Fraction(min(volumes[i], volumes[i - 1]))
+        denominator += weight
         reversed_direction = directions[i - 1] != 0 and directions[i - 1] == -directions[i - 2]
-        weighted_reversals.append(weight if reversed_direction else 0.0)
-    if len(weights) != REVERSAL_COMPARISONS:
+        if reversed_direction:
+            numerator += weight
+        comparisons += 1
+    if comparisons != REVERSAL_COMPARISONS:
         raise RuntimeError("Reversal feature window unexpectedly changed")
-    denominator = math.fsum(weights)
-    if not math.isfinite(denominator) or denominator <= 0:
+    if denominator <= 0:
         raise ValueError("Zero or nonfinite reversal-share denominator")
-    numerator = math.fsum(weighted_reversals)
-    result = numerator / denominator
+    result = float(numerator / denominator)
     if not math.isfinite(result) or not 0.0 <= result <= 1.0:
         raise ValueError("Reversal share is outside its mathematical domain")
     return result
