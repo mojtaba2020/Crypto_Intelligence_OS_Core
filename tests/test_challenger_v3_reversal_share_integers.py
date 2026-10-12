@@ -55,10 +55,7 @@ def _oracle(prices: list[int | float], volumes: list[int | float]) -> float:
     for i in range(2, 9):
         weight = Fraction(min(volumes[i], volumes[i - 1]))
         denominator += weight
-        if (
-            prices[i - 2] > prices[i - 1] < prices[i]
-            or prices[i - 2] < prices[i - 1] > prices[i]
-        ):
+        if prices[i - 2] > prices[i - 1] < prices[i] or prices[i - 2] < prices[i - 1] > prices[i]:
             numerator += weight
     return float(numerator / denominator)
 
@@ -118,6 +115,4 @@ def test_256_deterministic_large_int_and_mixed_float_windows() -> None:
     for trial in range(256):
         prices = [levels[(trial + 3 * i + i * i) % len(levels)] for i in range(9)]
         volumes = [((trial + 1) * (i + 3) % 19) + 1 for i in range(9)]
-        assert _value(_bars(prices, volumes)) == pytest.approx(
-            _oracle(prices, volumes), abs=1e-15
-        )
+        assert _value(_bars(prices, volumes)) == pytest.approx(_oracle(prices, volumes), abs=1e-15)
