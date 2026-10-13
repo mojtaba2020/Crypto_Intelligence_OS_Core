@@ -24,9 +24,12 @@ not OHLCV values, labels, predictions, model performance or residuals.
 The closed schema rejects any extra fields; the caller cannot pass prices,
 target values, feature scores or gains. A plan declares the origin start,
 exclusive stop, forecast hypothetical publication lag, review as-of,
-development-exclusive end and reserved-start boundary. Every scheduled origin
-**must** have one unique immutable schedule ID and matching record; a missing
-slot is an error, not quietly replenished or compressed.
+development-exclusive end and reserved-start boundary. Each scheduled origin **must** have the exact deterministic
+`origin:{horizon}:{origin_cutoff_utc}` ID, so arbitrary ID text and ID
+reassignment fail closed. A missing slot is an error, not quietly replenished
+or compressed. The generated ID itself is *not an externally immutable*
+approval: the plan, time range and its independently trusted identity still
+need to be signed/fixed by a separately authorized operator.
 
 Weekly start = Monday 00:00 UTC. Month starts = first of the calendar month
 00:00 UTC, so three months never means 90 days. For all horizons the target
@@ -72,6 +75,40 @@ times, or crossing the development/locked boundary exclude an origin.
    schedule-size guard and no I/O provider or reserved-data access.
 7. Run all synthetic tests on Python 3.13/3.14 and separately report a
    non-assigned **GO/NO-GO for this software preflight only**.
+
+## Independent Codex falsification and corrective patch (2026-10-13)
+
+The independent Codex review of the first PR #80 head
+`a228635976679a69c85dd49f652e4d86f047cc90` returned
+**engineering NO-GO** despite CI being green. This is a substantive software
+defect, not proof the audit metadata was safe.
+
+1. **P2: hidden outcome-bearing text channel:** arbitrary `schedule_id`
+   strings could carry `close=123.45;future_return=0.42;model_MAPE=0.01` and
+   get echoed into reports. The corrected function only accepts the exact
+   generated ASCII `origin:{horizon}:{timestamp}` identifier and emits that
+   generated value, never a caller-supplied descriptive string.
+2. **P2: silent ID reassignment:** swapping distinct arbitrary IDs among valid
+   origin rows previously passed. Expected identity now binds to the closed
+   allowlist horizon and exact canonical time; any switch fails. *This is
+   internal deterministic consistency, NOT proof of external immutable
+   authorization or a frozen human-reviewed schedule.*
+3. **P3: datetime support inconsistencies:** near year 9999, hourly/daily/
+   weekly arithmetic could generate an out-of-range `target_end` that was
+   labelled provisionally eligible, whereas monthly already failed. Now all
+   supplied absolute timestamps, source/target publication timestamps,
+   computed forecast-issue timestamps, and every nonmonthly advancement must
+   fit the supported UTC datetime range or fail closed. Calendar arithmetic
+   never silently wraps or fabricates future dates.
+
+The regression suite explicitly includes the original malicious ID payload,
+ID permutation, re-horizon tampering, invalid numeric ID, all four calendar
+families near the datetime limit, publication timestamp and issue-lag
+overflow, and invalid absolute plan boundaries. It remains synthetic-only.
+**Fresh independent adversarial review on the post-fix commit is required**
+before the software-only GO can be recorded. Existing research data
+publication history, label-blindness of a real source, and the true runner
+sandbox A1–A6 remain UNVERIFIED and NO_RUN.
 
 ## Future P0 operator handoff (NOT authorized by this branch)
 
