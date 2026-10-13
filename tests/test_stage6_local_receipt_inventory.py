@@ -60,9 +60,7 @@ def test_distinct_response_bytes_reported_without_price_revision_claim() -> None
 
 
 def test_same_bytes_at_different_observation_times_are_explicit_repeats() -> None:
-    result = audit_local_receipt_inventory(
-        _plan(1), [_receipt(0), _receipt(0, delay=45)]
-    )
+    result = audit_local_receipt_inventory(_plan(1), [_receipt(0), _receipt(0, delay=45)])
     assert result["repeated_same_response_slots"] == 1
     assert result["response_byte_change_slots"] == 0
     assert result["slots"][0]["status"] == "REPEATED_SAME_RESPONSE_BYTES"
