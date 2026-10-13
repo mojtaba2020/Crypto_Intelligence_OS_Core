@@ -387,7 +387,7 @@ def test_asof_inconsistent_first_insert_after_chosen_version_is_blocked() -> Non
 def test_asof_duplicate_version_slot_cannot_inflate_input_completeness() -> None:
     plan, inputs = _asof_fixture()
     with pytest.raises(ValueError, match="Duplicate"):
-        audit_claimed_asof_input_versions(plan, inputs + [inputs[0].copy()])
+        audit_claimed_asof_input_versions(plan, [*inputs, inputs[0].copy()])
 
 
 def test_asof_missing_either_source_or_training_label_stays_blocked() -> None:
