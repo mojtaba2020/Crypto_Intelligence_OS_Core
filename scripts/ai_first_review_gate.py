@@ -112,11 +112,15 @@ def assess_dry_run_fleet(manifest: dict, packets: Mapping[str, object]) -> dict[
     if not isinstance(packets, Mapping):
         raise ValueError("Task review packets must be a mapping")
     scheduled = [task for wave in fleet["planned_waves"] for task in wave]
+    # plan() validates dependencies but omits them from its display-only waves.
+    # Retain the validated input edges so a blocked prerequisite stays blocked.
+    dependencies = {task["id"]: task.get("depends_on", []) for task in manifest["tasks"]}
     task_ids = {task["id"] for task in scheduled}
     if any(type(key) is not str for key in packets) or set(packets) - task_ids:
         raise ValueError("Unexpected or unsupported review task")
     reviews: dict[str, dict[str, object]] = {}
     blocked: list[str] = []
+    blocked_ids: set[str] = set()
     for task in scheduled:
         task_id = task["id"]
         if task_id not in packets:
@@ -127,8 +131,17 @@ def assess_dry_run_fleet(manifest: dict, packets: Mapping[str, object]) -> dict[
             if packet["proposal"]["task_id"] != task_id:
                 raise ValueError("Review packet task identity does not match fleet task")
             reviews[task_id] = {"status": review["status"], "gaps": review["gaps"]}
+        # Dependency order is already validated by plan(). A locally complete
+        # packet can never make a downstream task appear ready when its input
+        # task is blocked, even though no actual workers are dispatched.
+        upstream = sorted(dep for dep in dependencies[task_id] if dep in blocked_ids)
+        reviews[task_id]["blocked_upstream_dependencies"] = upstream
+        if upstream:
+            reviews[task_id]["status"] = "BLOCKED"
+            reviews[task_id]["gaps"].append("blocked_upstream_dependency")
         if reviews[task_id]["status"] == "BLOCKED":
             blocked.append(task_id)
+            blocked_ids.add(task_id)
     return {
         "mode": "dry_run",
         "planned_waves": fleet["planned_waves"],
