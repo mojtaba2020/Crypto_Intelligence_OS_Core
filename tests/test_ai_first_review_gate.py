@@ -226,9 +226,7 @@ def test_critic_veto_blocks_its_fleet_task_even_when_ci_claims_pass() -> None:
     assert report["task_review_states"]["evaluate"]["blocked_upstream_dependencies"] == [
         "research_model"
     ]
-    assert report["task_review_states"]["evaluate"]["gaps"] == [
-        "blocked_upstream_dependency"
-    ]
+    assert report["task_review_states"]["evaluate"]["gaps"] == ["blocked_upstream_dependency"]
     assert report["status"] == "BLOCKED"
 
 
@@ -267,27 +265,21 @@ def test_missing_upstream_packet_blocks_complete_downstream_reviews() -> None:
     }
     report = assess_dry_run_fleet(_fleet_manifest(), packets)
     assert report["blocked_task_ids"] == ["audit_data", "research_model", "evaluate"]
-    assert report["task_review_states"]["audit_data"]["gaps"] == [
-        "missing_task_review_packet"
-    ]
+    assert report["task_review_states"]["audit_data"]["gaps"] == ["missing_task_review_packet"]
     assert report["task_review_states"]["research_model"]["blocked_upstream_dependencies"] == [
         "audit_data"
     ]
     assert report["task_review_states"]["evaluate"]["blocked_upstream_dependencies"] == [
         "research_model"
     ]
-    assert all(
-        row["status"] == "BLOCKED" for row in report["task_review_states"].values()
-    )
+    assert all(row["status"] == "BLOCKED" for row in report["task_review_states"].values())
     assert report["dispatched_tasks"] == 0
     assert report["scientific_run_authorized"] is False
 
 
 def test_independent_sibling_remains_locally_ready_when_another_branch_blocks() -> None:
     manifest = _fleet_manifest()
-    manifest["tasks"].append(
-        {"id": "docs_only", "agent_id": "A085", "kind": "ci_review"}
-    )
+    manifest["tasks"].append({"id": "docs_only", "agent_id": "A085", "kind": "ci_review"})
     names = ("audit_data", "research_model", "evaluate", "docs_only")
     packets = {name: _packet_for(name) for name in names}
     packets["audit_data"]["test_report"]["result"] = "fail"
@@ -325,10 +317,6 @@ def test_diamond_blocks_only_descendants_of_failing_prerequisite() -> None:
     assert result["task_review_states"]["right"]["status"] == (
         "PACKET_READY_FOR_EXTERNAL_VERIFICATION"
     )
-    assert result["task_review_states"]["join"]["blocked_upstream_dependencies"] == [
-        "left"
-    ]
-    assert result["task_review_states"]["join"]["gaps"] == [
-        "blocked_upstream_dependency"
-    ]
+    assert result["task_review_states"]["join"]["blocked_upstream_dependencies"] == ["left"]
+    assert result["task_review_states"]["join"]["gaps"] == ["blocked_upstream_dependency"]
     assert result["active_workers"] == 0
