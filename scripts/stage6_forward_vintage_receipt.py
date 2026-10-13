@@ -180,8 +180,7 @@ def save_private_receipt(receipt: Mapping[str, object], private_root: Path) -> P
         if (
             not stat.S_ISDIR(opened_root.st_mode)
             or opened_root.st_mode & 0o077
-            or (opened_root.st_dev, opened_root.st_ino)
-            != (root_before.st_dev, root_before.st_ino)
+            or (opened_root.st_dev, opened_root.st_ino) != (root_before.st_dev, root_before.st_ino)
         ):
             raise ValueError("Receipt root changed or became insecure during open")
         descriptor = os.open(
