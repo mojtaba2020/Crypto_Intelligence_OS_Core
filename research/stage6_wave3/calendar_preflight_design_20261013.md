@@ -131,3 +131,40 @@ past observed diagnostic performance.
 - [User 13-horizon dual-target metrics contract, issue #78](https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/issues/78)
 - [Research frontier as of October 12, 2026, issue #79](https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/issues/79)
 - [Physical provenance and separate operator approval matrix, PR #77](https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/pull/77)
+
+## Offline as-of feature and training-label check (DRAFT; 2026-10-14)
+
+`audit_claimed_asof_input_versions(plan, inputs)` is a **pure, optional, metadata-only**
+consistency check. It does **not** run on old research files or exchange feeds
+and does **not** modify the old `multitimeframe_tournament_v1/v2` judge.
+It explicitly distinguishes:
+- a complete feature bar whose **specific selected bytes/version** were seen
+  by hypothetical issuance;
+- a matured **training target label** whose selected bytes/version had actually
+  become knowable by that issuance;
+- later corrections. If the **earlier original version** was retained and
+  selected, a correction occurring **after** issuance need not invalidate the
+  earlier version. But selecting the **later corrected bytes** at an earlier
+  issuance is blocked. A version already superseded by issuance is blocked.
+- missing, contradictory, late, duplicated or price-bearing metadata is
+  excluded/rejected rather than treated as a successful historical observation.
+
+The closed schema has one exact `origin_cutoff_utc` and
+`forecast_issued_at_utc`, plus a bounded list of `feature_bar` and
+`training_label` claim records with nominal bar bounds, first-observed,
+selected-version observed and version-supersession timestamps. **Both**
+categories must be represented, but their presence does NOT prove that the
+entire feature history, target-label set, legal dataset, identity or sampling
+schedule has been captured. Calendar continuity, provider clock provenance,
+record-version authenticity, immutable original bytes, true first-publication
+history, physical isolation and approved access still require *independent*
+A1–A6 attestation.
+
+Every return is either `BLOCKED` or `UNVERIFIED_ASOF_METADATA_ONLY`,
+with explicit `scientific_authorization=NO_RUN`,
+`real_source_vintages_authenticated=false` and
+`stage7_freeze_authorized=false`. It is **not** a scientific eligibility
+counter, data-vintage proof, security signoff, or authorization to start a new
+collector/training job. Synthetic tests specifically challenge late first-seen
+feature bars and labels, backdated corrections, outdated selected versions,
+missing records and hidden outcome-bearing fields.
