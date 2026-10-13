@@ -149,8 +149,14 @@ It explicitly distinguishes:
 - missing, contradictory, late, duplicated or price-bearing metadata is
   excluded/rejected rather than treated as a successful historical observation.
 
-The closed schema has one exact `origin_cutoff_utc` and
-`forecast_issued_at_utc`, plus a bounded list of `feature_bar` and
+The closed schema has one exact `origin_cutoff_utc`,
+`forecast_issued_at_utc` **and `forecast_target_end_utc`**, requiring
+`origin_cutoff_utc < forecast_issued_at_utc < forecast_target_end_utc`.
+This blocks a superficially valid feature/label snapshot being combined with
+a **hindsight forecast issued after its future outcome already closed**.
+The claimed target-end timestamp must itself match a **separately approved
+canonical 13-horizon calendar and immutable origin schedule**; this pure
+checker does not authenticate that declared boundary. A bounded list of `feature_bar` and
 `training_label` claim records with nominal bar bounds, first-observed,
 selected-version observed and version-supersession timestamps. **Both**
 categories must be represented, but their presence does NOT prove that the
