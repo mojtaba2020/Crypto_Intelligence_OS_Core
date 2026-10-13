@@ -49,7 +49,7 @@ def _serialized(value: Mapping[str, object]) -> bytes:
 
 
 def _validate_metadata(source: object, opening: object, seconds: object) -> None:
-    if source not in SOURCES:
+    if type(source) is not str or source not in SOURCES:
         raise ValueError("Unapproved source identity")
     if type(seconds) is not int or seconds not in (3_600, 86_400):
         raise ValueError("Source bar seconds must be 3600 or 86400")
@@ -109,8 +109,10 @@ def validate_local_receipt(receipt: Mapping[str, object]) -> None:
     if not isinstance(receipt, Mapping) or set(receipt) != FIELDS:
         raise ValueError("Unexpected receipt schema")
     _validate_metadata(receipt["source"], receipt["bar_open_utc"], receipt["bar_seconds"])
-    if receipt["schema_version"] != 1 or receipt["status"] != STATUS:
-        raise ValueError("Unsupported receipt status or version")
+    if type(receipt["schema_version"]) is not int or receipt["schema_version"] != 1:
+        raise ValueError("Unsupported receipt version")
+    if type(receipt["status"]) is not str or receipt["status"] != STATUS:
+        raise ValueError("Unsupported receipt status")
     for key in (
         "source_first_publication_authenticated",
         "external_immutable_seal_verified",
@@ -166,7 +168,9 @@ def save_private_receipt(receipt: Mapping[str, object], private_root: Path) -> P
     if not private_root.is_dir() or private_root.stat().st_mode & 0o077:
         raise ValueError("Receipt root must be an existing private directory (0700)")
     observed = datetime.fromisoformat(str(receipt["system_observed_at_utc"]).replace("Z", "+00:00"))
-    stamp_us = int(observed.timestamp() * 1_000_000)
+    # Exact integer epoch microseconds: never round receipt IDs through float time.
+    elapsed = observed - datetime(1970, 1, 1, tzinfo=UTC)
+    stamp_us = ((elapsed.days * 86_400 + elapsed.seconds) * 1_000_000) + elapsed.microseconds
     filename = f"stage6-{stamp_us}-{receipt['receipt_sha256'][:20]}.json"
     root_fd = os.open(private_root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | os.O_NOFOLLOW)
     try:
