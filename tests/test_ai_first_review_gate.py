@@ -209,9 +209,7 @@ def test_dry_run_fleet_stops_without_any_review_packets() -> None:
 
 def test_claimed_full_review_never_dispatches_or_authenticates() -> None:
     names = ("audit_data", "research_model", "evaluate")
-    result = assess_dry_run_fleet(
-        _fleet_manifest(), {name: _packet_for(name) for name in names}
-    )
+    result = assess_dry_run_fleet(_fleet_manifest(), {name: _packet_for(name) for name in names})
     assert result["status"] == "REVIEW_METADATA_READY_FOR_EXTERNAL_VERIFICATION"
     assert result["blocked_task_ids"] == []
     assert result["independent_evidence_authenticated"] is False
@@ -221,9 +219,7 @@ def test_claimed_full_review_never_dispatches_or_authenticates() -> None:
 
 
 def test_critic_veto_blocks_its_fleet_task_even_when_ci_claims_pass() -> None:
-    packets = {
-        name: _packet_for(name) for name in ("audit_data", "research_model", "evaluate")
-    }
+    packets = {name: _packet_for(name) for name in ("audit_data", "research_model", "evaluate")}
     packets["research_model"]["critique"]["blockers"] = ["possible leakage"]
     report = assess_dry_run_fleet(_fleet_manifest(), packets)
     assert report["blocked_task_ids"] == ["research_model"]
