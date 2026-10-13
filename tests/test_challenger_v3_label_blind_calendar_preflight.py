@@ -300,9 +300,7 @@ def test_issue_lag_that_overflows_supported_range_rejected() -> None:
         audit_label_blind_calendar(plan, records)
 
 
-def _asof_fixture(
-    horizon: str = "1d", *, origin: int | None = None
-) -> tuple[dict, list[dict]]:
+def _asof_fixture(horizon: str = "1d", *, origin: int | None = None) -> tuple[dict, list[dict]]:
     day = 86_400
     family, bars = HORIZONS[horizon]
     if origin is None:
