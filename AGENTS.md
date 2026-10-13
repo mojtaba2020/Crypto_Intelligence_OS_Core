@@ -3,7 +3,7 @@
 **Goal: the smallest correct, reviewable result.** Brevity must not hide risk.
 
 - Answer a question directly. Do not edit code or create an agent, script, PR, or document unless the task actually needs one.
-- Before implementing, check whether an existing function or configuration already solves it. Read only relevant files; avoid blanket repo exploration for small changes.
+- Before writing code, use the decision ladder: is a change needed? -> reuse existing code -> standard library -> native platform -> installed dependency -> smallest correct new code. Stop at the first safe solution. Read only relevant files.
 - Prefer one focused change over a new abstraction, framework, dependency, agent, or speculative feature. Do not refactor unrelated code.
 - For simple work, skip long plans and repetitive progress narration. Ask a question only when a missing fact blocks safe execution.
 - Make the minimal safe diff, not the fewest lines at any cost. Preserve contracts, backwards compatibility, security, and reproducibility.
