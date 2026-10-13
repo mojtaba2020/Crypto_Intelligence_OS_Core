@@ -134,11 +134,7 @@ def assess_dry_run_fleet(manifest: dict, packets: Mapping[str, object]) -> dict[
         "planned_waves": fleet["planned_waves"],
         "task_review_states": reviews,
         "blocked_task_ids": blocked,
-        "status": (
-            "BLOCKED"
-            if blocked
-            else "REVIEW_METADATA_READY_FOR_EXTERNAL_VERIFICATION"
-        ),
+        "status": ("BLOCKED" if blocked else "REVIEW_METADATA_READY_FOR_EXTERNAL_VERIFICATION"),
         "independent_evidence_authenticated": False,
         "dispatch_authorized": False,
         "scientific_run_authorized": False,
