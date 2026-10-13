@@ -215,3 +215,109 @@ def audit_label_blind_calendar(
         "locked_oos_access": False,
         "origins": results,
     }
+
+
+# Optional synthetic-only review for the input bytes actually claimed at an
+# issuance instant. This is NOT an exchange timestamp or version authenticator.
+ASOF_PLAN_KEYS = frozenset({"origin_cutoff_utc", "forecast_issued_at_utc"})
+ASOF_INPUT_KEYS = frozenset(
+    {
+        "kind",
+        "bar_open_utc",
+        "bar_end_utc",
+        "first_observed_at_utc",
+        "selected_version_observed_at_utc",
+        "selected_version_superseded_at_utc",
+    }
+)
+ASOF_KINDS = frozenset({"feature_bar", "training_label"})
+MAX_ASOF_INPUTS = 512
+
+
+def audit_claimed_asof_input_versions(
+    plan: Mapping[str, object], inputs: Sequence[Mapping[str, object]]
+) -> dict[str, object]:
+    """Fail closed on late source/label versions using claimed timestamps only.
+
+    An earlier authentic version remains usable after a *future* correction;
+    corrected final bytes cannot be substituted for the old version. Actual
+    vintage bytes, content digests, clock integrity and source authorization
+    require separate independent operator evidence under Issue #81 A1-A6.
+    """
+    if not isinstance(plan, Mapping) or set(plan) != ASOF_PLAN_KEYS:
+        raise ValueError("Exact as-of issuance plan metadata required")
+    origin = _strict_timestamp(plan["origin_cutoff_utc"], "origin cutoff")
+    issued = _strict_timestamp(plan["forecast_issued_at_utc"], "forecast issuance")
+    if origin <= 0 or issued <= origin:
+        raise ValueError("Forecast issuance must follow the nominal origin cutoff")
+    if (
+        not isinstance(inputs, Sequence)
+        or isinstance(inputs, (str, bytes))
+        or not 0 < len(inputs) <= MAX_ASOF_INPUTS
+    ):
+        raise ValueError("Nonempty bounded as-of metadata sequence required")
+
+    seen: set[tuple[str, int]] = set()
+    kinds: set[str] = set()
+    results: list[dict[str, object]] = []
+    for index, record in enumerate(inputs):
+        if not isinstance(record, Mapping) or set(record) != ASOF_INPUT_KEYS:
+            raise ValueError("Only closed-schema non-outcome as-of metadata allowed")
+        kind = record["kind"]
+        if type(kind) is not str or kind not in ASOF_KINDS:
+            raise ValueError("Unknown as-of input kind")
+        kinds.add(kind)
+        opening = _strict_timestamp(record["bar_open_utc"], "bar opening")
+        ending = _strict_timestamp(record["bar_end_utc"], "bar end")
+        if not 0 < opening < ending <= origin:
+            raise ValueError("As-of input bar must close by the forecast origin")
+        identity = (kind, ending)
+        if identity in seen:
+            raise ValueError("Duplicate kind/end identity in claimed as-of input")
+        seen.add(identity)
+
+        stamps: dict[str, int | None] = {}
+        for key in (
+            "first_observed_at_utc",
+            "selected_version_observed_at_utc",
+            "selected_version_superseded_at_utc",
+        ):
+            value = record[key]
+            stamps[key] = None if value is None else _strict_timestamp(value, key)
+        first = stamps["first_observed_at_utc"]
+        selected = stamps["selected_version_observed_at_utc"]
+        superseded = stamps["selected_version_superseded_at_utc"]
+        if superseded is not None and (selected is None or superseded <= selected):
+            raise ValueError("Contradictory version supersession chronology")
+
+        gaps: list[str] = []
+        if first is None or selected is None:
+            gaps.append("SOURCE_OR_LABEL_VINTAGE_UNKNOWN")
+        elif first < ending or selected < ending or first > selected:
+            gaps.append("CONTRADICTORY_VINTAGE_CHRONOLOGY")
+        elif first > issued or selected > issued:
+            gaps.append("VERSION_NOT_KNOWN_AT_ISSUE")
+        if superseded is not None and superseded <= issued:
+            gaps.append("SELECTED_VERSION_ALREADY_SUPERSEDED")
+        results.append(
+            {
+                "index": index,
+                "kind": kind,
+                "status": "BLOCKED" if gaps else "METADATA_CONSISTENT_UNVERIFIED",
+                "gaps": gaps,
+            }
+        )
+
+    missing_kinds = sorted(ASOF_KINDS - kinds)
+    blocked = bool(missing_kinds) or any(row["status"] == "BLOCKED" for row in results)
+    return {
+        "status": "BLOCKED" if blocked else "UNVERIFIED_ASOF_METADATA_ONLY",
+        "scientific_authorization": "NO_RUN",
+        "stage7_freeze_authorized": False,
+        "real_source_vintages_authenticated": False,
+        "independent_custody_verified": False,
+        "required_input_kinds_missing": missing_kinds,
+        "input_count": len(results),
+        "blocked_input_count": sum(row["status"] == "BLOCKED" for row in results),
+        "inputs": results,
+    }
