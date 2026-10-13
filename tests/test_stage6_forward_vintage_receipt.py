@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import json
-import os
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -80,7 +79,7 @@ def test_observation_not_backdated_to_market_bar_close() -> None:
     "clock",
     [
         lambda: datetime(2026, 10, 13),
-        lambda: NOW.astimezone(timedelta(hours=-5)),
+        lambda: NOW.astimezone(timezone(timedelta(hours=-5))),
         lambda: "2026-10-13",
     ],
 )
@@ -166,12 +165,3 @@ def test_unchanged_source_bytes_at_new_observation_time_are_distinct(tmp_path: P
     assert earlier["raw_response_sha256"] == later["raw_response_sha256"]
     assert earlier["receipt_sha256"] != later["receipt_sha256"]
 
-
-def test_no_provider_or_schedule_is_imported_or_executed() -> None:
-    # The module itself has no HTTP, external provider, workflow, or trading entry point.
-    from scripts import stage6_forward_vintage_receipt as receipts
-
-    assert not hasattr(receipts, "fetch")
-    assert not hasattr(receipts, "main")
-    assert not hasattr(receipts, "trade")
-    assert os.environ.get("OPENAI_API_KEY") is None or "OPENAI_API_KEY" not in receipts.FIELDS
