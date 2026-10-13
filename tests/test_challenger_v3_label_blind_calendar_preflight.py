@@ -451,9 +451,7 @@ def test_asof_hindsight_prediction_at_or_after_target_end_fails(
     late_issue_seconds: int,
 ) -> None:
     plan, inputs = _asof_fixture()
-    plan["forecast_issued_at_utc"] = (
-        plan["forecast_target_end_utc"] + late_issue_seconds
-    )
+    plan["forecast_issued_at_utc"] = plan["forecast_target_end_utc"] + late_issue_seconds
     with pytest.raises(ValueError, match="before future target end"):
         audit_claimed_asof_input_versions(plan, inputs)
 
