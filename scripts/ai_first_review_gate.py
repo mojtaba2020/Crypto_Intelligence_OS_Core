@@ -47,7 +47,7 @@ def assess_review_packet(packet: object) -> dict[str, object]:
     reviewer = _text(critique["reviewer_id"], "reviewer_id")
     _text(tests["runner_id"], "runner_id")
     _text(proposal["claim"], "claim")
-    if proposal["scope"] not in SCOPES if type(proposal["scope"]) is str else True:
+    if type(proposal["scope"]) is not str or proposal["scope"] not in SCOPES:
         raise ValueError("Unknown review scope")
     sha = _text(proposal["code_sha"], "proposal.code_sha")
     if not SHA40.fullmatch(sha):
