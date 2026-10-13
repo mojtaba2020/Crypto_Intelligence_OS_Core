@@ -47,3 +47,21 @@ deployment is performed by this proposal.
 This policy is advice and packet validation, not a cryptographic signature,
 workload identity, external attestation, active AI-orchestration or proof that
 an AI outperforms a human specialist.
+
+## Dry-run fleet integration (code review only)
+
+`assess_dry_run_fleet(manifest, packets_by_task_id)` reuses the existing
+`scripts.agent_fleet.plan` for validated dependencies and *no execution*.
+Every proposed task review includes the same exact `task_id` in proposal,
+critique and test records, and all three records must refer to the same
+Git commit. Missing task reviews, cross-task replay or critic veto cannot
+silently advance a simulated agent wave. Outcomes report review-metadata
+completeness only; even all-ready results explicitly show
+`dispatch_authorized: false`, `active_workers: 0` and
+`independent_evidence_authenticated: false`.
+
+**No real separate reviewer is launched, authenticated or recorded by this
+integration.** A claimed CI job or reviewer ID is not an independently
+verified run. This API is intentionally not imported into the live workflow
+or existing `agent_fleet` CLI. Any future auto-dispatch requires a separate
+security and cost approval, not just a successful local packet check.
