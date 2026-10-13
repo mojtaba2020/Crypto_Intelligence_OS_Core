@@ -11,11 +11,12 @@ import re
 from collections.abc import Mapping
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
+TASK_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 SCOPES = frozenset({"software", "research", "security"})
 FIELDS = frozenset({"proposal", "critique", "test_report"})
-PROPOSAL = frozenset({"author_id", "code_sha", "scope", "claim", "evidence_refs"})
-CRITIQUE = frozenset({"reviewer_id", "code_sha", "blockers", "counterevidence_refs"})
-TESTS = frozenset({"runner_id", "code_sha", "result", "log_ref"})
+PROPOSAL = frozenset({"author_id", "code_sha", "scope", "claim", "evidence_refs", "task_id"})
+CRITIQUE = frozenset({"reviewer_id", "code_sha", "blockers", "counterevidence_refs", "task_id"})
+TESTS = frozenset({"runner_id", "code_sha", "result", "log_ref", "task_id"})
 
 
 def _record(value: object, fields: frozenset[str], label: str) -> Mapping[str, object]:
@@ -42,6 +43,13 @@ def assess_review_packet(packet: object) -> dict[str, object]:
     proposal = _record(data["proposal"], PROPOSAL, "proposal")
     critique = _record(data["critique"], CRITIQUE, "critique")
     tests = _record(data["test_report"], TESTS, "test_report")
+
+    task_id = _text(proposal["task_id"], "proposal.task_id")
+    if not TASK_ID.fullmatch(task_id):
+        raise ValueError("Invalid task identity")
+    for row, label in ((critique, "critique"), (tests, "test_report")):
+        if _text(row["task_id"], f"{label}.task_id") != task_id:
+            raise ValueError("All review components must refer to the same task")
 
     author = _text(proposal["author_id"], "author_id")
     reviewer = _text(critique["reviewer_id"], "reviewer_id")
@@ -89,4 +97,54 @@ def assess_review_packet(packet: object) -> dict[str, object]:
         "production_authorized": False,
         "paid_tools_authorized": False,
         "live_agents_dispatched": 0,
+    }
+
+
+def assess_dry_run_fleet(manifest: dict, packets: Mapping[str, object]) -> dict[str, object]:
+    """Connect *metadata-only* reviews to existing dependency-ordered dry-run fleet.
+
+    Never dispatch tasks even when every claimed review packet is complete.
+    No model calls, network access, filesystem writes or trusted attestations.
+    """
+    from scripts.agent_fleet import plan
+
+    fleet = plan(manifest)
+    if not isinstance(packets, Mapping):
+        raise ValueError("Task review packets must be a mapping")
+    scheduled = [task for wave in fleet["planned_waves"] for task in wave]
+    task_ids = {task["id"] for task in scheduled}
+    if any(type(key) is not str for key in packets) or set(packets) - task_ids:
+        raise ValueError("Unexpected or unsupported review task")
+    reviews: dict[str, dict[str, object]] = {}
+    blocked: list[str] = []
+    for task in scheduled:
+        task_id = task["id"]
+        if task_id not in packets:
+            reviews[task_id] = {"status": "BLOCKED", "gaps": ["missing_task_review_packet"]}
+        else:
+            packet = packets[task_id]
+            review = assess_review_packet(packet)
+            if packet["proposal"]["task_id"] != task_id:
+                raise ValueError("Review packet task identity does not match fleet task")
+            reviews[task_id] = {"status": review["status"], "gaps": review["gaps"]}
+        if reviews[task_id]["status"] == "BLOCKED":
+            blocked.append(task_id)
+    return {
+        "mode": "dry_run",
+        "planned_waves": fleet["planned_waves"],
+        "task_review_states": reviews,
+        "blocked_task_ids": blocked,
+        "status": (
+            "BLOCKED"
+            if blocked
+            else "REVIEW_METADATA_READY_FOR_EXTERNAL_VERIFICATION"
+        ),
+        "independent_evidence_authenticated": False,
+        "dispatch_authorized": False,
+        "scientific_run_authorized": False,
+        "freeze_authorized": False,
+        "production_authorized": False,
+        "active_workers": 0,
+        "dispatched_tasks": 0,
+        "external_calls": 0,
     }
