@@ -56,6 +56,13 @@ def _strict_int(value: object, label: str) -> int:
     return value
 
 
+def _strict_timestamp(value: object, label: str) -> int:
+    """Require an exact UTC epoch integer representable by Python datetime."""
+    timestamp = _strict_int(value, label)
+    _utc(timestamp)
+    return timestamp
+
+
 def _utc(timestamp: int) -> datetime:
     try:
         return datetime.fromtimestamp(timestamp, tz=UTC)
@@ -88,7 +95,9 @@ def _advance(timestamp: int, family: str, bars: int) -> int:
         except ValueError as exc:
             raise ValueError("Monthly horizon exceeds supported calendar") from exc
     seconds = {"hourly": 3_600, "daily": 86_400, "weekly": 604_800}[family]
-    return timestamp + bars * seconds
+    result = timestamp + bars * seconds
+    _utc(result)  # Reject hourly/daily/weekly overflow like monthly already does.
+    return result
 
 
 def audit_label_blind_calendar(
@@ -106,12 +115,12 @@ def audit_label_blind_calendar(
     if not isinstance(horizon, str) or horizon not in HORIZONS:
         raise ValueError("Unknown forecast horizon")
     family, bars = HORIZONS[horizon]
-    first = _strict_int(plan["first_origin_utc"], "first_origin_utc")
-    stop = _strict_int(plan["stop_origin_utc"], "stop_origin_utc")
+    first = _strict_timestamp(plan["first_origin_utc"], "first_origin_utc")
+    stop = _strict_timestamp(plan["stop_origin_utc"], "stop_origin_utc")
     lag = _strict_int(plan["hypothetical_issue_lag_seconds"], "issue lag")
-    asof = _strict_int(plan["review_asof_utc"], "review as-of")
-    dev_end = _strict_int(plan["approved_dev_end_exclusive_utc"], "dev end")
-    reserved = _strict_int(plan["reserved_start_utc"], "reserved start")
+    asof = _strict_timestamp(plan["review_asof_utc"], "review as-of")
+    dev_end = _strict_timestamp(plan["approved_dev_end_exclusive_utc"], "dev end")
+    reserved = _strict_timestamp(plan["reserved_start_utc"], "reserved start")
     if not 0 < first < stop or not first < asof or not 0 < dev_end <= reserved:
         raise ValueError("Invalid calendar or reserved-boundary order")
     if not _canonical(first, family) or not _canonical(stop, family):
@@ -132,20 +141,16 @@ def audit_label_blind_calendar(
         raise ValueError("Missing or extra scheduled origin: do not replenish gaps")
 
     results: list[dict[str, object]] = []
-    seen_ids: set[str] = set()
     for expected, record in zip(origins, records, strict=True):
         if not isinstance(record, Mapping) or set(record) != RECORD_KEYS:
             raise ValueError("Rejected non-metadata, price, outcome or unknown fields")
-        record_id = record["schedule_id"]
-        if (
-            not isinstance(record_id, str)
-            or not record_id.strip()
-            or len(record_id) > 80
-            or record_id in seen_ids
-        ):
-            raise ValueError("Invalid or duplicate immutable schedule ID")
-        seen_ids.add(record_id)
-        origin = _strict_int(record["origin_cutoff_utc"], "origin cutoff")
+        # Never echo arbitrary caller text, which could carry prices or results.
+        # Identity is deterministically bound to both frozen plan horizon and
+        # the strictly scheduled origin: swapping otherwise valid IDs fails.
+        record_id = f"origin:{horizon}:{expected}"
+        if type(record["schedule_id"]) is not str or record["schedule_id"] != record_id:
+            raise ValueError("Schedule ID does not match fixed horizon/origin identity")
+        origin = _strict_timestamp(record["origin_cutoff_utc"], "origin cutoff")
         if origin != expected:
             raise ValueError("Unordered, substituted or missing scheduled origin")
         if type(record["source_window_complete"]) is not bool:
@@ -159,10 +164,10 @@ def audit_label_blind_calendar(
             "target_first_published_at_utc",
         ):
             value = record[field]
-            timestamps[field] = None if value is None else _strict_int(value, field)
+            timestamps[field] = None if value is None else _strict_timestamp(value, field)
 
         target_end = _advance(origin, family, bars)
-        hypothetical_issue = origin + lag
+        hypothetical_issue = _strict_timestamp(origin + lag, "hypothetical issue")
         first_published = timestamps["source_first_published_at_utc"]
         last_revised = timestamps["source_last_revised_at_utc"]
         target_published = timestamps["target_first_published_at_utc"]
