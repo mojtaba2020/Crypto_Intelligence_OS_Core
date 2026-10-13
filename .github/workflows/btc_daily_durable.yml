@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: btc-daily-archive-single-writer
+  group: private-btc-daily-archive-single-writer
   cancel-in-progress: false
 
 jobs:
