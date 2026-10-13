@@ -55,8 +55,14 @@ an AI outperforms a human specialist.
 Every proposed task review includes the same exact `task_id` in proposal,
 critique and test records, and all three records must refer to the same
 Git commit. Missing task reviews, cross-task replay or critic veto cannot
-silently advance a simulated agent wave. Outcomes report review-metadata
-completeness only; even all-ready results explicitly show
+silently advance a simulated agent wave. **Blocked dependencies propagate
+through the validated dry-run plan:** if a prerequisite review is missing,
+vetoed, or fails, every dependent task is marked BLOCKED even when its own
+packet claims a pass. Independent branches remain locally reviewable, never
+dispatchable. The output names each task's directly blocked prerequisites in
+`blocked_upstream_dependencies`; that list is metadata about declared task
+edges, not evidence of genuine separate agent execution. Outcomes report
+review-metadata completeness only; even all-ready results explicitly show
 `dispatch_authorized: false`, `active_workers: 0` and
 `independent_evidence_authenticated: false`.
 
