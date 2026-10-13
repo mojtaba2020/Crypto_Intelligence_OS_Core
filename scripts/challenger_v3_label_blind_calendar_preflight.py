@@ -220,7 +220,7 @@ def audit_label_blind_calendar(
 # Optional synthetic-only review for the input bytes actually claimed at an
 # issuance instant. This is NOT an exchange timestamp or version authenticator.
 ASOF_PLAN_KEYS = frozenset(
-    {"origin_cutoff_utc", "forecast_issued_at_utc", "forecast_target_end_utc"}
+    {"horizon", "origin_cutoff_utc", "forecast_issued_at_utc", "forecast_target_end_utc"}
 )
 ASOF_INPUT_KEYS = frozenset(
     {
@@ -248,11 +248,20 @@ def audit_claimed_asof_input_versions(
     """
     if not isinstance(plan, Mapping) or set(plan) != ASOF_PLAN_KEYS:
         raise ValueError("Exact as-of issuance plan metadata required")
+    horizon = plan["horizon"]
+    if type(horizon) is not str or horizon not in HORIZONS:
+        raise ValueError("Unsupported as-of forecast horizon")
+    family, bars = HORIZONS[horizon]
     origin = _strict_timestamp(plan["origin_cutoff_utc"], "origin cutoff")
     issued = _strict_timestamp(plan["forecast_issued_at_utc"], "forecast issuance")
     target_end = _strict_timestamp(plan["forecast_target_end_utc"], "forecast target end")
     if origin <= 0 or not origin < issued < target_end:
         raise ValueError("Forecast must be issued after origin and before future target end")
+    if not _canonical(origin, family):
+        raise ValueError("Noncanonical UTC forecast origin for horizon")
+    expected_end = _advance(origin, family, bars)
+    if target_end != expected_end:
+        raise ValueError("Forecast target end must match canonical horizon maturity")
     if (
         not isinstance(inputs, Sequence)
         or isinstance(inputs, (str, bytes))

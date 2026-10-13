@@ -300,13 +300,23 @@ def test_issue_lag_that_overflows_supported_range_rejected() -> None:
         audit_label_blind_calendar(plan, records)
 
 
-def _asof_fixture() -> tuple[dict, list[dict]]:
+def _asof_fixture(
+    horizon: str = "1d", *, origin: int | None = None
+) -> tuple[dict, list[dict]]:
     day = 86_400
-    origin = JAN_1 + day
+    family, bars = HORIZONS[horizon]
+    if origin is None:
+        if family == "weekly":
+            origin = MONDAY
+        elif family == "monthly":
+            origin = JAN_1
+        else:
+            origin = JAN_1 + day
     plan = {
+        "horizon": horizon,
         "origin_cutoff_utc": origin,
         "forecast_issued_at_utc": origin + 60,
-        "forecast_target_end_utc": origin + day,
+        "forecast_target_end_utc": _advance(origin, family, bars),
     }
     inputs = [
         {
@@ -479,8 +489,66 @@ def test_asof_target_end_is_utc_integer_and_within_calendar() -> None:
 
 
 def test_asof_valid_short_horizon_issuance_remains_unverified() -> None:
-    plan, inputs = _asof_fixture()
-    plan["forecast_target_end_utc"] = plan["origin_cutoff_utc"] + 3_600
+    plan, inputs = _asof_fixture("1h")
     result = audit_claimed_asof_input_versions(plan, inputs)
     assert result["status"] == "UNVERIFIED_ASOF_METADATA_ONLY"
     assert result["scientific_authorization"] == "NO_RUN"
+
+
+@pytest.mark.parametrize("horizon", list(HORIZONS))
+def test_asof_all_13_horizons_use_canonical_target_maturity(horizon: str) -> None:
+    plan, inputs = _asof_fixture(horizon)
+    result = audit_claimed_asof_input_versions(plan, inputs)
+    assert result["status"] == "UNVERIFIED_ASOF_METADATA_ONLY"
+    assert result["scientific_authorization"] == "NO_RUN"
+
+
+@pytest.mark.parametrize("horizon", ["2h", "3d", "2w", "3mo"])
+def test_asof_fake_shorter_horizon_target_fails_closed(horizon: str) -> None:
+    plan, inputs = _asof_fixture(horizon)
+    plan["forecast_target_end_utc"] = plan["origin_cutoff_utc"] + 3_600
+    with pytest.raises(ValueError, match="canonical horizon maturity"):
+        audit_claimed_asof_input_versions(plan, inputs)
+
+
+def test_asof_horizon_relabeling_cannot_extend_forecast_deadline() -> None:
+    plan, inputs = _asof_fixture("1d")
+    plan["horizon"] = "2d"
+    with pytest.raises(ValueError, match="canonical horizon maturity"):
+        audit_claimed_asof_input_versions(plan, inputs)
+
+
+def test_asof_weekly_off_calendar_origin_fails() -> None:
+    plan, inputs = _asof_fixture("1w")
+    plan["origin_cutoff_utc"] += 86_400
+    plan["forecast_issued_at_utc"] += 86_400
+    plan["forecast_target_end_utc"] += 86_400
+    with pytest.raises(ValueError, match="Noncanonical UTC forecast origin"):
+        audit_claimed_asof_input_versions(plan, inputs)
+
+
+def test_asof_monthly_duration_is_not_fixed_ninety_days() -> None:
+    february = int(datetime(2026, 2, 1, tzinfo=UTC).timestamp())
+    plan, inputs = _asof_fixture("3mo", origin=february)
+    assert datetime.fromtimestamp(plan["forecast_target_end_utc"], tz=UTC) == datetime(
+        2026, 5, 1, tzinfo=UTC
+    )
+    assert audit_claimed_asof_input_versions(plan, inputs)["blocked_input_count"] == 0
+    plan["forecast_target_end_utc"] = february + 90 * 86_400
+    with pytest.raises(ValueError, match="canonical horizon maturity"):
+        audit_claimed_asof_input_versions(plan, inputs)
+
+
+@pytest.mark.parametrize("bad_horizon", ["14h", "3y", "", None, 1, True])
+def test_asof_unknown_horizon_fails_closed(bad_horizon: object) -> None:
+    plan, inputs = _asof_fixture()
+    plan["horizon"] = bad_horizon
+    with pytest.raises(ValueError, match="forecast horizon"):
+        audit_claimed_asof_input_versions(plan, inputs)
+
+
+def test_asof_horizon_is_mandatory_metadata() -> None:
+    plan, inputs = _asof_fixture()
+    del plan["horizon"]
+    with pytest.raises(ValueError, match="issuance plan"):
+        audit_claimed_asof_input_versions(plan, inputs)

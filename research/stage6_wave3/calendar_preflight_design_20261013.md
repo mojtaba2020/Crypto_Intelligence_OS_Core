@@ -154,9 +154,14 @@ The closed schema has one exact `origin_cutoff_utc`,
 `origin_cutoff_utc < forecast_issued_at_utc < forecast_target_end_utc`.
 This blocks a superficially valid feature/label snapshot being combined with
 a **hindsight forecast issued after its future outcome already closed**.
-The claimed target-end timestamp must itself match a **separately approved
-canonical 13-horizon calendar and immutable origin schedule**; this pure
-checker does not authenticate that declared boundary. A bounded list of `feature_bar` and
+The new exact `horizon` field selects one of the project's **13 allowed
+horizons**; the checker calculates the canonical target end itself with the
+same hourly/daily/Monday-weekly/calendar-month arithmetic as the existing
+calendar preflight, and rejects any contradictory caller-supplied target
+end. This prevents extending a 1d forecast deadline by declaring it as 2d.
+The horizon choice, source identity, claimed timestamps and frozen schedule
+still require separate independent A1–A6 attestation. The guard cannot prove
+a real forecast was issued in the past. A bounded list of `feature_bar` and
 `training_label` claim records with nominal bar bounds, first-observed,
 selected-version observed and version-supersession timestamps. **Both**
 categories must be represented, but their presence does NOT prove that the
