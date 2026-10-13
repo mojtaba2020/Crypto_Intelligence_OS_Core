@@ -35,7 +35,7 @@ def _fixture(horizon: str = "1d", count: int = 3) -> tuple[dict, list[dict]]:
         target_end = _advance(origin, family, target_bars)
         records.append(
             {
-                "schedule_id": f"slot-{i}",
+                "schedule_id": f"origin:{horizon}:{origin}",
                 "origin_cutoff_utc": origin,
                 "source_first_published_at_utc": origin + 10,
                 "source_last_revised_at_utc": origin + 20,
@@ -186,5 +186,116 @@ def test_overlong_hourly_schedule_rejected_before_audit() -> None:
 def test_explicit_schedule_id_uniqueness_prevents_replacement() -> None:
     plan, records = _fixture()
     records[1]["schedule_id"] = records[0]["schedule_id"]
-    with pytest.raises(ValueError, match="duplicate"):
+    with pytest.raises(ValueError, match="Schedule ID"):
+        audit_label_blind_calendar(plan, records)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "close=123.45;future_return=0.42;model_MAPE=0.01",
+        "price:50000",
+        "origin:1d:1704067200\\nfuture_price=5",
+        "x" * 81,
+        "",
+    ],
+)
+def test_schedule_id_is_not_an_unrestricted_label_channel(payload: str) -> None:
+    plan, records = _fixture()
+    records[1]["schedule_id"] = payload
+    with pytest.raises(ValueError, match="Schedule ID"):
+        audit_label_blind_calendar(plan, records)
+
+
+def test_swapping_unique_schedule_ids_changes_identity_and_fails_closed() -> None:
+    plan, records = _fixture()
+    records[0]["schedule_id"], records[2]["schedule_id"] = (
+        records[2]["schedule_id"],
+        records[0]["schedule_id"],
+    )
+    with pytest.raises(ValueError, match="Schedule ID"):
+        audit_label_blind_calendar(plan, records)
+
+
+def test_altering_horizon_to_another_valid_horizon_rejects_old_identity() -> None:
+    plan, records = _fixture("1d")
+    plan["horizon"] = "2d"
+    with pytest.raises(ValueError, match="Schedule ID"):
+        audit_label_blind_calendar(plan, records)
+
+
+def test_non_string_schedule_id_rejected() -> None:
+    plan, records = _fixture()
+    records[0]["schedule_id"] = 123
+    with pytest.raises(ValueError, match="Schedule ID"):
+        audit_label_blind_calendar(plan, records)
+
+
+@pytest.mark.parametrize(
+    ("family", "bars"),
+    [("hourly", 12), ("daily", 1), ("weekly", 1), ("monthly", 1)],
+)
+def test_all_bar_arithmetic_rejects_python_datetime_overflow(
+    family: str, bars: int
+) -> None:
+    near_end = int(datetime(9999, 12, 31, 20, tzinfo=UTC).timestamp())
+    with pytest.raises(ValueError, match="range|calendar"):
+        _advance(near_end, family, bars)
+
+
+def test_hourly_horizon_overflow_rejected_before_provisional_eligibility() -> None:
+    first = int(datetime(9999, 12, 31, 20, tzinfo=UTC).timestamp())
+    stop = first + 3_600
+    end = int(datetime(9999, 12, 31, 23, 59, 59, tzinfo=UTC).timestamp())
+    plan = {
+        "horizon": "12h",
+        "first_origin_utc": first,
+        "stop_origin_utc": stop,
+        "hypothetical_issue_lag_seconds": 60,
+        "review_asof_utc": end,
+        "approved_dev_end_exclusive_utc": end,
+        "reserved_start_utc": end,
+    }
+    records = [
+        {
+            "schedule_id": f"origin:12h:{first}",
+            "origin_cutoff_utc": first,
+            "source_first_published_at_utc": first,
+            "source_last_revised_at_utc": first,
+            "source_window_complete": True,
+            "source_gap_present": False,
+            "target_first_published_at_utc": None,
+        }
+    ]
+    with pytest.raises(ValueError, match="range"):
+        audit_label_blind_calendar(plan, records)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "review_asof_utc",
+        "approved_dev_end_exclusive_utc",
+        "reserved_start_utc",
+        "stop_origin_utc",
+    ],
+)
+def test_out_of_supported_range_absolute_plan_timestamps_fail(field: str) -> None:
+    plan, records = _fixture()
+    plan[field] = 10**400
+    with pytest.raises(ValueError, match="range"):
+        audit_label_blind_calendar(plan, records)
+
+
+def test_publication_timestamp_beyond_supported_range_rejected() -> None:
+    plan, records = _fixture()
+    records[0]["source_last_revised_at_utc"] = 10**400
+    with pytest.raises(ValueError, match="range"):
+        audit_label_blind_calendar(plan, records)
+
+
+def test_issue_lag_that_overflows_supported_range_rejected() -> None:
+    plan, records = _fixture()
+    plan["hypothetical_issue_lag_seconds"] = 10**400
+    with pytest.raises(ValueError, match="range"):
         audit_label_blind_calendar(plan, records)
