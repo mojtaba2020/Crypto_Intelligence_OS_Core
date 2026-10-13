@@ -90,7 +90,7 @@ def test_missing_all_receipts_is_not_fabricated_as_source_gaps() -> None:
     [
         {"future_return": 0.9},
         {"untrusted_source_revision": "yes"},
-        {"source": "bitfinex:BTCUSD:1d"},
+        {"source": "bitfinex:BTCUSD:1h"},
         {"bar_seconds": 3_600},
     ],
 )
@@ -101,6 +101,15 @@ def test_closed_plan_schema_and_identity_reject_unreviewed_fields(
     plan.update(modification)
     with pytest.raises(ValueError):
         audit_local_receipt_inventory(plan, [])
+
+
+def test_other_allowlisted_source_does_not_count_as_independent_source_approval() -> None:
+    plan = _plan()
+    plan["source"] = "bitfinex:BTCUSD:1d"
+    result = audit_local_receipt_inventory(plan, [])
+    assert result["scientific_authorization"] == "NO_RUN"
+    assert result["independent_source_provenance_verified"] is False
+    assert result["exchange_first_publication_authenticated"] is False
 
 
 def test_receipt_source_mismatch_fails_without_relabeling() -> None:
