@@ -303,7 +303,11 @@ def test_issue_lag_that_overflows_supported_range_rejected() -> None:
 def _asof_fixture() -> tuple[dict, list[dict]]:
     day = 86_400
     origin = JAN_1 + day
-    plan = {"origin_cutoff_utc": origin, "forecast_issued_at_utc": origin + 60}
+    plan = {
+        "origin_cutoff_utc": origin,
+        "forecast_issued_at_utc": origin + 60,
+        "forecast_target_end_utc": origin + day,
+    }
     inputs = [
         {
             "kind": "feature_bar",
@@ -413,7 +417,7 @@ def test_asof_cannot_use_target_after_origin_or_issue_before_origin() -> None:
         audit_claimed_asof_input_versions(plan, inputs)
     plan, inputs = _asof_fixture()
     plan["forecast_issued_at_utc"] = plan["origin_cutoff_utc"]
-    with pytest.raises(ValueError, match="must follow"):
+    with pytest.raises(ValueError, match="after origin"):
         audit_claimed_asof_input_versions(plan, inputs)
 
 
@@ -440,3 +444,45 @@ def test_asof_future_clock_or_boolean_timestamp_rejected() -> None:
     inputs[1]["selected_version_observed_at_utc"] = 10**400
     with pytest.raises(ValueError, match="range"):
         audit_claimed_asof_input_versions(plan, inputs)
+
+
+@pytest.mark.parametrize("late_issue_seconds", [0, 1, 86_400])
+def test_asof_hindsight_prediction_at_or_after_target_end_fails(
+    late_issue_seconds: int,
+) -> None:
+    plan, inputs = _asof_fixture()
+    plan["forecast_issued_at_utc"] = (
+        plan["forecast_target_end_utc"] + late_issue_seconds
+    )
+    with pytest.raises(ValueError, match="before future target end"):
+        audit_claimed_asof_input_versions(plan, inputs)
+
+
+def test_asof_missing_or_backdated_target_end_fails_closed() -> None:
+    plan, inputs = _asof_fixture()
+    plan.pop("forecast_target_end_utc")
+    with pytest.raises(ValueError, match="issuance plan"):
+        audit_claimed_asof_input_versions(plan, inputs)
+    plan, inputs = _asof_fixture()
+    plan["forecast_target_end_utc"] = plan["origin_cutoff_utc"]
+    with pytest.raises(ValueError, match="before future target end"):
+        audit_claimed_asof_input_versions(plan, inputs)
+
+
+def test_asof_target_end_is_utc_integer_and_within_calendar() -> None:
+    plan, inputs = _asof_fixture()
+    plan["forecast_target_end_utc"] = True
+    with pytest.raises(ValueError, match="UTC integer"):
+        audit_claimed_asof_input_versions(plan, inputs)
+    plan, inputs = _asof_fixture()
+    plan["forecast_target_end_utc"] = 10**400
+    with pytest.raises(ValueError, match="range"):
+        audit_claimed_asof_input_versions(plan, inputs)
+
+
+def test_asof_valid_short_horizon_issuance_remains_unverified() -> None:
+    plan, inputs = _asof_fixture()
+    plan["forecast_target_end_utc"] = plan["origin_cutoff_utc"] + 3_600
+    result = audit_claimed_asof_input_versions(plan, inputs)
+    assert result["status"] == "UNVERIFIED_ASOF_METADATA_ONLY"
+    assert result["scientific_authorization"] == "NO_RUN"
