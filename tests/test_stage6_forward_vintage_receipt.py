@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
@@ -45,6 +46,8 @@ def test_receipt_has_only_local_observation_no_unauthorized_claims() -> None:
     ("field", "invalid"),
     [
         ("source", "unknown"),
+        ("source", []),
+        ("source", {"unexpected": "object"}),
         ("source", "bitfinex:BTCUSD:1w"),
         ("bar_open_utc", True),
         ("bar_open_utc", OPEN + 1),
@@ -104,6 +107,35 @@ def test_self_hash_does_not_allow_tampering(field: str, invalid: object) -> None
     packet[field] = invalid
     with pytest.raises(ValueError):
         validate_local_receipt(packet)
+
+
+def test_boolean_version_cannot_masquerade_as_schema_one_with_rehashed_receipt() -> None:
+    from scripts.stage6_forward_vintage_receipt import _serialized
+
+    packet = _make()
+    packet["schema_version"] = True  # True == 1 under Python equality: reject by type.
+    unsigned = {k: v for k, v in packet.items() if k != "receipt_sha256"}
+    packet["receipt_sha256"] = hashlib.sha256(_serialized(unsigned)).hexdigest()
+    with pytest.raises(ValueError, match="version"):
+        validate_local_receipt(packet)
+
+
+def test_validator_rejects_unhashable_source_instead_of_crashing() -> None:
+    packet = _make()
+    packet["source"] = []
+    with pytest.raises(ValueError, match="source identity"):
+        validate_local_receipt(packet)
+
+
+def test_adjacent_microsecond_receipts_have_distinct_exact_filenames(tmp_path: Path) -> None:
+    root = tmp_path / "private"
+    root.mkdir(mode=0o700)
+    first = save_private_receipt(_make(clock=lambda: NOW.replace(microsecond=2)), root)
+    second = save_private_receipt(_make(clock=lambda: NOW.replace(microsecond=3)), root)
+    expected_us = int(NOW.timestamp()) * 1_000_000
+    assert first != second
+    assert first.name.startswith(f"stage6-{expected_us + 2}-")
+    assert second.name.startswith(f"stage6-{expected_us + 3}-")
 
 
 def test_extra_price_or_target_fields_rejected() -> None:
