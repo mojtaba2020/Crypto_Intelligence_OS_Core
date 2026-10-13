@@ -165,9 +165,7 @@ def save_private_receipt(receipt: Mapping[str, object], private_root: Path) -> P
         raise ValueError("Never store observation receipts in public GitHub repository")
     if not private_root.is_dir() or private_root.stat().st_mode & 0o077:
         raise ValueError("Receipt root must be an existing private directory (0700)")
-    observed = datetime.fromisoformat(
-        str(receipt["system_observed_at_utc"]).replace("Z", "+00:00")
-    )
+    observed = datetime.fromisoformat(str(receipt["system_observed_at_utc"]).replace("Z", "+00:00"))
     stamp_us = int(observed.timestamp() * 1_000_000)
     filename = f"stage6-{stamp_us}-{receipt['receipt_sha256'][:20]}.json"
     root_fd = os.open(private_root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | os.O_NOFOLLOW)
