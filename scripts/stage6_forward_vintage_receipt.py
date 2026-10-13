@@ -44,9 +44,8 @@ STATUS = "LOCAL_OBSERVATION_ONLY_UNATTESTED"
 
 
 def _serialized(value: Mapping[str, object]) -> bytes:
-    return (json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n").encode(
-        "utf-8"
-    )
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    return (payload + "\n").encode("utf-8")
 
 
 def _validate_metadata(source: object, opening: object, seconds: object) -> None:
