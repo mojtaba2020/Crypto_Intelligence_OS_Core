@@ -164,4 +164,3 @@ def test_unchanged_source_bytes_at_new_observation_time_are_distinct(tmp_path: P
     assert first != second
     assert earlier["raw_response_sha256"] == later["raw_response_sha256"]
     assert earlier["receipt_sha256"] != later["receipt_sha256"]
-
