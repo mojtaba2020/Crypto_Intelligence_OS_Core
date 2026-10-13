@@ -196,3 +196,46 @@ def test_unchanged_source_bytes_at_new_observation_time_are_distinct(tmp_path: P
     assert first != second
     assert earlier["raw_response_sha256"] == later["raw_response_sha256"]
     assert earlier["receipt_sha256"] != later["receipt_sha256"]
+
+
+def test_permission_change_during_root_open_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os
+
+    root = tmp_path / "private"
+    root.mkdir(mode=0o700)
+    real_open = os.open
+
+    def chmod_before_open(path: object, flags: int, *args: object, **kwargs: object) -> int:
+        if path == root:
+            root.chmod(0o755)
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", chmod_before_open)
+    with pytest.raises(ValueError, match="insecure during open"):
+        save_private_receipt(_make(), root)
+    assert not list(root.iterdir())
+
+
+def test_directory_replacement_during_root_open_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os
+
+    root = tmp_path / "private"
+    moved = tmp_path / "moved"
+    root.mkdir(mode=0o700)
+    real_open = os.open
+
+    def swap_before_open(path: object, flags: int, *args: object, **kwargs: object) -> int:
+        if path == root:
+            root.rename(moved)
+            root.mkdir(mode=0o700)
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", swap_before_open)
+    with pytest.raises(ValueError, match="changed or became insecure"):
+        save_private_receipt(_make(), root)
+    assert not list(root.iterdir())
+    assert not list(moved.iterdir())
