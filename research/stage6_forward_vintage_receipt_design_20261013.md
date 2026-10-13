@@ -50,3 +50,25 @@ reserved/locked OOS, or Stage-7 decision is changed.
 
 **Current scientific result:** 24 frozen V3 diagnostics -> 0/24 Freeze-ready.
 NO_RUN/NO_FREEZE until provenance and prospective statistical gates pass.
+
+## Local receipt inventory (offline, opt-in)
+
+The companion pure module `scripts/stage6_local_receipt_inventory.py` compares
+validated *local observation* receipts against an exact caller-declared 1h/1d
+source/cadence/calendar plan. It has no filesystem or HTTP access and does
+not read, score or fit market data. Its synthetic regression tests cover:
+- Scheduled slot with no local receipt: `NO_LOCAL_RECEIPT`, **not** a claim
+  that the exchange was missing that bar or that the bar is statistically usable.
+- Multiple observations with identical raw-response bytes: explicit repetition,
+  not multiple independent data points.
+- Distinct response hashes for the same scheduled bar: `RESPONSE_BYTES_DIFFER`,
+  **not** proof that OHLCV prices changed. Serialization, API metadata and
+  representation can also change; real revisions need a trusted raw audit.
+- Identical receipt replay, off-schedule or wrong-source receipts and
+  unexpected fields: fail closed. All outputs retain NO_RUN/NO_FREEZE,
+  no third-party attestation and no hidden origin replenishment.
+
+Plans and receipts are self-asserted and do not establish completeness,
+authentic clock time, independent immutable custody or an authenticated
+first-publication history. This is a **local quality inventory only**, not
+a scientific eligibility count or authorization to activate collection.
