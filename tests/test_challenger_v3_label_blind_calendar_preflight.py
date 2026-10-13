@@ -8,6 +8,7 @@ import pytest
 from scripts.challenger_v3_label_blind_calendar_preflight import (
     HORIZONS,
     _advance,
+    audit_claimed_asof_input_versions,
     audit_label_blind_calendar,
 )
 
@@ -297,3 +298,146 @@ def test_issue_lag_that_overflows_supported_range_rejected() -> None:
     plan["hypothetical_issue_lag_seconds"] = 10**400
     with pytest.raises(ValueError, match="range"):
         audit_label_blind_calendar(plan, records)
+
+
+def _asof_fixture() -> tuple[dict, list[dict]]:
+    day = 86_400
+    origin = JAN_1 + day
+    plan = {"origin_cutoff_utc": origin, "forecast_issued_at_utc": origin + 60}
+    inputs = [
+        {
+            "kind": "feature_bar",
+            "bar_open_utc": origin - day,
+            "bar_end_utc": origin,
+            "first_observed_at_utc": origin + 5,
+            "selected_version_observed_at_utc": origin + 10,
+            "selected_version_superseded_at_utc": None,
+        },
+        {
+            "kind": "training_label",
+            "bar_open_utc": origin - 2 * day,
+            "bar_end_utc": origin - day,
+            "first_observed_at_utc": origin - day + 5,
+            "selected_version_observed_at_utc": origin - day + 10,
+            "selected_version_superseded_at_utc": None,
+        },
+    ]
+    return plan, inputs
+
+
+def test_asof_both_source_and_label_pretend_ready_only_as_metadata() -> None:
+    plan, inputs = _asof_fixture()
+    result = audit_claimed_asof_input_versions(plan, inputs)
+    assert result["status"] == "UNVERIFIED_ASOF_METADATA_ONLY"
+    assert result["blocked_input_count"] == 0
+    assert result["scientific_authorization"] == "NO_RUN"
+    assert result["stage7_freeze_authorized"] is False
+    assert result["real_source_vintages_authenticated"] is False
+    assert result["independent_custody_verified"] is False
+
+
+@pytest.mark.parametrize("kind", ["feature_bar", "training_label"])
+def test_asof_late_first_observed_blocks_even_when_bar_closed(kind: str) -> None:
+    plan, inputs = _asof_fixture()
+    selected = next(record for record in inputs if record["kind"] == kind)
+    selected["first_observed_at_utc"] = plan["forecast_issued_at_utc"] + 90
+    selected["selected_version_observed_at_utc"] = plan["forecast_issued_at_utc"] + 100
+    result = audit_claimed_asof_input_versions(plan, inputs)
+    assert result["status"] == "BLOCKED"
+    assert "VERSION_NOT_KNOWN_AT_ISSUE" in next(
+        item["gaps"] for item in result["inputs"] if item["kind"] == kind
+    )
+
+
+def test_asof_later_revisions_allow_only_preserved_earlier_version() -> None:
+    plan, inputs = _asof_fixture()
+    future_revision = plan["forecast_issued_at_utc"] + 100
+    inputs[0]["selected_version_superseded_at_utc"] = future_revision
+    assert audit_claimed_asof_input_versions(plan, inputs)["blocked_input_count"] == 0
+    # Retrospectively substituting the corrected version is NOT an as-of view.
+    inputs[0]["selected_version_observed_at_utc"] = future_revision
+    inputs[0]["selected_version_superseded_at_utc"] = None
+    result = audit_claimed_asof_input_versions(plan, inputs)
+    assert "VERSION_NOT_KNOWN_AT_ISSUE" in result["inputs"][0]["gaps"]
+
+
+def test_asof_revision_already_superseded_before_issue_is_blocked() -> None:
+    plan, inputs = _asof_fixture()
+    inputs[0]["selected_version_superseded_at_utc"] = plan["forecast_issued_at_utc"] - 5
+    result = audit_claimed_asof_input_versions(plan, inputs)
+    assert result["inputs"][0]["gaps"] == ["SELECTED_VERSION_ALREADY_SUPERSEDED"]
+
+
+def test_asof_missing_source_or_label_vintage_fails_closed() -> None:
+    plan, inputs = _asof_fixture()
+    inputs[1]["first_observed_at_utc"] = None
+    result = audit_claimed_asof_input_versions(plan, inputs)
+    assert result["status"] == "BLOCKED"
+    assert result["inputs"][1]["gaps"] == ["SOURCE_OR_LABEL_VINTAGE_UNKNOWN"]
+
+
+def test_asof_inconsistent_first_insert_after_chosen_version_is_blocked() -> None:
+    plan, inputs = _asof_fixture()
+    inputs[1]["first_observed_at_utc"] = inputs[1]["selected_version_observed_at_utc"] + 1
+    assert "CONTRADICTORY_VINTAGE_CHRONOLOGY" in (
+        audit_claimed_asof_input_versions(plan, inputs)["inputs"][1]["gaps"]
+    )
+
+
+def test_asof_duplicate_version_slot_cannot_inflate_input_completeness() -> None:
+    plan, inputs = _asof_fixture()
+    with pytest.raises(ValueError, match="Duplicate"):
+        audit_claimed_asof_input_versions(plan, inputs + [inputs[0].copy()])
+
+
+def test_asof_missing_either_source_or_training_label_stays_blocked() -> None:
+    plan, inputs = _asof_fixture()
+    result = audit_claimed_asof_input_versions(plan, inputs[:1])
+    assert result["status"] == "BLOCKED"
+    assert result["required_input_kinds_missing"] == ["training_label"]
+
+
+@pytest.mark.parametrize("payload", [{"close": 50000}, {"next_return": 0.3}])
+def test_asof_cannot_smuggle_outcomes_via_metadata(payload: dict) -> None:
+    plan, inputs = _asof_fixture()
+    inputs[0].update(payload)
+    with pytest.raises(ValueError, match="closed-schema"):
+        audit_claimed_asof_input_versions(plan, inputs)
+
+
+def test_asof_cannot_use_target_after_origin_or_issue_before_origin() -> None:
+    plan, inputs = _asof_fixture()
+    inputs[1]["bar_end_utc"] = plan["origin_cutoff_utc"] + 86_400
+    with pytest.raises(ValueError, match="close by"):
+        audit_claimed_asof_input_versions(plan, inputs)
+    plan, inputs = _asof_fixture()
+    plan["forecast_issued_at_utc"] = plan["origin_cutoff_utc"]
+    with pytest.raises(ValueError, match="must follow"):
+        audit_claimed_asof_input_versions(plan, inputs)
+
+
+@pytest.mark.parametrize("bad", [None, "a string", [], [{}] * 513])
+def test_asof_empty_or_oversized_input_cannot_pass(bad: object) -> None:
+    plan, _ = _asof_fixture()
+    with pytest.raises(ValueError, match="bounded"):
+        audit_claimed_asof_input_versions(plan, bad)
+
+
+def test_asof_chosen_version_supersession_must_be_after_selected_time() -> None:
+    plan, inputs = _asof_fixture()
+    inputs[0]["selected_version_superseded_at_utc"] = (
+        inputs[0]["selected_version_observed_at_utc"]
+    )
+    with pytest.raises(ValueError, match="supersession chronology"):
+        audit_claimed_asof_input_versions(plan, inputs)
+
+
+def test_asof_future_clock_or_boolean_timestamp_rejected() -> None:
+    plan, inputs = _asof_fixture()
+    inputs[0]["first_observed_at_utc"] = True
+    with pytest.raises(ValueError, match="UTC integer"):
+        audit_claimed_asof_input_versions(plan, inputs)
+    plan, inputs = _asof_fixture()
+    inputs[1]["selected_version_observed_at_utc"] = 10**400
+    with pytest.raises(ValueError, match="range"):
+        audit_claimed_asof_input_versions(plan, inputs)
