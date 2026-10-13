@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a factual, private GitHub-native CEO mission board for an actual BTC data run.
+"""Create a factual, repository-hosted GitHub-native CEO mission board for an actual BTC data run.
 
 This report is a completed-run snapshot shown in GitHub Actions on mobile; it is
 not a hosted dashboard or a live autonomous agent control surface.
@@ -26,8 +26,8 @@ def build_mission_board(report: dict[str, Any], *, run_id: str) -> str:
         raise ValueError("Only an actually completed ingestion can be displayed as completed")
     if report.get("worker_type") != "DETERMINISTIC_MARKET_DATA_PIPELINE_NOT_AI_AGENT":
         raise ValueError("Unexpected worker type")
-    if report.get("persistence") != "PRIVATE_GITHUB_DATA_BRANCH":
-        raise ValueError("No verified persistent private data branch")
+    if report.get("persistence") not in {"GITHUB_DATA_BRANCH", "PRIVATE_GITHUB_DATA_BRANCH"}:
+        raise ValueError("No recognized persistent repository data branch")
     if report.get("instrument") != "market:coinbase:spot:btc-usd":
         raise ValueError("Unexpected instrument")
     if report.get("source") != "source:coinbase.advanced-trade.public":
@@ -104,7 +104,7 @@ def build_mission_board(report: dict[str, Any], *, run_id: str) -> str:
         f"- Collector completed (UTC): `{dates['completed_at_utc'].isoformat()}`\n"
         f"- Coinbase server timestamp (UTC): `{dates['source_time_utc'].isoformat()}`\n"
         f"- SQLite SHA-256: `{digest}`\n"
-        f"- [Open persistent data and ingestion report — private GitHub branch]"
+        f"- [Open persistent data and report — branch access follows repository visibility]"
         f"({DATA_BRANCH_URL})\n\n"
         "## CEO actions available now\n\n"
         f"- [Inspect this real run and its step-by-step logs]({run_url})\n"
