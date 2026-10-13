@@ -219,7 +219,7 @@ def audit_label_blind_calendar(
 
 # Optional synthetic-only review for the input bytes actually claimed at an
 # issuance instant. This is NOT an exchange timestamp or version authenticator.
-ASOF_PLAN_KEYS = frozenset({"origin_cutoff_utc", "forecast_issued_at_utc"})
+ASOF_PLAN_KEYS = frozenset({"origin_cutoff_utc", "forecast_issued_at_utc", "forecast_target_end_utc"})
 ASOF_INPUT_KEYS = frozenset(
     {
         "kind",
@@ -248,8 +248,9 @@ def audit_claimed_asof_input_versions(
         raise ValueError("Exact as-of issuance plan metadata required")
     origin = _strict_timestamp(plan["origin_cutoff_utc"], "origin cutoff")
     issued = _strict_timestamp(plan["forecast_issued_at_utc"], "forecast issuance")
-    if origin <= 0 or issued <= origin:
-        raise ValueError("Forecast issuance must follow the nominal origin cutoff")
+    target_end = _strict_timestamp(plan["forecast_target_end_utc"], "forecast target end")
+    if origin <= 0 or not origin < issued < target_end:
+        raise ValueError("Forecast must be issued after origin and before future target end")
     if (
         not isinstance(inputs, Sequence)
         or isinstance(inputs, (str, bytes))
