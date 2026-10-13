@@ -455,3 +455,40 @@ def test_provider_usage_rejects_inconsistent_total(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(runtime.urllib.request, "urlopen", lambda *_args, **_kwargs: response)
     with pytest.raises(ValueError, match="inconsistent"):
         runtime.call_provider(task(), [])
+
+
+def test_compact_prompt_roundtrips_unmodified_evidence() -> None:
+    original_task = task()
+    original_context = [
+        {"id": "development-1", "content": "two  spaces, \n literal \u2022 and فارسی"},
+        {"id": "development-2", "content": 'backslash \\ and "quotes"'},
+    ]
+    prompt = runtime.build_prompt(original_task, original_context)
+    task_json, after_task = prompt.split("Task JSON: ", 1)[1].split(
+        "\nRequired provider fields: ", 1
+    )
+    fields_json, context_json = after_task.split("\nContext JSON: ", 1)
+
+    assert json.loads(task_json) == original_task
+    assert json.loads(fields_json) == sorted(runtime.PROVIDER_FIELDS)
+    assert json.loads(context_json) == original_context
+    assert len(task_json.encode("utf-8")) < len(
+        json.dumps(original_task, sort_keys=True, allow_nan=False).encode("utf-8")
+    )
+    assert len(context_json.encode("utf-8")) < len(
+        json.dumps(original_context, sort_keys=True, allow_nan=False).encode("utf-8")
+    )
+
+
+def test_prompt_budget_fails_closed_before_any_provider_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "not-a-real-key")
+    monkeypatch.setattr(runtime, "MAX_PROMPT_BYTES", 100)
+    monkeypatch.setattr(
+        runtime.urllib.request,
+        "urlopen",
+        lambda *_args, **_kwargs: pytest.fail("provider must not be contacted"),
+    )
+    with pytest.raises(ValueError, match="prompt exceeds byte budget"):
+        runtime.call_provider(task(), [{"id": "development-only", "content": "x" * 400}])
