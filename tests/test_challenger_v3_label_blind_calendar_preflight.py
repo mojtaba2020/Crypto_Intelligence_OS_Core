@@ -239,7 +239,7 @@ def test_all_bar_arithmetic_rejects_python_datetime_overflow(
     family: str, bars: int
 ) -> None:
     near_end = int(datetime(9999, 12, 31, 20, tzinfo=UTC).timestamp())
-    with pytest.raises(ValueError, match="range|calendar"):
+    with pytest.raises(ValueError, match=r"range|calendar"):
         _advance(near_end, family, bars)
 
 
