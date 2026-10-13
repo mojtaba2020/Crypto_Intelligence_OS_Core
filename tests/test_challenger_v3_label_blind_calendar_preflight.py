@@ -379,8 +379,9 @@ def test_asof_missing_source_or_label_vintage_fails_closed() -> None:
 def test_asof_inconsistent_first_insert_after_chosen_version_is_blocked() -> None:
     plan, inputs = _asof_fixture()
     inputs[1]["first_observed_at_utc"] = inputs[1]["selected_version_observed_at_utc"] + 1
-    assert "CONTRADICTORY_VINTAGE_CHRONOLOGY" in (
-        audit_claimed_asof_input_versions(plan, inputs)["inputs"][1]["gaps"]
+    assert (
+        "CONTRADICTORY_VINTAGE_CHRONOLOGY"
+        in (audit_claimed_asof_input_versions(plan, inputs)["inputs"][1]["gaps"])
     )
 
 
@@ -425,9 +426,7 @@ def test_asof_empty_or_oversized_input_cannot_pass(bad: object) -> None:
 
 def test_asof_chosen_version_supersession_must_be_after_selected_time() -> None:
     plan, inputs = _asof_fixture()
-    inputs[0]["selected_version_superseded_at_utc"] = (
-        inputs[0]["selected_version_observed_at_utc"]
-    )
+    inputs[0]["selected_version_superseded_at_utc"] = inputs[0]["selected_version_observed_at_utc"]
     with pytest.raises(ValueError, match="supersession chronology"):
         audit_claimed_asof_input_versions(plan, inputs)
 
