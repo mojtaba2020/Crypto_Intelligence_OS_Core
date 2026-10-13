@@ -219,7 +219,9 @@ def audit_label_blind_calendar(
 
 # Optional synthetic-only review for the input bytes actually claimed at an
 # issuance instant. This is NOT an exchange timestamp or version authenticator.
-ASOF_PLAN_KEYS = frozenset({"origin_cutoff_utc", "forecast_issued_at_utc", "forecast_target_end_utc"})
+ASOF_PLAN_KEYS = frozenset(
+    {"origin_cutoff_utc", "forecast_issued_at_utc", "forecast_target_end_utc"}
+)
 ASOF_INPUT_KEYS = frozenset(
     {
         "kind",
