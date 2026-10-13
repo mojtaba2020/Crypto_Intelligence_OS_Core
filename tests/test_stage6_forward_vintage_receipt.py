@@ -84,7 +84,7 @@ def test_observation_not_backdated_to_market_bar_close() -> None:
     ],
 )
 def test_local_clock_requires_actual_utc_aware_datetime(clock: object) -> None:
-    with pytest.raises(ValueError, match="UTC|timezone"):
+    with pytest.raises(ValueError, match=r"UTC|timezone"):
         _make(clock=clock)
 
 
