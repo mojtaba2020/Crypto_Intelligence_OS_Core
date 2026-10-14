@@ -106,6 +106,7 @@ def test_no_price_or_future_outcome_can_enter_claim(addition: dict) -> None:
     with pytest.raises(ValueError, match="non-outcome"):
         audit_chainlink_anchor_claim(data)
 
+
 def test_claim_first_observed_at_issuance_in_same_second_is_blocked() -> None:
     claim = _claim()
     claim["claimed_block_first_seen_at_utc"] = claim["forecast_issued_at_utc"]
