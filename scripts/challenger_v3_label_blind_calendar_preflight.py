@@ -333,3 +333,63 @@ def audit_claimed_asof_input_versions(
         "blocked_input_count": sum(row["status"] == "BLOCKED" for row in results),
         "inputs": results,
     }
+
+
+def audit_paired_calendar_and_asof(
+    plan: Mapping[str, object],
+    records: Sequence[Mapping[str, object]],
+    bundles: Mapping[str, Sequence[Mapping[str, object]]],
+) -> dict[str, object]:
+    """Conjoin calendar and version checks, without authorizing science."""
+    from typing import cast
+
+    calendar = audit_label_blind_calendar(plan, records)
+    origins = cast(list[dict[str, object]], calendar["origins"])
+    ids = {cast(str, row["schedule_id"]) for row in origins}
+    if not isinstance(bundles, Mapping) or any(type(k) is not str for k in bundles):
+        raise ValueError("As-of bundles must be keyed by fixed schedule IDs")
+    if set(bundles) - ids:
+        raise ValueError("Unscheduled as-of bundle cannot replace an origin")
+    total = 0
+    for value in bundles.values():
+        if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+            raise ValueError("As-of bundle must contain a metadata sequence")
+        total += len(value)
+        if total > 8_192:
+            raise ValueError("Too many as-of records in offline review")
+
+    rows: list[dict[str, object]] = []
+    consistent = 0
+    for row in origins:
+        key = cast(str, row["schedule_id"])
+        if row["status"] != "PROVISIONAL_ELIGIBLE":
+            status, gaps = "CALENDAR_EXCLUDED", row["reasons"]
+        elif key not in bundles:
+            status, gaps = "BLOCKED", ["MISSING_ASOF_INPUT_BUNDLE"]
+        else:
+            asof = audit_claimed_asof_input_versions(
+                {
+                    "horizon": calendar["horizon"],
+                    "origin_cutoff_utc": row["origin_cutoff_utc"],
+                    "forecast_issued_at_utc": row["hypothetical_issue_utc"],
+                    "forecast_target_end_utc": row["target_end_utc"],
+                },
+                bundles[key],
+            )
+            if asof["status"] == "UNVERIFIED_ASOF_METADATA_ONLY":
+                status, gaps = "PAIRED_METADATA_CONSISTENT_UNVERIFIED", []
+                consistent += 1
+            else:
+                status, gaps = "BLOCKED", ["ASOF_INPUT_VERSION_BLOCKED"]
+        rows.append({"schedule_id": key, "status": status, "gaps": gaps})
+    return {
+        "status": "UNVERIFIED_PAIRED_METADATA_ONLY" if consistent == len(origins) else "BLOCKED",
+        "calendar_provisional_count": calendar["provisionally_eligible_count"],
+        "paired_metadata_consistent_count": consistent,
+        "scheduled_origin_count": len(origins),
+        "scientific_authorization": "NO_RUN",
+        "stage7_freeze_authorized": False,
+        "source_provenance_authenticated": False,
+        "independent_effective_n": "UNKNOWN",
+        "rows": rows,
+    }
