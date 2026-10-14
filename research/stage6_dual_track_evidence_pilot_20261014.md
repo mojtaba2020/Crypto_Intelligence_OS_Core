@@ -30,3 +30,38 @@ Before activation, require:
 - Only a *later separately approved* prospective sequence can support genuinely new forward performance evidence. This pilot alone will not prove predictive skill or unlock Stage 7.
 
 References: issue #81 (A1–A6), draft PR #85 (offline local receipts), draft PR #80 (calendar metadata only). Vendor licensing and source evidence must be reviewed before any new collection.
+
+## Offline Chainlink phase/round anchor consistency gate
+
+Added `scripts/stage6_chainlink_anchor_preflight.py` and synthetic tests to
+PR #85, without performing an Ethereum RPC call. The fixed candidate is the
+**standard** Ethereum Mainnet BTC/USD proxy, chain ID 1,
+`0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c`, not the alternative SVR proxy.
+The checker requires a proxy round equal to `(phase_id << 64) | aggregator_round_id`,
+plausible chain and block references, a nonzero oracle `updatedAt` no later
+than the claimed block, and a claimed block-first-seen strictly earlier than
+the forecast issuance. It blocks missing, out-of-sequence and late evidence.
+
+**WARNING:** no cryptographic inclusion verification is performed by the
+checker. Merely providing a syntactically valid block hash, transaction hash,
+aggregator address or first-seen timestamp establishes *nothing* independently:
+the source can still be fictional, changed, offchain-only or from an incorrect
+aggregator phase. The reviewer must independently establish the actual
+chain ID, proxy source, phase-to-aggregator mapping *as of the proposed block*,
+transmission log decoding and receipt inclusion, canonical block ancestry,
+finality, exact price-feed decimals, market staleness, custody and rights to
+use any resulting oracle-price data. Block timestamp alone is not trusted
+first-observed availability, and oracle reference prices cannot substitute
+for Bitstamp or Bitfinex trade records.
+
+The only successful checker output is explicitly
+`UNVERIFIED_ORACLE_METADATA_ONLY`, with
+`onchain_inclusion_independently_verified=false`, `NO_RUN` and
+`NO_FREEZE`. Tests fabricate **metadata**, not prices or market outcomes.
+The current plan uses this as a falsification aid, not a source authenticator.
+
+Official references:
+- https://data.chain.link/feeds/ethereum/mainnet/btc-usd
+- https://docs.chain.link/data-feeds/api-reference
+- https://docs.chain.link/data-feeds/historical-data
+- https://etherscan.io/address/0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c

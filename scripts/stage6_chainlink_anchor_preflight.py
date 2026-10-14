@@ -53,7 +53,7 @@ def audit_chainlink_anchor_claim(claim: Mapping[str, object]) -> dict[str, objec
         raise ValueError("Exact non-outcome Chainlink claim schema required")
     if type(claim["chain_id"]) is not int or claim["chain_id"] != CHAIN_ID:
         raise ValueError("Wrong Ethereum network")
-    if claim["feed_proxy"] != BTC_USD_PROXY:
+    if type(claim["feed_proxy"]) is not str or claim["feed_proxy"] != BTC_USD_PROXY:
         raise ValueError("Wrong pinned BTC/USD standard feed proxy")
     aggregator = _hex(claim["aggregator_address"], 20, "aggregator address")
     if aggregator == BTC_USD_PROXY or aggregator == "0x" + "0" * 40:
@@ -84,8 +84,8 @@ def audit_chainlink_anchor_claim(claim: Mapping[str, object]) -> dict[str, objec
         seen_ts = _positive_int(seen, "block first seen")
         if seen_ts < block_ts:
             gaps.append("FIRST_SEEN_BEFORE_BLOCK")
-        if seen_ts > issued:
-            gaps.append("FIRST_SEEN_AFTER_FORECAST")
+        if seen_ts >= issued:
+            gaps.append("FIRST_SEEN_NOT_BEFORE_FORECAST")
     return {
         "status": "BLOCKED" if gaps else "UNVERIFIED_ORACLE_METADATA_ONLY",
         "gaps": gaps,

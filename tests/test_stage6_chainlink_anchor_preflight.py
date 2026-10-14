@@ -74,7 +74,7 @@ def test_late_observation_never_backdates_claimed_availability() -> None:
     data["claimed_block_first_seen_at_utc"] = data["forecast_issued_at_utc"] + 1
     result = audit_chainlink_anchor_claim(data)
     assert result["status"] == "BLOCKED"
-    assert "FIRST_SEEN_AFTER_FORECAST" in result["gaps"]
+    assert "FIRST_SEEN_NOT_BEFORE_FORECAST" in result["gaps"]
 
 
 def test_unknown_observation_is_not_a_pit_pass() -> None:
@@ -105,3 +105,17 @@ def test_no_price_or_future_outcome_can_enter_claim(addition: dict) -> None:
     data.update(addition)
     with pytest.raises(ValueError, match="non-outcome"):
         audit_chainlink_anchor_claim(data)
+
+def test_claim_first_observed_at_issuance_in_same_second_is_blocked() -> None:
+    claim = _claim()
+    claim["claimed_block_first_seen_at_utc"] = claim["forecast_issued_at_utc"]
+    result = audit_chainlink_anchor_claim(claim)
+    assert result["status"] == "BLOCKED"
+    assert "FIRST_SEEN_NOT_BEFORE_FORECAST" in result["gaps"]
+
+
+def test_wrong_proxy_type_is_not_a_valid_feed() -> None:
+    claim = _claim()
+    claim["feed_proxy"] = None
+    with pytest.raises(ValueError, match="pinned"):
+        audit_chainlink_anchor_claim(claim)
