@@ -101,8 +101,12 @@ def score(database: Path, ledger: Path, *, now: datetime) -> dict:
             and date.fromisoformat(row["target_day"]) < today
             and datetime.fromisoformat(row["issued_at_utc"]).astimezone(UTC).date()
             <= date.fromisoformat(row["origin_day"]) + timedelta(days=1)
-            and datetime.fromisoformat(row["issued_at_utc"]).astimezone(UTC).date()
-            < date.fromisoformat(row["target_day"])
+            and datetime.fromisoformat(row["issued_at_utc"]).astimezone(UTC)
+            < datetime.combine(
+                date.fromisoformat(row["target_day"]) + timedelta(days=1),
+                datetime.min.time(),
+                tzinfo=UTC,
+            )
             and row["target_day"] in closes
         ]
         paired = [
