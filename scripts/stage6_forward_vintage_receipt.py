@@ -183,14 +183,35 @@ def save_private_receipt(receipt: Mapping[str, object], private_root: Path) -> P
             or (opened_root.st_dev, opened_root.st_ino) != (root_before.st_dev, root_before.st_ino)
         ):
             raise ValueError("Receipt root changed or became insecure during open")
+        # Resolve the PINNED opened inode, not the mutable pathname. A parent
+        # can turn into a symlink between resolve() and stat()/open().
+        # This prototype deliberately fails closed without Linux procfs;
+        # independent OS isolation and external custody are still required.
+        proc_fd = Path("/proc/self/fd") / str(root_fd)
+        if not proc_fd.exists():
+            raise ValueError("Pinned directory verification requires Linux procfs")
+        pinned_root = proc_fd.resolve(strict=True)
+        if pinned_root != resolved or pinned_root.is_relative_to(repo_root):
+            raise ValueError("Receipt root changed or became public during open")
         descriptor = os.open(
             filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=root_fd
         )
-        with os.fdopen(descriptor, "wb") as output:
-            output.write(_serialized(receipt))
-            output.flush()
-            os.fsync(output.fileno())
-        os.fsync(root_fd)
+        try:
+            with os.fdopen(descriptor, "wb") as output:
+                output.write(_serialized(receipt))
+                output.flush()
+                os.fsync(output.fileno())
+            os.fsync(root_fd)
+        except BaseException:
+            # A failed partial write/fsync is not a durable receipt. Unlink via
+            # the opened directory handle; never leave an ambiguous O_EXCL
+            # placeholder that permanently blocks a legitimate retry.
+            try:
+                os.unlink(filename, dir_fd=root_fd)
+                os.fsync(root_fd)
+            except OSError:
+                pass  # Preserve the original failure; operator must inspect.
+            raise
     finally:
         os.close(root_fd)
-    return resolved / filename
+    return pinned_root / filename
