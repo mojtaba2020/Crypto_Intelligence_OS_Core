@@ -216,3 +216,25 @@ def test_extreme_source_price_ratio_still_clamps_without_overflow() -> None:
     report = build_synthetic_comparator_batches(windows, SHA)
     for result in report["candidates"]["one_bar_momentum"]["forecasts"]:
         assert 100.0 < result["predicted_target_price_usd"] < 125.0
+
+
+
+def test_subnormal_downtrend_cannot_silently_become_flat() -> None:
+    windows = _windows()
+    for row in windows:
+        row["previous_price_usd"] = 2**-1073
+        row["origin_price_usd"] = 2**-1074
+    with pytest.raises(ValueError, match="lost direction to float underflow"):
+        build_synthetic_comparator_batches(windows, SHA)
+
+
+def test_extreme_small_but_representable_momentum_remains_down() -> None:
+    windows = _windows()
+    for row in windows:
+        row["previous_price_usd"] = 1e-100
+        row["origin_price_usd"] = 5e-101
+    report = build_synthetic_comparator_batches(windows, SHA)
+    assert all(
+        row["predicted_direction"] == "down"
+        for row in report["candidates"]["one_bar_momentum"]["forecasts"]
+    )
