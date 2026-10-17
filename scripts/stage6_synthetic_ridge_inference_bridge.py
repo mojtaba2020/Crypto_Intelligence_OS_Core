@@ -10,7 +10,6 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 
-from crypto_intelligence_os.hybrid_forecasting import _estimate
 from scripts.stage6_dual_target_forecast_contract import (
     HORIZONS,
     _digest,
@@ -20,6 +19,7 @@ from scripts.stage6_synthetic_baseline_adapters import (
     _illustrative_intervals,
     _inspect_synthetic_window,
 )
+from crypto_intelligence_os.hybrid_forecasting import _estimate
 
 STATE_KEYS = frozenset({"weights", "means", "scales", "model_code_sha256"})
 MAX_COEFFICIENT = 1_000.0
