@@ -3,7 +3,6 @@
 from datetime import UTC, datetime
 
 import pytest
-
 from scripts.stage6_hourly_elapsed_lead_audit import audit_elapsed_lead
 
 START = int(datetime(2026, 10, 16, tzinfo=UTC).timestamp())
