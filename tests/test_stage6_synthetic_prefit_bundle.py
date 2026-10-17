@@ -196,7 +196,7 @@ def test_state_disallows_target_label_injection() -> None:
         inspect_in_memory_mock_bundle(payload, _sha(payload))
 
 
-@pytest.mark.parametrize("bad", [True, "0.5", 1e400, math.nan])
+@pytest.mark.parametrize("bad", [True, "0.5", 1e9, math.nan])
 def test_invalid_state_weights_fail_before_forecast_creation(bad: object) -> None:
     document = _envelope()
     document["model_states"]["1h"]["weights"][1] = bad
