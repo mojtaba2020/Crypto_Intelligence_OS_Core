@@ -157,7 +157,7 @@ def test_issue_time_target_calendar_and_type_require_strict_order(
 ) -> None:
     row = _record()
     row[field] = bad
-    with pytest.raises(ValueError, match="target|issue|origin|calendar"):
+    with pytest.raises(ValueError, match=r"target|issue|origin|calendar"):
         validate_dual_target_forecast(row)
 
 
@@ -181,7 +181,9 @@ def test_weekly_requires_monday_and_three_week_target_end() -> None:
         validate_dual_target_forecast(row)
 
 
-@pytest.mark.parametrize("field", ["model_code_sha256", "feature_code_sha256", "dataset_manifest_sha256"])
+@pytest.mark.parametrize(
+    "field", ["model_code_sha256", "feature_code_sha256", "dataset_manifest_sha256"]
+)
 @pytest.mark.parametrize("digest", ["A" * 64, "g" * 64, "a" * 63, True])
 def test_self_asserted_fingerprints_are_at_least_canonical(field: str, digest: object) -> None:
     row = _record()
