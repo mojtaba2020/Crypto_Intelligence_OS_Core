@@ -134,6 +134,10 @@ def build_synthetic_comparator_batches(
                     single_bar_return = math.log(origin_price) - math.log(previous_price)
                 signal = bars * single_bar_return
                 point = origin_price * math.exp(max(-0.20, min(0.20, signal)))
+                # Subnormal prices can collapse a nonzero signal to the exact
+                # input float; never misreport that as a flat forecast.
+                if signal != 0.0 and point == origin_price:
+                    raise ValueError("Synthetic momentum lost direction to float underflow")
             if not math.isfinite(point) or point <= 0:
                 raise ValueError("Synthetic comparator output is not a finite positive price")
             low80, high80, low95, high95 = _illustrative_intervals(point)
