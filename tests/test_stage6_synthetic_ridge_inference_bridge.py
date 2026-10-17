@@ -126,7 +126,7 @@ def test_nonfinite_ridge_signal_rejected_even_with_bounded_parameters() -> None:
     states["1h"]["scales"] = [1e-8]
     windows = _windows()
     windows[0]["previous_price_usd"] = 1e-300
-    windows[0]["origin_price_usd"] = 1e300
+    windows[0]["origin_price_usd"] = 1.79e308
     # Large, finite signal is clipped and may yield a still-valid synthetic
     # output; the point and intervals may be unrepresentable, which must fail.
     with pytest.raises(ValueError, match="finite|unrepresentable"):
