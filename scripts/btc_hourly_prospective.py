@@ -9,6 +9,7 @@ import math
 import statistics
 import urllib.parse
 import urllib.request
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from itertools import pairwise
 from pathlib import Path
@@ -101,7 +102,38 @@ def train(candles: list[tuple[datetime, float]], horizon: int) -> tuple[float, f
     return blend * signal, blend, len(examples)
 
 
-def run(now: datetime, ledger: Path, report: Path, scores_ledger: Path | None = None) -> dict:
+def _utc_aware(value: object, field: str) -> datetime:
+    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError(f"{field} must be a timezone-aware datetime")
+    return value.astimezone(UTC)
+
+
+def validate_postfit_issuance(
+    started_at: datetime, observed_after_fit: datetime, target_closes: Sequence[datetime]
+) -> str:
+    """Local post-computation clock guard; NOT independent publication proof."""
+    started = _utc_aware(started_at, "Forecast-start clock")
+    issued = _utc_aware(observed_after_fit, "Postfit issuance clock")
+    if issued < started:
+        raise ValueError("Postfit clock cannot precede the start of the run")
+    if not isinstance(target_closes, Sequence) or isinstance(target_closes, (str, bytes)):
+        raise ValueError("Explicit forecast target closes are required")
+    if not target_closes:
+        raise ValueError("Empty forecast batch cannot be issued")
+    for close in target_closes:
+        if issued >= _utc_aware(close, "Target close"):
+            raise ValueError("At least one forecast matured before postfit issuance")
+    return issued.isoformat()
+
+
+def run(
+    now: datetime,
+    ledger: Path,
+    report: Path,
+    scores_ledger: Path | None = None,
+    *,
+    issue_clock: Callable[[], datetime] | None = None,
+) -> dict:
     if now.tzinfo is None:
         raise ValueError("UTC-aware issuance time required")
     candles = fetch(now)
@@ -119,7 +151,6 @@ def run(now: datetime, ledger: Path, report: Path, scores_ledger: Path | None = 
         new.append(
             {
                 "version": VERSION,
-                "issued_at_utc": now.astimezone(UTC).isoformat(),
                 "origin_hour_utc": origin.isoformat(),
                 "target_hour_utc": (origin + timedelta(hours=horizon)).isoformat(),
                 "target_close_utc": (origin + timedelta(hours=horizon + 1)).isoformat(),
@@ -136,6 +167,15 @@ def run(now: datetime, ledger: Path, report: Path, scores_ledger: Path | None = 
             }
         )
     if new:
+        # Observe time only AFTER all forecasts have been computed and BEFORE
+        # local persistence. GitHub publication still needs external evidence.
+        issued_at = validate_postfit_issuance(
+            now,
+            (issue_clock or (lambda: datetime.now(UTC)))(),
+            [datetime.fromisoformat(row["target_close_utc"]) for row in new],
+        )
+        for row in new:
+            row["issued_at_utc"] = issued_at
         ledger.parent.mkdir(parents=True, exist_ok=True)
         with ledger.open("a", encoding="utf-8") as output:
             for row in new:
