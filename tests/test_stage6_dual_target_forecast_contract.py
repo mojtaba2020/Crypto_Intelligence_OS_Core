@@ -152,9 +152,7 @@ def test_exact_boundary_coverage_is_allowed_as_a_schema_not_probability_proof() 
         ("target_end_utc", 10**400),
     ],
 )
-def test_issue_time_target_calendar_and_type_require_strict_order(
-    field: str, bad: object
-) -> None:
+def test_issue_time_target_calendar_and_type_require_strict_order(field: str, bad: object) -> None:
     row = _record()
     row[field] = bad
     with pytest.raises(ValueError, match=r"target|issue|origin|calendar"):
