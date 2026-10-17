@@ -237,3 +237,10 @@ def test_extreme_small_but_representable_momentum_remains_down() -> None:
         row["predicted_direction"] == "down"
         for row in report["candidates"]["one_bar_momentum"]["forecasts"]
     )
+
+
+def test_distinct_candidate_hashes_required_even_when_predictions_are_flat() -> None:
+    same_digest = {"persistence": "a" * 64, "one_bar_momentum": "a" * 64}
+    windows = [_window(h, previous_price=100.0, price=100.0) for h in HORIZONS]
+    with pytest.raises(ValueError, match="Distinct model SHA-256"):
+        build_synthetic_comparator_batches(windows, same_digest)
