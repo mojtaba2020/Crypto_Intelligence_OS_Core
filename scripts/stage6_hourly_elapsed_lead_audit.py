@@ -150,14 +150,10 @@ def audit_elapsed_lead(
             }
         )
     missing_count = sum(summary["missing_count"] for summary in horizon_summaries)
-    blocked_count = sum(
-        summary["blocked_or_unknown_claim_count"] for summary in horizon_summaries
-    )
+    blocked_count = sum(summary["blocked_or_unknown_claim_count"] for summary in horizon_summaries)
     return {
         "status": (
-            "BLOCKED"
-            if missing_count or blocked_count
-            else "UNVERIFIED_ELAPSED_LEAD_METADATA_ONLY"
+            "BLOCKED" if missing_count or blocked_count else "UNVERIFIED_ELAPSED_LEAD_METADATA_ONLY"
         ),
         "missing_slot_count": missing_count,
         "blocked_or_unknown_claim_count": blocked_count,
