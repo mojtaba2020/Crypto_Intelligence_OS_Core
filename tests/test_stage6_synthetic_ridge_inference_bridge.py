@@ -10,6 +10,7 @@ from scripts.stage6_dual_target_forecast_contract import HORIZONS
 from scripts.stage6_synthetic_ridge_inference_bridge import (
     bridge_mock_ridge_to_13_horizon_contract,
 )
+
 from crypto_intelligence_os.hybrid_forecasting import _estimate
 
 DAY = 86_400
