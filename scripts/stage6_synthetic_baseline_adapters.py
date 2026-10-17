@@ -108,6 +108,8 @@ def build_synthetic_comparator_batches(
     if type(model_code_sha256) is not dict or set(model_code_sha256) != MODEL_HASH_KEYS:
         raise ValueError("Both fixed model-code digest claims are required")
     hashes = {key: _digest(model_code_sha256[key], key) for key in CANDIDATES}
+    if hashes["persistence"] == hashes["one_bar_momentum"]:
+        raise ValueError("Distinct model SHA-256 claims required for comparator identities")
 
     inspected = [_inspect_synthetic_window(window) for window in windows]
     if set(str(row["horizon"]) for row in inspected) != set(HORIZONS):
