@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Incrementally ingest final BTC/USD daily candles into a private SQLite archive."""
+"""Incrementally ingest final BTC/USD daily candles into a repository-scoped SQLite archive."""
 
 from __future__ import annotations
 
@@ -70,7 +70,7 @@ def main() -> int:
         "inserted_count": inserted,
         "archive_total_count": count,
         "sqlite_sha256": checksum,
-        "persistence": "PRIVATE_GITHUB_DATA_BRANCH",
+        "persistence": "GITHUB_DATA_BRANCH",
     }
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     REPORT_PATH.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")

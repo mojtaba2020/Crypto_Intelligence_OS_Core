@@ -65,7 +65,7 @@ deterministic Python software.</p>
 <dt>End UTC</dt><dd>{field("completed_at_utc")}</dd>
 <dt>Last candle UTC</dt><dd>{field("last_archived_bar_utc")}</dd>
 <dt>Database checksum</dt><dd><code>{field("sqlite_sha256")}</code></dd>
-<dt>Storage</dt><dd>Private GitHub branch: data/btc-usd-daily</dd>
+<dt>Storage</dt><dd>GitHub branch: data/btc-usd-daily (repository visibility applies)</dd>
 </dl></section>
 <p class="notice">NOT DEPLOYED: autonomous research agents, CEO live controls,
 financial execution, and customer-facing dashboard. Historical candles were
