@@ -152,7 +152,7 @@ def test_cannot_pass_actual_future_price_or_secret_in_synthetic_window() -> None
 def test_bad_previous_synthetic_prices_fail_closed(price: object) -> None:
     windows = _windows()
     windows[0]["previous_price_usd"] = price
-    with pytest.raises(ValueError, match="finite|precision"):
+    with pytest.raises(ValueError, match=r"finite|precision"):
         build_synthetic_comparator_batches(windows, SHA)
 
 
