@@ -129,9 +129,7 @@ def build_synthetic_comparator_batches(
                 # one-ULP price moves; log1p keeps their small relative return.
                 # Extreme ratios use a log difference to avoid ratio overflow.
                 if 0.5 * previous_price <= origin_price <= 2.0 * previous_price:
-                    single_bar_return = math.log1p(
-                        (origin_price - previous_price) / previous_price
-                    )
+                    single_bar_return = math.log1p((origin_price - previous_price) / previous_price)
                 else:
                     single_bar_return = math.log(origin_price) - math.log(previous_price)
                 signal = bars * single_bar_return
