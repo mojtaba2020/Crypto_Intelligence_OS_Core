@@ -58,6 +58,8 @@ def audit_elapsed_lead(
     observed: dict[tuple[int, int], dict[str, object]] = {}
     run_origins: dict[int, int] = {}
     origin_runs: dict[int, int] = {}
+    run_issuance: dict[int, int] = {}
+    inconsistent_origins: set[int] = set()
     for record in records:
         if not isinstance(record, Mapping) or set(record) != RECORD_FIELDS:
             raise ValueError("Exact price-free forecast metadata required")
@@ -77,6 +79,10 @@ def audit_elapsed_lead(
         run_origins[run_id] = origin
         origin_runs[origin] = run_id
         issued = _second(record["claimed_issued_at_utc"], "claimed_issued_at_utc")
+        if run_id in run_issuance and run_issuance[run_id] != issued:
+            inconsistent_origins.add(origin)
+        else:
+            run_issuance[run_id] = issued
         seen_raw = record["claimed_github_log_seen_at_utc"]
         seen = None if seen_raw is None else _second(seen_raw, "claimed_github_log_seen_at_utc")
         close = _second(record["target_close_utc"], "target_close_utc")
@@ -108,6 +114,16 @@ def audit_elapsed_lead(
                 close - seen if status == "CLAIMED_PRE_CLOSE_UNVERIFIED" else None
             ),
         }
+
+    # The deployed producer samples one issuance instant per four-horizon batch.
+    # Flag *every* received row for a contradictory claimed batch, not just
+    # whichever row arrived second. Never let it contribute to lead summaries.
+    for origin in inconsistent_origins:
+        for horizon in HORIZONS:
+            row = observed.get((origin, horizon))
+            if row is not None:
+                row["status"] = "INCONSISTENT_BATCH_ISSUANCE_CLAIMS"
+                row["claimed_elapsed_lead_seconds"] = None
 
     rows: list[dict[str, object]] = []
     horizon_summaries: list[dict[str, object]] = []
