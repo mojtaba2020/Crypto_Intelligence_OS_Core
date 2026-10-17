@@ -253,3 +253,26 @@ def test_distinct_huge_integer_prices_cannot_masquerade_as_flat_forecast() -> No
     row["predicted_direction"] = "flat"
     with pytest.raises(ValueError, match="integer precision"):
         validate_dual_target_forecast(row)
+
+
+def test_stateful_dict_subclass_cannot_swap_validated_sha_after_check() -> None:
+    class SwappingDict(dict):
+        def __getitem__(self, key: object) -> object:
+            if key == "model_code_sha256":
+                self.calls = getattr(self, "calls", 0) + 1
+                return "a" * 64 if self.calls == 1 else "forged"
+            return super().__getitem__(key)
+
+    row = SwappingDict(_record())
+    with pytest.raises(ValueError, match="Unexpected forecast schema"):
+        validate_dual_target_forecast(row)
+
+
+def test_deceptive_list_subclass_cannot_claim_thirteen_but_yield_fourteen() -> None:
+    class DeceptiveList(list):
+        def __len__(self) -> int:
+            return 13
+
+    rows = DeceptiveList([_record(h) for h in HORIZONS] + [_record("1h")])
+    with pytest.raises(ValueError, match="bounded sequence"):
+        validate_full_13_horizon_batch(rows)
