@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import stat
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -151,67 +149,15 @@ def validate_local_receipt(receipt: Mapping[str, object]) -> None:
 
 
 def save_private_receipt(receipt: Mapping[str, object], private_root: Path) -> Path:
-    """Single create-only file, outside the Git repo; never store response bytes.
+    """Disabled: private-root path checks cannot attest an immutable OS namespace.
 
-    Does not prove append-only *external* custody. Operators must separately seal
-    receipts and provide independent source-clock and filesystem attestations.
+    Even a pinned directory fd can be MOVED into a public Git checkout after a
+    path check by another actor with parent rename privilege. There is no
+    general safe in-process pathname recheck against this race. A separate
+    restricted operator with independently verified OS isolation, fixed mount
+    and custody policy must own persistence before a new implementation is
+    approved. No filesystem operations are performed here.
     """
-    validate_local_receipt(receipt)
-    if not private_root.is_absolute():
-        raise ValueError("Receipt root must be absolute")
-    if any(p.is_symlink() for p in (private_root, *private_root.parents)):
-        raise ValueError("Receipt root must not have symlinked ancestors")
-    resolved = private_root.resolve(strict=True)
-    repo_root = Path(__file__).resolve().parents[1]
-    if resolved.is_relative_to(repo_root):
-        raise ValueError("Never store observation receipts in public GitHub repository")
-    # The initial path check alone can race a permission or directory replacement.
-    root_before = private_root.stat()
-    if not stat.S_ISDIR(root_before.st_mode) or root_before.st_mode & 0o077:
-        raise ValueError("Receipt root must be an existing private directory (0700)")
-    observed = datetime.fromisoformat(str(receipt["system_observed_at_utc"]).replace("Z", "+00:00"))
-    # Exact integer epoch microseconds: never round receipt IDs through float time.
-    elapsed = observed - datetime(1970, 1, 1, tzinfo=UTC)
-    stamp_us = ((elapsed.days * 86_400 + elapsed.seconds) * 1_000_000) + elapsed.microseconds
-    filename = f"stage6-{stamp_us}-{receipt['receipt_sha256'][:20]}.json"
-    root_fd = os.open(private_root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | os.O_NOFOLLOW)
-    try:
-        opened_root = os.fstat(root_fd)
-        if (
-            not stat.S_ISDIR(opened_root.st_mode)
-            or opened_root.st_mode & 0o077
-            or (opened_root.st_dev, opened_root.st_ino) != (root_before.st_dev, root_before.st_ino)
-        ):
-            raise ValueError("Receipt root changed or became insecure during open")
-        # Resolve the PINNED opened inode, not the mutable pathname. A parent
-        # can turn into a symlink between resolve() and stat()/open().
-        # This prototype deliberately fails closed without Linux procfs;
-        # independent OS isolation and external custody are still required.
-        proc_fd = Path("/proc/self/fd") / str(root_fd)
-        if not proc_fd.exists():
-            raise ValueError("Pinned directory verification requires Linux procfs")
-        pinned_root = proc_fd.resolve(strict=True)
-        if pinned_root != resolved or pinned_root.is_relative_to(repo_root):
-            raise ValueError("Receipt root changed or became public during open")
-        descriptor = os.open(
-            filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=root_fd
-        )
-        try:
-            with os.fdopen(descriptor, "wb") as output:
-                output.write(_serialized(receipt))
-                output.flush()
-                os.fsync(output.fileno())
-            os.fsync(root_fd)
-        except BaseException:
-            # A failed partial write/fsync is not a durable receipt. Unlink via
-            # the opened directory handle; never leave an ambiguous O_EXCL
-            # placeholder that permanently blocks a legitimate retry.
-            try:
-                os.unlink(filename, dir_fd=root_fd)
-                os.fsync(root_fd)
-            except OSError:
-                pass  # Preserve the original failure; operator must inspect.
-            raise
-    finally:
-        os.close(root_fd)
-    return pinned_root / filename
+    raise PermissionError(
+        "Stage-6 receipt persistence disabled pending independent OS isolation approval"
+    )
