@@ -1,0 +1,43 @@
+name: BTC Timeframe Coverage Research
+
+on:
+  pull_request:
+    paths:
+      - "scripts/report_timeframe_coverage.py"
+      - "tests/test_timeframe_coverage.py"
+      - ".github/workflows/btc_timeframe_coverage.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install test dependency
+        run: python -m pip install pytest
+      - name: Test manifest
+        run: python -m pytest -q tests/test_timeframe_coverage.py
+      - name: Generate manifest
+        run: python scripts/report_timeframe_coverage.py --output .research/timeframe_coverage.json
+      - name: Validate manifest
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path(".research/timeframe_coverage.json").read_text())
+          assert len(data["coverage"]) == 24
+          assert len({r["input_candle"] for r in data["coverage"]}) == 13
+          assert all(r["research_only"] for r in data["coverage"])
+          print("Validated", len(data["coverage"]), "coverage rows")
+          PY
+      - name: Upload research manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-timeframe-coverage
+          path: .research/timeframe_coverage.json
