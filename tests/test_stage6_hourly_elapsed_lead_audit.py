@@ -168,6 +168,54 @@ def test_complete_synthetic_claims_remain_unverified_and_never_authorize():
     assert report["stage7_freeze_authorized"] is False
 
 
+def test_inconsistent_issuance_blocks_whole_batch_and_avoids_leads():
+    rows = [record(horizon=h, issue_lag=30, publication_lag=40) for h in HORIZONS]
+    rows[2]["claimed_issued_at_utc"] += 2
+    # All individual claims are otherwise ordered, pre-close and would pass.
+    report = audit_elapsed_lead(plan(1), rows)
+    assert report["status"] == "BLOCKED"
+    assert report["received_claim_count"] == 4
+    assert report["missing_slot_count"] == 0
+    assert report["blocked_or_unknown_claim_count"] == 4
+    assert len(report["slots"]) == 4
+    assert all(
+        row["status"] == "INCONSISTENT_BATCH_ISSUANCE_CLAIMS"
+        and row["claimed_elapsed_lead_seconds"] is None
+        for row in report["slots"]
+    )
+    assert all(row["claimed_preclose_count"] == 0 for row in report["by_horizon"])
+    assert report["scientific_authorization"] == "NO_RUN"
+    assert report["stage7_freeze_authorized"] is False
+
+
+def test_consistent_issuance_may_have_distinct_publication_claims():
+    rows = [
+        record(horizon=h, issue_lag=30, publication_lag=30 + i)
+        for i, h in enumerate(HORIZONS)
+    ]
+    report = audit_elapsed_lead(plan(1), rows)
+    assert report["status"] == "UNVERIFIED_ELAPSED_LEAD_METADATA_ONLY"
+    assert report["blocked_or_unknown_claim_count"] == 0
+    assert report["received_claim_count"] == 4
+    assert report["github_publication_timestamps_independently_verified"] is False
+    assert report["scientific_authorization"] == "NO_RUN"
+
+
+def test_different_origins_can_claim_different_issuance_times():
+    rows = [
+        record(hour=0, horizon=1, issue_lag=30, publication_lag=31),
+        record(hour=1, horizon=1, issue_lag=45, publication_lag=46),
+    ]
+    report = audit_elapsed_lead(plan(2), rows)
+    assert report["blocked_or_unknown_claim_count"] == 0
+    assert report["missing_slot_count"] == 6
+    assert report["status"] == "BLOCKED"
+    assert [row["status"] for row in report["slots"] if row["horizon_hours"] == 1] == [
+        "CLAIMED_PRE_CLOSE_UNVERIFIED",
+        "CLAIMED_PRE_CLOSE_UNVERIFIED",
+    ]
+
+
 def test_schedule_overflow_rejected():
     with pytest.raises(ValueError, match="bounded"):
         audit_elapsed_lead(plan(169), [])
