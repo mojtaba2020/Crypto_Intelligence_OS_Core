@@ -1,0 +1,68 @@
+name: BTC Hourly Regime Confirmation
+
+on:
+  workflow_dispatch:
+    inputs:
+      period:
+        description: "Independent validation period"
+        required: true
+        type: choice
+        options:
+          - "2023"
+          - "2025"
+        default: "2023"
+
+permissions:
+  contents: read
+
+jobs:
+  confirm-regime-hypothesis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Resolve locked validation period
+        id: period
+        shell: bash
+        run: |
+          if [ "${{ inputs.period }}" = "2023" ]; then
+            echo "start=2023-01-01T00:00:00+00:00" >> "$GITHUB_OUTPUT"
+            echo "end=2024-01-01T00:00:00+00:00" >> "$GITHUB_OUTPUT"
+          elif [ "${{ inputs.period }}" = "2025" ]; then
+            echo "start=2025-01-01T00:00:00+00:00" >> "$GITHUB_OUTPUT"
+            echo "end=2026-01-01T00:00:00+00:00" >> "$GITHUB_OUTPUT"
+          else
+            echo "Unsupported period" >&2
+            exit 1
+          fi
+
+      - name: Backfill independent Bitstamp archive
+        run: |
+          mkdir -p artifacts/regime-confirmation
+          python scripts/backfill_bitstamp_hourly.py             --start "${{ steps.period.outputs.start }}"             --end "${{ steps.period.outputs.end }}"             --database artifacts/regime-confirmation/bitstamp-btcusd-1h.sqlite             --report artifacts/regime-confirmation/bitstamp-btcusd-1h-report.json
+
+      - name: Run locked preregistered confirmation
+        run: |
+          python scripts/confirm_hourly_regime_hypothesis.py             --database artifacts/regime-confirmation/bitstamp-btcusd-1h.sqlite             --preregistration research/prereg_range_mean_6h_down_low_vol_12h_v1.json             --output artifacts/regime-confirmation/confirmatory-result.json
+          cat artifacts/regime-confirmation/confirmatory-result.json
+
+      - name: Upload confirmatory artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-hourly-regime-confirmation-${{ inputs.period }}
+          path: artifacts/regime-confirmation/
+          if-no-files-found: error
+          retention-days: 30
