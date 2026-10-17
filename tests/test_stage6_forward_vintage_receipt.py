@@ -264,9 +264,7 @@ def test_ancestor_symlink_swap_cannot_redirect_receipt_into_checkout(
     real_stat = Path.stat
     swapped = False
 
-    def replace_ancestor_during_stat(
-        path: Path, *args: object, **kwargs: object
-    ) -> object:
+    def replace_ancestor_during_stat(path: Path, *args: object, **kwargs: object) -> object:
         nonlocal swapped
         if path == root and not swapped:
             swapped = True
