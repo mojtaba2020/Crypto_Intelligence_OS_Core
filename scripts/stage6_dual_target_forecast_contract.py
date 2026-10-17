@@ -94,6 +94,11 @@ def _canonical_origin(stamp: datetime, family: str) -> bool:
 def _price(value: object, label: str) -> float:
     if type(value) not in (int, float):
         raise ValueError(f"{label} must be a finite positive numeric price")
+    # Binary64 cannot represent every integer above 2**53. In particular,
+    # 2**53 and 2**53+1 normalize to the SAME float, corrupting direction and
+    # the local hash. Fail closed rather than silently rounding an input price.
+    if type(value) is int and value > 2**53:
+        raise ValueError(f"{label} exceeds exact binary64 integer precision")
     try:
         number = float(value)
     except OverflowError as exc:
