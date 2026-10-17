@@ -120,7 +120,9 @@ def _digest(value: object, label: str) -> str:
 
 def validate_dual_target_forecast(record: Mapping[str, object]) -> dict[str, object]:
     """Check one caller-supplied forecast WITHOUT claiming issuance or correctness."""
-    if not isinstance(record, Mapping) or set(record) != REQUIRED:
+    # Admit only ordinary JSON-style dicts: custom Mapping instances may mutate
+    # values between validation and normalization (__getitem__ TOCTOU).
+    if type(record) is not dict or set(record) != REQUIRED:
         raise ValueError("Unexpected forecast schema: outcomes and extra fields are forbidden")
     horizon = record["horizon"]
     if type(horizon) is not str or horizon not in HORIZONS:
@@ -136,13 +138,13 @@ def validate_dual_target_forecast(record: Mapping[str, object]) -> dict[str, obj
         raise ValueError("Target end mismatches exact horizon calendar")
     if not origin < issued < computed_end:
         raise ValueError("Claimed forecast issue must precede the future target end")
-    if (
-        type(record["source_market_id"]) is not str
-        or record["source_market_id"] not in SOURCE_MARKETS
-    ):
+    market = record["source_market_id"]
+    if type(market) is not str or market not in SOURCE_MARKETS:
         raise ValueError("Unrecognized BTCUSD source market identity")
-    for field in ("model_code_sha256", "feature_code_sha256", "dataset_manifest_sha256"):
-        _digest(record[field], field)
+    digests = {
+        field: _digest(record[field], field)
+        for field in ("model_code_sha256", "feature_code_sha256", "dataset_manifest_sha256")
+    }
 
     origin_price = _price(record["origin_price_usd"], "origin price")
     point = _price(record["predicted_target_price_usd"], "predicted target price")
@@ -167,7 +169,7 @@ def validate_dual_target_forecast(record: Mapping[str, object]) -> dict[str, obj
         "origin_cutoff_utc": origin,
         "forecast_issued_at_utc": issued,
         "target_end_utc": computed_end,
-        "source_market_id": record["source_market_id"],
+        "source_market_id": market,
         "origin_price_usd": origin_price,
         "predicted_target_price_usd": point,
         "predicted_direction": direction,
@@ -175,9 +177,7 @@ def validate_dual_target_forecast(record: Mapping[str, object]) -> dict[str, obj
         "interval_80_high_usd": hi80,
         "interval_95_low_usd": lo95,
         "interval_95_high_usd": hi95,
-        "model_code_sha256": record["model_code_sha256"],
-        "feature_code_sha256": record["feature_code_sha256"],
-        "dataset_manifest_sha256": record["dataset_manifest_sha256"],
+        **digests,
     }
     payload = json.dumps(normalized, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return {
@@ -196,13 +196,18 @@ def validate_full_13_horizon_batch(
     records: Sequence[Mapping[str, object]],
 ) -> dict[str, object]:
     """Require exactly one complete 13-horizon set, with no partial success."""
-    if not isinstance(records, Sequence) or isinstance(records, (str, bytes)):
+    # Avoid custom Sequences whose reported len() differs from actual iteration.
+    if type(records) is not list:
         raise ValueError("Expected a bounded sequence of all 13 forecast records")
     if len(records) != len(HORIZONS):
         raise ValueError("All 13 requested horizons must be present once")
     checked = [validate_dual_target_forecast(record) for record in records]
     seen = [str(record["horizon"]) for record in checked]
-    if len(set(seen)) != len(HORIZONS) or set(seen) != set(HORIZONS):
+    if (
+        len(checked) != len(HORIZONS)
+        or len(set(seen)) != len(HORIZONS)
+        or set(seen) != set(HORIZONS)
+    ):
         raise ValueError("Duplicated or missing horizon in complete forecast batch")
     order = {name: index for index, name in enumerate(HORIZONS)}
     checked.sort(key=lambda record: order[str(record["horizon"])])
