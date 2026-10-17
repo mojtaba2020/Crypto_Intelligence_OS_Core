@@ -45,12 +45,7 @@ def audit_elapsed_lead(
         raise ValueError("All four canonical hourly horizons required")
     start = _second(plan["first_origin_utc"], "start")
     stop = _second(plan["stop_origin_exclusive_utc"], "stop")
-    if (
-        start % HOUR
-        or stop % HOUR
-        or stop <= start
-        or stop - start > MAX_HOURS * HOUR
-    ):
+    if start % HOUR or stop % HOUR or stop <= start or stop - start > MAX_HOURS * HOUR:
         raise ValueError("Invalid bounded hourly plan")
     origin_count = (stop - start) // HOUR
     if (
@@ -83,11 +78,7 @@ def audit_elapsed_lead(
         origin_runs[origin] = run_id
         issued = _second(record["claimed_issued_at_utc"], "claimed_issued_at_utc")
         seen_raw = record["claimed_github_log_seen_at_utc"]
-        seen = (
-            None
-            if seen_raw is None
-            else _second(seen_raw, "claimed_github_log_seen_at_utc")
-        )
+        seen = None if seen_raw is None else _second(seen_raw, "claimed_github_log_seen_at_utc")
         close = _second(record["target_close_utc"], "target_close_utc")
         if close != origin + (horizon + 1) * HOUR:
             raise ValueError("Target close conflicts with nominal completed-bar convention")
@@ -147,7 +138,8 @@ def audit_elapsed_lead(
                 ),
                 "claimed_preclose_count": len(leads),
                 "blocked_or_unknown_claim_count": sum(
-                    r["status"] not in (
+                    r["status"]
+                    not in (
                         "MISSING_SCHEDULED_FORECAST_CLAIM",
                         "CLAIMED_PRE_CLOSE_UNVERIFIED",
                     )
