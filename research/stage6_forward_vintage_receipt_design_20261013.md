@@ -16,15 +16,18 @@ API key, training loop or deployment.** Only synthetic unit tests execute on CI.
 - Rejects unsupported source/cadence, malformed byte buffers and a supposed
   finalized-bar observation before nominal close. No user-provided historical
   first-published timestamp may be asserted.
-- save_private_receipt **must be explicitly called by a future authorized
-  operator**. It refuses relative paths, symlinked root ancestry, an ordinary
-  group/world-readable directory, and any destination within the GitHub
-  checkout. A Linux-procfs-only descriptor check now rechecks the **opened**
-  directory target against the prevalidated path and public checkout, blocking
-  an ancestor symlink swap between validation and open; without procfs it
-  fails closed. A failed write or sync unlinks its incomplete create-only
-  file (best effort, operator must inspect on cleanup errors), allowing
-  a clean retry. No ingestion data or receipts are stored by this PR.
+- `save_private_receipt` is now **unconditionally DISABLED** and raises
+  `PermissionError` before touching the filesystem. Independent Codex review
+  demonstrated an unresolved TOCTOU directory-move attack **after** descriptor
+  verification: a privileged actor can move the opened inode into the public
+  checkout before the file is created. Repeated Python pathname checks or
+  directory-fd operations cannot guarantee confinement against an attacker
+  controlling the containing mount/rename namespace. No receipt persistence,
+  collector or real-data activity is permitted in this prototype. Retained
+  offline receipt creation/validation and pure synthetic inventory only.
+  Restoring persistence requires a separately reviewed, OS-enforced immutable
+  namespace/identity/custody design, independent operator signoff and explicit
+  new authorization; not a boolean flag, user-supplied path or checklist.
 - validate_local_receipt guards schema and self-checksum, rejecting forged
   authorization fields and accidental mutations.
 
