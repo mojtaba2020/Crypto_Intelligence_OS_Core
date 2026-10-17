@@ -191,5 +191,28 @@ def test_synthetic_oversized_momentum_overflow_is_not_returned_as_a_forecast() -
     for row in windows:
         row["previous_price_usd"] = 1.0
         row["origin_price_usd"] = 1.79e308
-    with pytest.raises(ValueError, match="finite positive price"):
+    with pytest.raises(ValueError, match="finite positive numeric price"):
         build_synthetic_comparator_batches(windows, SHA)
+
+
+def test_near_equal_one_ulp_rise_is_not_erased_by_log_cancellation() -> None:
+    windows = _windows()
+    row = next(item for item in windows if item["horizon"] == "12h")
+    row["previous_price_usd"] = 100.0
+    row["origin_price_usd"] = math.nextafter(100.0, math.inf)
+    report = build_synthetic_comparator_batches(windows, SHA)
+    forecasts = report["candidates"]["one_bar_momentum"]["forecasts"]
+    target = next(item for item in forecasts if item["horizon"] == "12h")
+    assert target["predicted_direction"] == "up"
+    assert target["predicted_target_price_usd"] > row["origin_price_usd"]
+    assert report["candidate_superiority_evaluated"] is False
+
+
+def test_extreme_source_price_ratio_still_clamps_without_overflow() -> None:
+    windows = _windows()
+    for row in windows:
+        row["previous_price_usd"] = 1e-100
+        row["origin_price_usd"] = 100.0
+    report = build_synthetic_comparator_batches(windows, SHA)
+    for result in report["candidates"]["one_bar_momentum"]["forecasts"]:
+        assert 100.0 < result["predicted_target_price_usd"] < 125.0
