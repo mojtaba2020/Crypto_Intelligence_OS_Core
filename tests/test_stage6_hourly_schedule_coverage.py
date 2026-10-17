@@ -55,3 +55,41 @@ def test_late_log_cannot_pass() -> None:
     packet["github_log_seen_at_utc"] = START + 7200
     with pytest.raises(ValueError, match="prospectively"):
         audit_hourly_schedule_coverage(plan(1), [packet])
+
+
+def test_partial_horizons_not_marked_complete() -> None:
+    result = audit_hourly_schedule_coverage(plan(1), four(0)[:2])
+    assert result["partial_origin_count"] == 1
+    assert result["claimed_complete_origin_count"] == 0
+    assert result["origins"][0]["missing_horizons_hours"] == [12, 24]
+
+
+def test_duplicate_cannot_replenish_missing_hour() -> None:
+    row = four(0)[0]
+    with pytest.raises(ValueError, match="Duplicate"):
+        audit_hourly_schedule_coverage(plan(1), [row, row])
+
+
+def test_unscheduled_origin_not_rebranded_as_valid() -> None:
+    with pytest.raises(ValueError, match="outside"):
+        audit_hourly_schedule_coverage(plan(1), four(1))
+
+
+def test_price_field_forbidden_in_coverage_metadata() -> None:
+    row = four(0)[0]
+    row["future_close"] = 90_000
+    with pytest.raises(ValueError, match="non-outcome"):
+        audit_hourly_schedule_coverage(plan(1), [row])
+
+
+@pytest.mark.parametrize("invalid", [(1,), (4, 1, 12, 24), [1, 4, 12, 24]])
+def test_unapproved_horizon_subset_or_order_rejected(invalid) -> None:
+    p = plan(1)
+    p["horizons_hours"] = invalid
+    with pytest.raises(ValueError, match="four"):
+        audit_hourly_schedule_coverage(p, [])
+
+
+def test_oversized_schedule_fails_closed() -> None:
+    with pytest.raises(ValueError, match="bounded"):
+        audit_hourly_schedule_coverage(plan(169), [])
