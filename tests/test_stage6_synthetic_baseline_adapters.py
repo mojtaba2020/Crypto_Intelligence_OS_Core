@@ -218,7 +218,6 @@ def test_extreme_source_price_ratio_still_clamps_without_overflow() -> None:
         assert 100.0 < result["predicted_target_price_usd"] < 125.0
 
 
-
 def test_subnormal_downtrend_cannot_silently_become_flat() -> None:
     windows = _windows()
     for row in windows:
