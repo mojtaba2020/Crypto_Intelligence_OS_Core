@@ -125,7 +125,16 @@ def build_synthetic_comparator_batches(
             else:
                 # Clamp an entirely illustrative two-observation log-return
                 # extrapolation to +/-20%; no learned coefficient or calibration.
-                signal = bars * (math.log(origin_price) - math.log(previous_price))
+                # Subtracting two nearly equal logarithms loses the sign of
+                # one-ULP price moves; log1p keeps their small relative return.
+                # Extreme ratios use a log difference to avoid ratio overflow.
+                if 0.5 * previous_price <= origin_price <= 2.0 * previous_price:
+                    single_bar_return = math.log1p(
+                        (origin_price - previous_price) / previous_price
+                    )
+                else:
+                    single_bar_return = math.log(origin_price) - math.log(previous_price)
+                signal = bars * single_bar_return
                 point = origin_price * math.exp(max(-0.20, min(0.20, signal)))
             if not math.isfinite(point) or point <= 0:
                 raise ValueError("Synthetic comparator output is not a finite positive price")
