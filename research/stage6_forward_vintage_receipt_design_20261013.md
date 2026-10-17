@@ -19,8 +19,12 @@ API key, training loop or deployment.** Only synthetic unit tests execute on CI.
 - save_private_receipt **must be explicitly called by a future authorized
   operator**. It refuses relative paths, symlinked root ancestry, an ordinary
   group/world-readable directory, and any destination within the GitHub
-  checkout. It writes individual **create-only** receipt files and refuses
-  name collisions; no ingestion data or receipts are stored by this PR.
+  checkout. A Linux-procfs-only descriptor check now rechecks the **opened**
+  directory target against the prevalidated path and public checkout, blocking
+  an ancestor symlink swap between validation and open; without procfs it
+  fails closed. A failed write or sync unlinks its incomplete create-only
+  file (best effort, operator must inspect on cleanup errors), allowing
+  a clean retry. No ingestion data or receipts are stored by this PR.
 - validate_local_receipt guards schema and self-checksum, rejecting forged
   authorization fields and accidental mutations.
 
