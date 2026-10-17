@@ -131,7 +131,10 @@ def validate_dual_target_forecast(record: Mapping[str, object]) -> dict[str, obj
         raise ValueError("Target end mismatches exact horizon calendar")
     if not origin < issued < computed_end:
         raise ValueError("Claimed forecast issue must precede the future target end")
-    if type(record["source_market_id"]) is not str or record["source_market_id"] not in SOURCE_MARKETS:
+    if (
+        type(record["source_market_id"]) is not str
+        or record["source_market_id"] not in SOURCE_MARKETS
+    ):
         raise ValueError("Unrecognized BTCUSD source market identity")
     for field in ("model_code_sha256", "feature_code_sha256", "dataset_manifest_sha256"):
         _digest(record[field], field)
@@ -145,7 +148,10 @@ def validate_dual_target_forecast(record: Mapping[str, object]) -> dict[str, obj
     if not lo95 <= lo80 <= point <= hi80 <= hi95:
         raise ValueError("Unnested or point-excluding 80%/95% forecast intervals")
     direction = "up" if point > origin_price else "down" if point < origin_price else "flat"
-    if type(record["predicted_direction"]) is not str or record["predicted_direction"] not in DIRECTIONS:
+    if (
+        type(record["predicted_direction"]) is not str
+        or record["predicted_direction"] not in DIRECTIONS
+    ):
         raise ValueError("Direction must be up, down or flat")
     if record["predicted_direction"] != direction:
         raise ValueError("Direction contradicts the predicted price and origin price")
