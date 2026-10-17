@@ -2,10 +2,9 @@
 
 import json
 import math
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
-from datetime import UTC, datetime, timedelta
-
 from scripts import btc_hourly_prospective as hourly
 
 
@@ -34,6 +33,7 @@ def test_hourly_issuance_scoring_and_idempotency(tmp_path, monkeypatch):
     ledger = tmp_path / "forecasts.jsonl"
     scores = tmp_path / "scores.jsonl"
     report = tmp_path / "report.json"
+
     def postfit_clock():
         return now + timedelta(seconds=2)
 
@@ -111,6 +111,7 @@ def test_postfit_guard_normalizes_offset_and_rejects_empty_batches():
     now = datetime(2026, 9, 20, 12, 9, tzinfo=UTC)
     issued = now + timedelta(seconds=3)
     target = now + timedelta(hours=1)
-    assert hourly.validate_postfit_issuance(now, issued, [target]) == issued.isoformat()
+    shifted = issued.astimezone(timezone(timedelta(hours=-5)))
+    assert hourly.validate_postfit_issuance(now, shifted, [target]) == issued.isoformat()
     with pytest.raises(ValueError, match="Empty forecast batch"):
         hourly.validate_postfit_issuance(now, issued, [])
