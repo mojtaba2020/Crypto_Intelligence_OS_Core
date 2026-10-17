@@ -166,8 +166,9 @@ def test_market_allowlist_rejects_other_venues() -> None:
 def test_injected_code_hash_is_not_assumed_authenticated() -> None:
     windows = _windows()
     with pytest.raises(ValueError, match="digest"):
-        build_synthetic_comparator_batches(windows, {"persistence": "g" * 64,
-                                                    "one_bar_momentum": "b" * 64})
+        build_synthetic_comparator_batches(
+            windows, {"persistence": "g" * 64, "one_bar_momentum": "b" * 64}
+        )
     with pytest.raises(ValueError, match="Both fixed"):
         build_synthetic_comparator_batches(windows, {"persistence": "a" * 64})
 
@@ -192,6 +193,6 @@ def test_synthetic_oversized_momentum_overflow_is_not_returned_as_a_forecast() -
     windows = _windows()
     for row in windows:
         row["previous_price_usd"] = 1.0
-        row["origin_price_usd"] = 1e308
+        row["origin_price_usd"] = 1.79e308
     with pytest.raises(ValueError, match="finite positive price"):
         build_synthetic_comparator_batches(windows, SHA)
