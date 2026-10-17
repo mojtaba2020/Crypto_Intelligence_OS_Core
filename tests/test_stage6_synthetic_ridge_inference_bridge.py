@@ -198,3 +198,29 @@ def test_no_real_data_or_model_fit_api_exposed_by_bridge() -> None:
     assert result["point_in_time_vintage_authenticated"] is False
     assert result["actual_issue_authenticated"] is False
     assert result["trained_model_present"] is False
+
+
+@pytest.mark.parametrize("tiny_weight", [5e-324, -5e-324])
+def test_tiny_nonzero_slope_cannot_be_erased_into_fake_flat(tiny_weight: float) -> None:
+    states = _states()
+    for state in states.values():
+        state["weights"] = [0.0, tiny_weight]
+    with pytest.raises(ValueError, match="term lost to floating underflow"):
+        bridge_mock_ridge_to_13_horizon_contract(_windows(), states)
+
+
+def test_tiny_nonzero_term_after_scaling_must_not_disappear() -> None:
+    states = _states()
+    for state in states.values():
+        state["weights"] = [0.0, 5e-320]
+        state["scales"] = [1000.0]
+    with pytest.raises(ValueError, match="scale erased"):
+        bridge_mock_ridge_to_13_horizon_contract(_windows(), states)
+
+
+def test_nonzero_term_below_bias_float_resolution_must_not_be_ignored() -> None:
+    states = _states()
+    for state in states.values():
+        state["weights"] = [0.1, 1e-18]
+    with pytest.raises(ValueError, match="contribution lost"):
+        bridge_mock_ridge_to_13_horizon_contract(_windows(), states)
