@@ -8,9 +8,12 @@ Describe what changed and why.
 - [ ] Chose the smallest available tool: deterministic code / Codex / specialist agent / manual review; listed which **actually ran**
 - [ ] Reported actual test/CI and independent critic evidence (or explicitly **not yet reviewed**)
 - [ ] Checked data vintage, missing/late forecast slots, elapsed lead and locked-OOS restrictions where relevant
-- [ ] Disclosed API/token/cost, automation, permissions and data-access impact; no unapproved spending or dispatch
-- [ ] Preserved Stage-6 **NO-GO / NO_RUN / NO_FREEZE** unless A1–A6 and independent scientific approval are documented
+- [ ] Disclosed API/token/cost, automation, permissions and data-access impact; **each** external/sub-agent dispatch requires explicit scoped human authorization
+- [ ] Verified no secrets, confidential material or unredacted attestations leave approved custody through prompts, AI providers, issues/PRs, artifacts or logs
+- [ ] Preserved Stage-6 **NO-GO / NO_RUN / NO_FREEZE unconditionally** in this PR; a checklist, CI, issue link, or claimed signoff never lifts the gate
 
+**Separate independent A1–A6 verified gate decision (not this PR):** NOT APPROVED
+**Separate scoped authorization for any later real-data execution:** NOT APPROVED
 **Next blocking gate / owner:** 
 
 ## Impact
