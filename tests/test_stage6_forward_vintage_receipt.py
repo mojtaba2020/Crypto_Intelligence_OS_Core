@@ -297,7 +297,7 @@ def test_short_write_failure_removes_placeholder_and_allows_retry(
         def __init__(self, fd: int, mode: str) -> None:
             self.handle = real_fdopen(fd, mode)
 
-        def __enter__(self) -> "ShortWrite":
+        def __enter__(self) -> ShortWrite:
             return self
 
         def __exit__(self, *args: object) -> object:
