@@ -230,5 +230,22 @@ def test_copy_of_same_record_has_stable_local_hash_but_no_authenticity() -> None
 def test_no_fake_batch_from_text_or_unbounded_source() -> None:
     with pytest.raises(ValueError, match="bounded sequence"):
         validate_full_13_horizon_batch("thirteen")
-    with pytest.raises(ValueError, match="bounded sequence"):
+    with pytest.raises(ValueError, match="All 13 requested horizons"):
         validate_full_13_horizon_batch([_record(x) for x in HORIZONS] + [{}] * 1000)
+
+
+@pytest.mark.parametrize("field", ["origin_price_usd", "predicted_target_price_usd"])
+def test_integer_above_binary64_exact_precision_is_not_silently_rounded(field: str) -> None:
+    row = _record()
+    row[field] = 2**53 + 1
+    with pytest.raises(ValueError, match="integer precision"):
+        validate_dual_target_forecast(row)
+
+
+def test_distinct_huge_integer_prices_cannot_masquerade_as_flat_forecast() -> None:
+    row = _record()
+    row["origin_price_usd"] = 2**53
+    row["predicted_target_price_usd"] = 2**53 + 1
+    row["predicted_direction"] = "flat"
+    with pytest.raises(ValueError, match="integer precision"):
+        validate_dual_target_forecast(row)
