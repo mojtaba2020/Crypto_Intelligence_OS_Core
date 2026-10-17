@@ -30,6 +30,10 @@ instant, claimed GitHub log observation, and target close. It:
   cross-origin run-ID reuse, cross-run origin replenishment, prices and outcomes.
 - Retains invalid, immature or late claims **as blocked/unknown categories**,
   never silently discards them from scheduled denominators.
+- Sets top-level `status=BLOCKED` if **any** scheduled slot is missing or
+  any claim is late, unknown or inconsistent. Even if all claims are present
+  and internally ordered, status stays `UNVERIFIED_ELAPSED_LEAD_METADATA_ONLY`,
+  never `PASS`; neither state authorizes scientific runs.
 - Computes `target_close - claimed_github_log_seen_at_utc` **only** for
   internally ordered pre-close claims; reports each claimed elapsed lead in
   seconds and min/max by nominal horizon. It never selects a winner, estimates
