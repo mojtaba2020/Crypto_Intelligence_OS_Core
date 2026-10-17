@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
-from datetime import UTC, datetime
 
 from scripts.stage6_dual_target_forecast_contract import (
     HORIZONS,
