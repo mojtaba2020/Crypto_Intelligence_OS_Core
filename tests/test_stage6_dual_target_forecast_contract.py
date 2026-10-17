@@ -93,6 +93,11 @@ def test_wrong_or_invalid_price_direction_rejected(target: object, direction: ob
     row = _record()
     row["predicted_target_price_usd"] = target
     row["predicted_direction"] = direction
+    if target == 90.0:
+        row["interval_80_low_usd"] = 85.0
+        row["interval_80_high_usd"] = 95.0
+        row["interval_95_low_usd"] = 80.0
+        row["interval_95_high_usd"] = 100.0
     with pytest.raises(ValueError, match="Direction"):
         validate_dual_target_forecast(row)
 
