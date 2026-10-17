@@ -212,7 +212,7 @@ def test_tiny_nonzero_slope_cannot_be_erased_into_fake_flat(tiny_weight: float) 
 def test_tiny_nonzero_term_after_scaling_must_not_disappear() -> None:
     states = _states()
     for state in states.values():
-        state["weights"] = [0.0, 5e-320]
+        state["weights"] = [0.0, 5e-321]
         state["scales"] = [1000.0]
     with pytest.raises(ValueError, match="scale erased"):
         bridge_mock_ridge_to_13_horizon_contract(_windows(), states)
