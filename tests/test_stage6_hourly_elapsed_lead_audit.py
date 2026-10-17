@@ -55,9 +55,7 @@ def test_every_absent_hour_and_horizon_in_denominator():
 def test_preclosed_horizon_is_not_automatically_complete_hour_lead():
     rows = [record(horizon=h, publication_lag=3570) for h in HORIZONS]
     report = audit_elapsed_lead(plan(1), rows)
-    assert [r["claimed_elapsed_lead_seconds"] for r in report["slots"]] == [
-        30, 10830, 39630, 82830
-    ]
+    assert [r["claimed_elapsed_lead_seconds"] for r in report["slots"]] == [30, 10830, 39630, 82830]
     assert all(r["status"] == "CLAIMED_PRE_CLOSE_UNVERIFIED" for r in report["slots"])
 
 
@@ -100,9 +98,7 @@ def test_different_run_cannot_replenish_missing_horizons_at_one_origin():
 
 def test_run_id_cannot_span_unrelated_origins():
     with pytest.raises(ValueError, match="different origins"):
-        audit_elapsed_lead(
-            plan(2), [record(), {**record(hour=1, horizon=4), "github_run_id": 123}]
-        )
+        audit_elapsed_lead(plan(2), [record(), {**record(hour=1, horizon=4), "github_run_id": 123}])
 
 
 @pytest.mark.parametrize("bad", [True, "1", 1.5, -1])
