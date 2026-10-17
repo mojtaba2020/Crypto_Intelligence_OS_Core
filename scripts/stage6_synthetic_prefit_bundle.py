@@ -19,9 +19,7 @@ from scripts.stage6_synthetic_ridge_inference_bridge import (
 
 FORMAT = "stage6-synthetic-ridge-bundle-v1"
 MAX_BUNDLE_BYTES = 65_536
-BUNDLE_KEYS = frozenset(
-    {"format", "classification", "model_states", "real_data_authorized"}
-)
+BUNDLE_KEYS = frozenset({"format", "classification", "model_states", "real_data_authorized"})
 
 
 def _no_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -124,15 +122,11 @@ def bridge_in_memory_mock_bundle(
 ) -> dict[str, object]:
     """Feed inspected MOCK states into the existing synthetic 13-horizon bridge."""
     inspected = inspect_in_memory_mock_bundle(bundle_bytes, expected_local_sha256)
-    forecast = bridge_mock_ridge_to_13_horizon_contract(
-        windows, inspected["model_states"]
-    )
+    forecast = bridge_mock_ridge_to_13_horizon_contract(windows, inspected["model_states"])
     return {
         "status": "SYNTHETIC_BUNDLE_RIDGE_BRIDGE_ONLY",
         "local_bundle_sha256": inspected["local_bundle_sha256"],
-        "local_mock_state_sha256_by_horizon": inspected[
-            "local_mock_state_sha256_by_horizon"
-        ],
+        "local_mock_state_sha256_by_horizon": inspected["local_mock_state_sha256_by_horizon"],
         "caller_bytes_match_caller_digest": True,
         "forecast_batch": forecast["forecast_batch"],
         "trained_model_authenticated": False,
