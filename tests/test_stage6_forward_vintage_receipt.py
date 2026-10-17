@@ -262,17 +262,27 @@ def test_ancestor_symlink_swap_cannot_redirect_receipt_into_checkout(
         receipt_module, "__file__", str(checkout / "scripts" / "stage6_forward_vintage_receipt.py")
     )
     real_stat = Path.stat
+    real_resolve = Path.resolve
+    armed = False
     swapped = False
+
+    def arm_after_validation(path: Path, *args: object, **kwargs: object) -> Path:
+        nonlocal armed
+        resolved = real_resolve(path, *args, **kwargs)
+        if path == root:
+            armed = True
+        return resolved
 
     def replace_ancestor_during_stat(path: Path, *args: object, **kwargs: object) -> object:
         nonlocal swapped
-        if path == root and not swapped:
+        if path == root and armed and not swapped:
             swapped = True
             carrier.rename(moved)
             carrier.symlink_to(checkout, target_is_directory=True)
         return real_stat(path, *args, **kwargs)
 
     with monkeypatch.context() as patch:
+        patch.setattr(Path, "resolve", arm_after_validation)
         patch.setattr(Path, "stat", replace_ancestor_during_stat)
         with pytest.raises(ValueError, match="changed or became public"):
             save_private_receipt(_make(), root)
