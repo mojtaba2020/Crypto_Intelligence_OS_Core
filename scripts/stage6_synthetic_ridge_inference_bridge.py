@@ -86,18 +86,14 @@ def bridge_mock_ridge_to_13_horizon_contract(
     """
     if type(windows) is not list or len(windows) != len(HORIZONS):
         raise ValueError("Exactly 13 synthetic input windows required")
-    if (
-        type(mock_states_by_horizon) is not dict
-        or set(mock_states_by_horizon) != set(HORIZONS)
-    ):
+    if type(mock_states_by_horizon) is not dict or set(mock_states_by_horizon) != set(HORIZONS):
         raise ValueError("Exactly 13 declared mock ridge states required")
 
     inspected = [_inspect_synthetic_window(window) for window in windows]
     if len({row["horizon"] for row in inspected}) != len(HORIZONS):
         raise ValueError("Missing or duplicate synthetic horizon")
     states = {
-        horizon: _validated_mock_state(mock_states_by_horizon[horizon])
-        for horizon in HORIZONS
+        horizon: _validated_mock_state(mock_states_by_horizon[horizon]) for horizon in HORIZONS
     }
     records: list[dict[str, object]] = []
     for row in inspected:
