@@ -131,6 +131,43 @@ def test_noncanonical_horizon_plan_rejected(horizons):
         audit_elapsed_lead(bad, [])
 
 
+def test_no_forecast_claims_is_explicitly_blocked():
+    report = audit_elapsed_lead(plan(2), [])
+    assert report["status"] == "BLOCKED"
+    assert report["missing_slot_count"] == 8
+    assert report["blocked_or_unknown_claim_count"] == 0
+    assert report["received_claim_count"] == 0
+    assert report["scientific_authorization"] == "NO_RUN"
+
+
+def test_partial_claims_cannot_make_packet_appear_unblocked():
+    report = audit_elapsed_lead(plan(1), [record()])
+    assert report["status"] == "BLOCKED"
+    assert report["missing_slot_count"] == 3
+    assert report["blocked_or_unknown_claim_count"] == 0
+
+
+def test_late_claim_blocks_even_when_all_four_horizons_are_present():
+    rows = [record(horizon=h) for h in HORIZONS]
+    rows[0]["claimed_github_log_seen_at_utc"] = START + 2 * HOUR
+    report = audit_elapsed_lead(plan(1), rows)
+    assert report["status"] == "BLOCKED"
+    assert report["missing_slot_count"] == 0
+    assert report["blocked_or_unknown_claim_count"] == 1
+    assert report["by_horizon"][0]["claimed_preclose_count"] == 0
+
+
+def test_complete_synthetic_claims_remain_unverified_and_never_authorize():
+    rows = [record(horizon=h) for h in HORIZONS]
+    report = audit_elapsed_lead(plan(1), rows)
+    assert report["status"] == "UNVERIFIED_ELAPSED_LEAD_METADATA_ONLY"
+    assert report["missing_slot_count"] == 0
+    assert report["blocked_or_unknown_claim_count"] == 0
+    assert report["github_publication_timestamps_independently_verified"] is False
+    assert report["scientific_authorization"] == "NO_RUN"
+    assert report["stage7_freeze_authorized"] is False
+
+
 def test_schedule_overflow_rejected():
     with pytest.raises(ValueError, match="bounded"):
         audit_elapsed_lead(plan(169), [])
