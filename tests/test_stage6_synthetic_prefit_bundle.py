@@ -45,8 +45,7 @@ def _envelope() -> dict:
 
 def _encode(value: object) -> bytes:
     return json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
-        allow_nan=False
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
     ).encode("utf-8")
 
 
@@ -65,19 +64,21 @@ def _windows() -> list[dict]:
             origin, previous = JAN_2, JAN_1
         else:
             origin, previous = JAN_2, JAN_2 - 3600
-        result.append({
-            "horizon": horizon,
-            "origin_cutoff_utc": origin,
-            "previous_cutoff_utc": previous,
-            "previous_price_usd": 100.0,
-            "origin_price_usd": 110.0,
-            "previous_observed_at_utc": previous + 10,
-            "origin_observed_at_utc": origin + 10,
-            "forecast_issued_at_utc": origin + 60,
-            "source_market_id": "bitstamp:BTCUSD:spot",
-            "feature_code_sha256": "c" * 64,
-            "dataset_manifest_sha256": "d" * 64,
-        })
+        result.append(
+            {
+                "horizon": horizon,
+                "origin_cutoff_utc": origin,
+                "previous_cutoff_utc": previous,
+                "previous_price_usd": 100.0,
+                "origin_price_usd": 110.0,
+                "previous_observed_at_utc": previous + 10,
+                "origin_observed_at_utc": origin + 10,
+                "forecast_issued_at_utc": origin + 60,
+                "source_market_id": "bitstamp:BTCUSD:spot",
+                "feature_code_sha256": "c" * 64,
+                "dataset_manifest_sha256": "d" * 64,
+            }
+        )
     return result
 
 
@@ -89,9 +90,12 @@ def test_canonical_mock_bytes_roundtrip_without_claiming_external_provenance() -
     assert set(record["model_states"]) == set(HORIZONS)
     assert set(record["local_mock_state_sha256_by_horizon"]) == set(HORIZONS)
     for flag in (
-        "trained_model_authenticated", "publisher_signature_verified",
-        "immutable_external_custody_verified", "data_first_availability_verified",
-        "license_verified", "stage7_freeze_authorized",
+        "trained_model_authenticated",
+        "publisher_signature_verified",
+        "immutable_external_custody_verified",
+        "data_first_availability_verified",
+        "license_verified",
+        "stage7_freeze_authorized",
     ):
         assert record[flag] is False
     assert record["scientific_authorization"] == "NO_RUN"
@@ -223,8 +227,7 @@ def test_zero_mock_coefficients_keep_flat_price_implied_direction() -> None:
     payload = _encode(document)
     report = bridge_in_memory_mock_bundle(_windows(), payload, _sha(payload))
     assert all(
-        row["predicted_direction"] == "flat"
-        for row in report["forecast_batch"]["forecasts"]
+        row["predicted_direction"] == "flat" for row in report["forecast_batch"]["forecasts"]
     )
 
 
