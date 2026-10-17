@@ -107,6 +107,19 @@ def bridge_mock_ridge_to_13_horizon_contract(
         feature = _synthetic_log_return(previous, origin_price)
         weights, means, scales, model_digest = states[horizon]
 
+        # The existing _estimate arithmetic multiplies the slope by the
+        # centered feature BEFORE dividing by the scale. Refuse inputs whose
+        # nonzero contribution is rounded to zero at either operation.
+        centered = feature - means[0]
+        raw_term = weights[1] * centered
+        if weights[1] != 0.0 and centered != 0.0 and raw_term == 0.0:
+            raise ValueError("Mock ridge term lost to floating underflow")
+        scaled_term = raw_term / scales[0]
+        if raw_term != 0.0 and scaled_term == 0.0:
+            raise ValueError("Mock ridge scale erased a nonzero contribution")
+        if scaled_term != 0.0 and weights[0] + scaled_term == weights[0]:
+            raise ValueError("Mock ridge contribution lost to floating cancellation")
+
         # This calls the EXISTING project's unmodified ridge inference
         # arithmetic; all coefficients and features are mock synthetic inputs.
         predicted_log_return = _estimate(weights, means, scales, (feature,))
