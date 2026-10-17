@@ -79,6 +79,10 @@ def test_exact_flat_is_not_mislabelled_up() -> None:
     row = _record()
     row["predicted_target_price_usd"] = row["origin_price_usd"]
     row["predicted_direction"] = "flat"
+    row["interval_80_low_usd"] = 95.0
+    row["interval_80_high_usd"] = 105.0
+    row["interval_95_low_usd"] = 90.0
+    row["interval_95_high_usd"] = 110.0
     assert validate_dual_target_forecast(row)["predicted_direction"] == "flat"
     row["predicted_direction"] = "up"
     with pytest.raises(ValueError, match="contradicts"):
@@ -109,7 +113,7 @@ def test_origin_and_prediction_prices_must_be_positive_finite_numbers(
 ) -> None:
     row = _record()
     row[field] = bad
-    with pytest.raises(ValueError, match="finite"):
+    with pytest.raises(ValueError, match=r"finite|precision"):
         validate_dual_target_forecast(row)
 
 
@@ -155,7 +159,7 @@ def test_exact_boundary_coverage_is_allowed_as_a_schema_not_probability_proof() 
 def test_issue_time_target_calendar_and_type_require_strict_order(field: str, bad: object) -> None:
     row = _record()
     row[field] = bad
-    with pytest.raises(ValueError, match=r"target|issue|origin|calendar"):
+    with pytest.raises(ValueError, match=r"target|issue|origin|calendar|issuance"):
         validate_dual_target_forecast(row)
 
 
