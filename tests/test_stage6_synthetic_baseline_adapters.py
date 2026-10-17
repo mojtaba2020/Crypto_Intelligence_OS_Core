@@ -77,14 +77,11 @@ def test_two_synthetic_comparators_emit_all_thirteen_validated_forecasts() -> No
 def test_exact_calendar_target_and_before_maturity_issuance_for_all(horizon: str) -> None:
     report = build_synthetic_comparator_batches(_windows(), SHA)
     forecast = next(
-        r for r in report["candidates"]["one_bar_momentum"]["forecasts"]
-        if r["horizon"] == horizon
+        r for r in report["candidates"]["one_bar_momentum"]["forecasts"] if r["horizon"] == horizon
     )
     window = _window(horizon)
     family, bars = HORIZONS[horizon]
-    assert forecast["target_end_utc"] == _target_end(
-        window["origin_cutoff_utc"], family, bars
-    )
+    assert forecast["target_end_utc"] == _target_end(window["origin_cutoff_utc"], family, bars)
     assert forecast["forecast_issued_at_utc"] < forecast["target_end_utc"]
 
 
