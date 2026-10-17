@@ -189,10 +189,7 @@ def test_inconsistent_issuance_blocks_whole_batch_and_avoids_leads():
 
 
 def test_consistent_issuance_may_have_distinct_publication_claims():
-    rows = [
-        record(horizon=h, issue_lag=30, publication_lag=30 + i)
-        for i, h in enumerate(HORIZONS)
-    ]
+    rows = [record(horizon=h, issue_lag=30, publication_lag=30 + i) for i, h in enumerate(HORIZONS)]
     report = audit_elapsed_lead(plan(1), rows)
     assert report["status"] == "UNVERIFIED_ELAPSED_LEAD_METADATA_ONLY"
     assert report["blocked_or_unknown_claim_count"] == 0
