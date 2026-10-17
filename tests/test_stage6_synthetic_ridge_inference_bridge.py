@@ -6,11 +6,11 @@ import math
 from datetime import UTC, datetime
 
 import pytest
-from crypto_intelligence_os.hybrid_forecasting import _estimate
 from scripts.stage6_dual_target_forecast_contract import HORIZONS
 from scripts.stage6_synthetic_ridge_inference_bridge import (
     bridge_mock_ridge_to_13_horizon_contract,
 )
+from crypto_intelligence_os.hybrid_forecasting import _estimate
 
 DAY = 86_400
 JAN_1 = int(datetime(2026, 1, 1, tzinfo=UTC).timestamp())
@@ -116,7 +116,7 @@ def test_model_weights_are_strict_bounded_numeric_mock_values(bad: object) -> No
 def test_model_scale_must_be_valid_non_degenerate(bad: object) -> None:
     states = _states()
     states["3mo"]["scales"] = [bad]
-    with pytest.raises(ValueError, match="scale|coefficient"):
+    with pytest.raises(ValueError, match=r"scale|coefficient"):
         bridge_mock_ridge_to_13_horizon_contract(_windows(), states)
 
 
@@ -129,7 +129,7 @@ def test_nonfinite_ridge_signal_rejected_even_with_bounded_parameters() -> None:
     windows[0]["origin_price_usd"] = 1.79e308
     # Large, finite signal is clipped and may yield a still-valid synthetic
     # output; the point and intervals may be unrepresentable, which must fail.
-    with pytest.raises(ValueError, match="finite|unrepresentable"):
+    with pytest.raises(ValueError, match=r"finite|unrepresentable"):
         bridge_mock_ridge_to_13_horizon_contract(windows, states)
 
 
