@@ -239,3 +239,79 @@ def test_directory_replacement_during_root_open_is_rejected(
         save_private_receipt(_make(), root)
     assert not list(root.iterdir())
     assert not list(moved.iterdir())
+
+
+def test_ancestor_symlink_swap_cannot_redirect_receipt_into_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import scripts.stage6_forward_vintage_receipt as receipt_module
+
+    checkout = tmp_path / "fake-public-checkout"
+    (checkout / "scripts").mkdir(parents=True)
+    public_dest = checkout / "private"
+    public_dest.mkdir(mode=0o700)
+    carrier = tmp_path / "carrier"
+    carrier.mkdir(mode=0o700)
+    root = carrier / "private"
+    root.mkdir(mode=0o700)
+    moved = tmp_path / "moved-carrier"
+
+    # Recreate the real failure: resolve() was safe, then an ancestor becomes
+    # a symlink into the public checkout immediately before root.stat().
+    monkeypatch.setattr(
+        receipt_module, "__file__", str(checkout / "scripts" / "stage6_forward_vintage_receipt.py")
+    )
+    real_stat = Path.stat
+    swapped = False
+
+    def replace_ancestor_during_stat(
+        path: Path, *args: object, **kwargs: object
+    ) -> object:
+        nonlocal swapped
+        if path == root and not swapped:
+            swapped = True
+            carrier.rename(moved)
+            carrier.symlink_to(checkout, target_is_directory=True)
+        return real_stat(path, *args, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "stat", replace_ancestor_during_stat)
+        with pytest.raises(ValueError, match="changed or became public"):
+            save_private_receipt(_make(), root)
+    assert swapped
+    assert not list(public_dest.iterdir())
+
+
+def test_short_write_failure_removes_placeholder_and_allows_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import errno
+    import os
+
+    root = tmp_path / "private"
+    root.mkdir(mode=0o700)
+    payload = _make()
+    real_fdopen = os.fdopen
+
+    class ShortWrite:
+        def __init__(self, fd: int, mode: str) -> None:
+            self.handle = real_fdopen(fd, mode)
+
+        def __enter__(self) -> "ShortWrite":
+            return self
+
+        def __exit__(self, *args: object) -> object:
+            return self.handle.__exit__(*args)
+
+        def write(self, data: bytes) -> None:
+            self.handle.write(data[:10])
+            raise OSError(errno.ENOSPC, "synthetic disk full")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "fdopen", lambda fd, mode: ShortWrite(fd, mode))
+        with pytest.raises(OSError, match="synthetic disk full"):
+            save_private_receipt(payload, root)
+    assert list(root.iterdir()) == []
+
+    destination = save_private_receipt(payload, root)
+    assert json.loads(destination.read_text()) == payload
