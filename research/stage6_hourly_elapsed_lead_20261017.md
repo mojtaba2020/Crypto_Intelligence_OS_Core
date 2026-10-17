@@ -28,6 +28,11 @@ instant, claimed GitHub log observation, and target close. It:
 - Enumerates **every** scheduled `(origin, horizon)` including absent claims.
 - Rejects noncanonical horizons, duplicates, target-close inconsistencies,
   cross-origin run-ID reuse, cross-run origin replenishment, prices and outcomes.
+- For a claimed run/origin, **all issued timestamps must agree** with the deployed
+  four-horizon producer's single issuance clock. Contradiction marks **all
+  received slots** in that batch `INCONSISTENT_BATCH_ISSUANCE_CLAIMS`, omitting
+  their elapsed leads even when each timestamp alone appears pre-close. It is
+  not a trusted proof of common issuance, only a negative consistency check.
 - Retains invalid, immature or late claims **as blocked/unknown categories**,
   never silently discards them from scheduled denominators.
 - Sets top-level `status=BLOCKED` if **any** scheduled slot is missing or
