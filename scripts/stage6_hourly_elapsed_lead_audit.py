@@ -235,6 +235,12 @@ def _sha(value: object) -> str:
     return value
 
 
+def _github_numeric_id(value: object, field: str) -> int:
+    if type(value) is not int or not 0 < value < 10**16:
+        raise ValueError(f"{field} must be a positive GitHub ID")
+    return value
+
+
 def reconcile_github_push_bundle(
     run: Mapping[str, object],
     job: Mapping[str, object],
@@ -262,8 +268,8 @@ def reconcile_github_push_bundle(
         or job.get("conclusion") != "success"
     ):
         raise ValueError("Successful scheduled hourly run and job required")
-    run_id = _second(run.get("id"), "run ID")
-    _second(job.get("id"), "job ID")
+    run_id = _github_numeric_id(run.get("id"), "run ID")
+    _github_numeric_id(job.get("id"), "job ID")
     if job.get("run_id") != run_id:
         raise ValueError("Job does not belong to the claimed run")
     if not isinstance(log_lines, Sequence) or isinstance(log_lines, (str, bytes)):
