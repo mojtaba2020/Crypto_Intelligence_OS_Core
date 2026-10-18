@@ -64,6 +64,50 @@ specified target close has **30 seconds of claimed elapsed lead**, not 1 hour.
 That observation is not proof of a successful forecast, public immutable
 publication or first-observed source-data availability.
 
+
+## GitHub-hosted push/commit consistency (bounded real observation)
+
+`reconcile_github_push_bundle(run, job, commit, log_lines, rows, claim_semantics)`
+uses a **price-free** projection of the exact GitHub REST scheduled run, its
+successful `hourly` job, the fetched pushed commit, GitHub's timestamp-prefixed
+job-log `<old>..<new> HEAD -> main` line, and all four newly appended forecast
+time/horizon metadata rows. It enforces same run/job identity, positive numeric
+IDs (including larger GitHub job IDs), the recognized workflow and version,
+checkout-head/commit-parent/push SHA consistency, bounded server-log time within
+the run's GitHub creation/update window, four consistent origin and issuance
+times, and the existing canonical calendar/horizon/lead checks. Mismatches
+fail closed. It never fetches market data, trades, prices or predictions.
+
+A **real** price-blind regression fixture is based on public run
+[39136397235](https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/actions/runs/39136397235),
+job `117701666173`, pushed commit
+[`7a5599d`](https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/commit/7a5599d716dd5ce79b0d012885e08ba17c17bcd3),
+and the GitHub-hosted push-line timestamp `2026-10-18T14:31:58.0994084Z`.
+The 1h target closed 15:00 UTC, so the observed push-log-to-target lead was
+approximately **28m 01.90s**, not 60 minutes. The audit's integer-second
+metadata result is **1682 seconds** (rounded at second resolution).
+`minimum_elapsed` correctly blocks the four nominal 1/4/12/24h full-lead
+claims at that publication time; `bar_aligned` retains actual elapsed
+durations but makes **no full-horizon representation**.
+
+**Trust boundary: the helper is NOT an external verifier.** The objects and
+log string supplied to this function can be forged by its caller. An independent
+reviewer must authenticate that each was separately fetched from GitHub's
+actual API/log endpoint and that the price-free projection truly matches bytes
+of the referenced append commit. The function does *not* authenticate that
+projection, prove earliest public GitHub API visibility, provide a signed
+immutable timestamp or approve source as-known-at vintage. It returns explicit
+`False` authentication and first-publication-attestation flags and
+`NO_RUN`, never GO. Git author/committer timestamps are not substitutes for
+server evidence.
+
+**Live-remediation prerequisite remains:** preregister a new full elapsed
+target convention, never silently change old model-version meaning, bind
+forecast content digest to independently witnessed publication, refuse late
+or missing receipts in scoring and leave every missed origin in the denominator.
+Do not change the currently scheduled runner or merge either draft based
+on this metadata work alone.
+
 ## Independent review still required
 
 A GitHub run ID and a timestamp supplied by the caller are not evidence that
