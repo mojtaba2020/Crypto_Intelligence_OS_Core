@@ -255,9 +255,7 @@ def test_minimum_elapsed_mode_blocks_all_four_bar_horizons_after_origin_close():
     assert result["blocked_or_unknown_claim_count"] == 4
     assert result["status"] == "BLOCKED"
     assert [r["short_elapsed_horizon_count"] for r in result["by_horizon"]] == [1] * 4
-    assert all(
-        r["status"] == "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON" for r in result["slots"]
-    )
+    assert all(r["status"] == "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON" for r in result["slots"])
 
 
 def test_bar_aligned_mode_preserves_actual_short_lead_without_claiming_full_hour():
