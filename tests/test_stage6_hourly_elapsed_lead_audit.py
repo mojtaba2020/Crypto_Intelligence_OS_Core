@@ -10,11 +10,12 @@ HOUR = 3600
 HORIZONS = (1, 4, 12, 24)
 
 
-def plan(hours=24):
+def plan(hours=24, semantics="bar_aligned"):
     return {
         "first_origin_utc": START,
         "stop_origin_exclusive_utc": START + hours * HOUR,
         "horizons_hours": HORIZONS,
+        "claim_semantics": semantics,
     }
 
 
@@ -216,3 +217,75 @@ def test_different_origins_can_claim_different_issuance_times():
 def test_schedule_overflow_rejected():
     with pytest.raises(ValueError, match="bounded"):
         audit_elapsed_lead(plan(169), [])
+
+
+def test_fixed_elapsed_mode_blocks_50_minute_nominal_hour_claim():
+    row = record(issue_lag=2, publication_lag=2)
+    report = audit_elapsed_lead(plan(1, semantics="fixed_elapsed"), [row])
+    assert report["claim_semantics"] == "fixed_elapsed"
+    assert report["slots"][0]["status"] == "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON"
+    assert report["slots"][0]["claimed_elapsed_lead_seconds"] == 3598
+    assert report["by_horizon"][0]["short_elapsed_horizon_count"] == 1
+    assert report["by_horizon"][0]["claimed_preclose_count"] == 0
+    assert report["blocked_or_unknown_claim_count"] == 1
+    assert report["status"] == "BLOCKED"
+    assert report["scientific_authorization"] == "NO_RUN"
+
+
+def test_fixed_elapsed_mode_exact_boundary_and_one_second_short():
+    exact = audit_elapsed_lead(
+        plan(1, semantics="fixed_elapsed"),
+        [record(issue_lag=0, publication_lag=0)],
+    )
+    assert exact["slots"][0]["status"] == "CLAIMED_PRE_CLOSE_UNVERIFIED"
+    assert exact["slots"][0]["claimed_elapsed_lead_seconds"] == 3600
+    one_second = audit_elapsed_lead(
+        plan(1, semantics="fixed_elapsed"),
+        [record(issue_lag=0, publication_lag=1)],
+    )
+    assert one_second["slots"][0]["status"] == "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON"
+    assert one_second["slots"][0]["claimed_elapsed_lead_seconds"] == 3599
+
+
+def test_fixed_elapsed_mode_blocks_all_four_bar_horizons_after_origin_close():
+    rows = [record(horizon=h, issue_lag=20, publication_lag=30) for h in HORIZONS]
+    result = audit_elapsed_lead(plan(1, semantics="fixed_elapsed"), rows)
+    assert result["received_claim_count"] == 4
+    assert result["missing_slot_count"] == 0
+    assert result["blocked_or_unknown_claim_count"] == 4
+    assert result["status"] == "BLOCKED"
+    assert [r["short_elapsed_horizon_count"] for r in result["by_horizon"]] == [1] * 4
+    assert all(
+        r["status"] == "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON" for r in result["slots"]
+    )
+
+
+def test_bar_aligned_mode_preserves_actual_short_lead_without_claiming_full_hour():
+    report = audit_elapsed_lead(plan(1), [record(issue_lag=3569, publication_lag=3570)])
+    assert report["claim_semantics"] == "bar_aligned"
+    assert report["slots"][0]["claimed_elapsed_lead_seconds"] == 30
+    assert report["slots"][0]["status"] == "CLAIMED_PRE_CLOSE_UNVERIFIED"
+    assert report["elapsed_horizon_claim_independently_verified"] is False
+
+
+@pytest.mark.parametrize("bad", [None, "other", 1, True, "FIXED_ELAPSED"])
+def test_undefined_horizon_claim_semantics_rejected(bad):
+    p = plan(1)
+    p["claim_semantics"] = bad
+    with pytest.raises(ValueError, match="claim semantics"):
+        audit_elapsed_lead(p, [])
+
+
+def test_unstated_semantics_rejected_instead_of_defaulting():
+    p = plan(1)
+    del p["claim_semantics"]
+    with pytest.raises(ValueError, match="Exact, price-free"):
+        audit_elapsed_lead(p, [])
+
+
+def test_fixed_elapsed_claim_cannot_use_missing_publication_witness():
+    row = record(issue_lag=0, publication_lag=0)
+    row["claimed_github_log_seen_at_utc"] = None
+    result = audit_elapsed_lead(plan(1, semantics="fixed_elapsed"), [row])
+    assert result["slots"][0]["status"] == "NO_PUBLICATION_WITNESS_CLAIM"
+    assert result["scientific_authorization"] == "NO_RUN"
