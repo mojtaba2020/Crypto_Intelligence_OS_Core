@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 HORIZONS = (1, 4, 12, 24)
-CLAIM_SEMANTICS = ("bar_aligned", "fixed_elapsed")
+CLAIM_SEMANTICS = ("bar_aligned", "minimum_elapsed")
 HOUR = 3_600
 MAX_HOURS = 168
 PLAN_FIELDS = frozenset(
@@ -48,7 +48,7 @@ def audit_elapsed_lead(
         raise ValueError("All four canonical hourly horizons required")
     semantics = plan["claim_semantics"]
     if type(semantics) is not str or semantics not in CLAIM_SEMANTICS:
-        raise ValueError("Explicit bar_aligned or fixed_elapsed claim semantics required")
+        raise ValueError("Explicit bar_aligned or minimum_elapsed claim semantics required")
     start = _second(plan["first_origin_utc"], "start")
     stop = _second(plan["stop_origin_exclusive_utc"], "stop")
     if start % HOUR or stop % HOUR or stop <= start or stop - start > MAX_HOURS * HOUR:
@@ -105,7 +105,7 @@ def audit_elapsed_lead(
             status = "PUBLICATION_CLAIM_BEFORE_ISSUANCE_CLAIM"
         elif seen >= close:
             status = "PUBLICATION_CLAIM_AT_OR_AFTER_MATURITY"
-        elif semantics == "fixed_elapsed" and close - seen < horizon * HOUR:
+        elif semantics == "minimum_elapsed" and close - seen < horizon * HOUR:
             # Do not relabel a bar-aligned forecast as a full elapsed-horizon claim.
             status = "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON"
         else:
