@@ -20,9 +20,7 @@ ORIGIN = int(datetime(2026, 1, 2, tzinfo=UTC).timestamp())
 EARLIER = date(2025, 12, 1)
 
 
-def _hybrid(
-    horizon_days: int = 2, feature_group: str = "all", **changes: object
-) -> HybridModel:
+def _hybrid(horizon_days: int = 2, feature_group: str = "all", **changes: object) -> HybridModel:
     n = len(FEATURE_LAYOUTS[feature_group])
     data: dict[str, object] = {
         "horizon_days": horizon_days,
@@ -75,27 +73,26 @@ def test_same_mock_hybrid_cannot_impersonate_thirteen_fitted_horizons(horizon: s
 
 
 @pytest.mark.parametrize("model", [_hybrid(7), _linear(7), _hybrid(30), _linear(30)])
-def test_daily_7_and_30_day_targets_do_not_prove_week_or_calendar_month(
-    model: object
-) -> None:
+def test_daily_7_and_30_day_targets_do_not_prove_week_or_calendar_month(model: object) -> None:
     for horizon in ("1w", "1mo"):
         result = inspect_existing_model_horizon_metadata(model, horizon, ORIGIN)
-        assert "existing_research_trainer_has_daily_targets_only" in result[
-            "incompatibility_reasons"
-        ]
+        assert (
+            "existing_research_trainer_has_daily_targets_only" in result["incompatibility_reasons"]
+        )
         assert result["candidate_shape_compatible"] is False
 
 
-@pytest.mark.parametrize("group,n", [
-    ("all", 12),
-    ("no_halving", 10),
-    ("no_extrema", 8),
-    ("momentum_only", 5),
-])
+@pytest.mark.parametrize(
+    "group,n",
+    [
+        ("all", 12),
+        ("no_halving", 10),
+        ("no_extrema", 8),
+        ("momentum_only", 5),
+    ],
+)
 def test_real_hybrid_class_group_dimensions_recognized(group: str, n: int) -> None:
-    result = inspect_existing_model_horizon_metadata(
-        _hybrid(feature_group=group), "2d", ORIGIN
-    )
+    result = inspect_existing_model_horizon_metadata(_hybrid(feature_group=group), "2d", ORIGIN)
     assert result["dimension"] == n
     assert result["feature_group"] == group
 
@@ -106,7 +103,8 @@ def test_full_thirteen_horizon_matrix_has_only_one_shape_match() -> None:
     assert result["shape_compatible_horizon_count"] == 1
     assert [item["requested_horizon"] for item in result["horizons"]] == list(HORIZONS)
     assert [
-        item["requested_horizon"] for item in result["horizons"]
+        item["requested_horizon"]
+        for item in result["horizons"]
         if item["candidate_shape_compatible"]
     ] == ["3d"]
     assert result["real_model_execution_authorized"] is False
@@ -114,15 +112,14 @@ def test_full_thirteen_horizon_matrix_has_only_one_shape_match() -> None:
 
 
 @pytest.mark.parametrize("bad", [date(2026, 1, 2), date(2026, 1, 3)])
-def test_unresolved_last_training_target_day_cannot_be_called_compatible(
-    bad: date
-) -> None:
+def test_unresolved_last_training_target_day_cannot_be_called_compatible(bad: date) -> None:
     result = inspect_existing_model_horizon_metadata(
         _hybrid(last_training_target=bad), "2d", ORIGIN
     )
-    assert "last_training_target_date_not_strictly_before_origin_date" in result[
-        "incompatibility_reasons"
-    ]
+    assert (
+        "last_training_target_date_not_strictly_before_origin_date"
+        in result["incompatibility_reasons"]
+    )
 
 
 @pytest.mark.parametrize("bad", [True, 0, -1, 1.5, "3"])
