@@ -156,7 +156,7 @@ def test_malformed_shape_and_unknown_hybrid_group_rejected() -> None:
         inspect_existing_model_horizon_metadata(_hybrid(weights=(0.0,)), "2d", ORIGIN)
     with pytest.raises(ValueError, match="feature group"):
         inspect_existing_model_horizon_metadata(
-            _hybrid(feature_group="all", **{"feature_group": "invented"}), "2d", ORIGIN
+            HybridModel(**{**_hybrid().__dict__, "feature_group": "invented"}), "2d", ORIGIN
         )
 
 
