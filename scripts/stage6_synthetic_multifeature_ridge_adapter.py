@@ -173,7 +173,9 @@ def inspect_synthetic_multifeature_bundle(
     }
 
 
-def _mock_row(row: object, window: dict[str, object]) -> tuple[float, ...]:
+def _mock_row(
+    row: object, window: dict[str, object], source_observed_at_utc: object
+) -> tuple[float, ...]:
     if type(row) is not dict or set(row) != ROW_KEYS:
         raise ValueError("Exact synthetic feature row required, no labels")
     if type(row["horizon"]) is not str or row["horizon"] != window["horizon"]:
@@ -183,8 +185,9 @@ def _mock_row(row: object, window: dict[str, object]) -> tuple[float, ...]:
     if type(values) is not list or len(values) != len(names):
         raise ValueError("Synthetic feature vector dimension mismatch")
     observed, _ = _utc_timestamp(row["observed_at_utc"], "synthetic feature observation")
-    if not window["origin_cutoff_utc"] <= observed <= window["forecast_issued_at_utc"]:
-        raise ValueError("Synthetic feature observed after issuance or before close")
+    source_ready, _ = _utc_timestamp(source_observed_at_utc, "completed source arrival")
+    if not source_ready <= observed <= window["forecast_issued_at_utc"]:
+        raise ValueError("Synthetic feature predates completed source or follows issuance")
     return tuple(_finite_coefficient(value, "synthetic feature") for value in values)
 
 
@@ -246,10 +249,12 @@ def bridge_synthetic_multifeature_bundle(
         raise ValueError("Incomplete synthetic feature horizon set")
 
     outputs: list[dict[str, object]] = []
-    for window in inspected:
+    for window, raw_window in zip(inspected, windows, strict=True):
         horizon = str(window["horizon"])
         state = states[horizon]
-        values = _mock_row(rows_by_horizon[horizon], window)
+        values = _mock_row(
+            rows_by_horizon[horizon], window, raw_window["origin_observed_at_utc"]
+        )
         if (
             rows_by_horizon[horizon]["feature_group"] != state["feature_group"]
             or rows_by_horizon[horizon]["feature_names"] != state["feature_names"]
