@@ -96,7 +96,8 @@ def inspect_existing_model_horizon_metadata(
     return {
         "status": (
             "DAILY_SHAPE_COMPATIBLE_BUT_UNVERIFIED"
-            if shape_compatible else "INCOMPATIBLE_OR_UNRESOLVED_MODEL_METADATA"
+            if shape_compatible
+            else "INCOMPATIBLE_OR_UNRESOLVED_MODEL_METADATA"
         ),
         "requested_horizon": requested_horizon,
         "original_model_horizon_days": model.horizon_days,
@@ -119,9 +120,7 @@ def inspect_existing_model_horizon_metadata(
     }
 
 
-def inspect_existing_model_all_13(
-    model: object, origin_cutoff_utc: int
-) -> dict[str, object]:
+def inspect_existing_model_all_13(model: object, origin_cutoff_utc: int) -> dict[str, object]:
     """Report an exact 13-row compatibility matrix, never execute forecasts."""
     results = [
         inspect_existing_model_horizon_metadata(model, horizon, origin_cutoff_utc)
