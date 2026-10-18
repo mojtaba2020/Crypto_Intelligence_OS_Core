@@ -260,6 +260,18 @@ def bridge_synthetic_multifeature_bundle(
             raise ValueError("Synthetic feature vector differs from mock model layout")
         if state["last_training_target_utc"] > window["origin_cutoff_utc"]:
             raise ValueError("Mock training label extends beyond forecast origin")
+        # An origin or previous bar used as the terminal training target
+        # is not available merely when its UTC interval closes. Reject
+        # model creation before the validated source-observation timestamp.
+        for bar_cutoff, arrival in (
+            ("origin_cutoff_utc", "origin_observed_at_utc"),
+            ("previous_cutoff_utc", "previous_observed_at_utc"),
+        ):
+            if (
+                state["last_training_target_utc"] == raw_window[bar_cutoff]
+                and state["model_created_at_utc"] < raw_window[arrival]
+            ):
+                raise ValueError("Mock model was created before its terminal label arrived")
         if state["model_created_at_utc"] > window["forecast_issued_at_utc"]:
             raise ValueError("Mock model created after claimed forecast issuance")
         weights = tuple(state["weights"])
