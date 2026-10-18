@@ -9,9 +9,12 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 HORIZONS = (1, 4, 12, 24)
+CLAIM_SEMANTICS = ("bar_aligned", "fixed_elapsed")
 HOUR = 3_600
 MAX_HOURS = 168
-PLAN_FIELDS = frozenset({"first_origin_utc", "stop_origin_exclusive_utc", "horizons_hours"})
+PLAN_FIELDS = frozenset(
+    {"first_origin_utc", "stop_origin_exclusive_utc", "horizons_hours", "claim_semantics"}
+)
 RECORD_FIELDS = frozenset(
     {
         "github_run_id",
@@ -43,6 +46,9 @@ def audit_elapsed_lead(
         raise ValueError("Exact, price-free hourly plan required")
     if type(plan["horizons_hours"]) is not tuple or plan["horizons_hours"] != HORIZONS:
         raise ValueError("All four canonical hourly horizons required")
+    semantics = plan["claim_semantics"]
+    if type(semantics) is not str or semantics not in CLAIM_SEMANTICS:
+        raise ValueError("Explicit bar_aligned or fixed_elapsed claim semantics required")
     start = _second(plan["first_origin_utc"], "start")
     stop = _second(plan["stop_origin_exclusive_utc"], "stop")
     if start % HOUR or stop % HOUR or stop <= start or stop - start > MAX_HOURS * HOUR:
@@ -99,6 +105,9 @@ def audit_elapsed_lead(
             status = "PUBLICATION_CLAIM_BEFORE_ISSUANCE_CLAIM"
         elif seen >= close:
             status = "PUBLICATION_CLAIM_AT_OR_AFTER_MATURITY"
+        elif semantics == "fixed_elapsed" and close - seen < horizon * HOUR:
+            # Do not relabel a bar-aligned forecast as a full elapsed-horizon claim.
+            status = "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON"
         else:
             status = "CLAIMED_PRE_CLOSE_UNVERIFIED"
 
@@ -111,7 +120,12 @@ def audit_elapsed_lead(
             "claimed_github_log_seen_at_utc": seen,
             "target_close_utc": close,
             "claimed_elapsed_lead_seconds": (
-                close - seen if status == "CLAIMED_PRE_CLOSE_UNVERIFIED" else None
+                close - seen
+                if status in (
+                    "CLAIMED_PRE_CLOSE_UNVERIFIED",
+                    "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON",
+                )
+                else None
             ),
         }
 
@@ -153,6 +167,9 @@ def audit_elapsed_lead(
                     r["status"] == "MISSING_SCHEDULED_FORECAST_CLAIM" for r in subset
                 ),
                 "claimed_preclose_count": len(leads),
+                "short_elapsed_horizon_count": sum(
+                    r["status"] == "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON" for r in subset
+                ),
                 "blocked_or_unknown_claim_count": sum(
                     r["status"]
                     not in (
@@ -174,6 +191,8 @@ def audit_elapsed_lead(
         "missing_slot_count": missing_count,
         "blocked_or_unknown_claim_count": blocked_count,
         "scheduled_origin_count": origin_count,
+        "claim_semantics": semantics,
+        "elapsed_horizon_claim_independently_verified": False,
         "expected_origin_horizon_slots": origin_count * len(HORIZONS),
         "received_claim_count": len(observed),
         "github_run_identity_independently_verified": False,
