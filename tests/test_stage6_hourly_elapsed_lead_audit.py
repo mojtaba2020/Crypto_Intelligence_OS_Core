@@ -1,6 +1,6 @@
 """Synthetic-only elapsed lead audit tests; no network or market prices."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from scripts.stage6_hourly_elapsed_lead_audit import (
@@ -330,11 +330,7 @@ def github_bundle():
         {
             "origin_hour_utc": origin.isoformat(),
             "issued_at_utc": "2026-10-18T14:31:55.995510+00:00",
-            "target_close_utc": (origin.replace(tzinfo=UTC)).isoformat()
-            if False
-            else datetime.fromtimestamp(
-                int(origin.timestamp()) + (horizon + 1) * HOUR, tz=UTC
-            ).isoformat(),
+            "target_close_utc": (origin + timedelta(hours=horizon + 1)).isoformat(),
             "horizon_hours": horizon,
             "version": "hourly-hybrid-ridge-v2",
         }
