@@ -10,6 +10,9 @@ from collections.abc import Mapping, Sequence
 
 HORIZONS = (1, 4, 12, 24)
 CLAIM_SEMANTICS = ("bar_aligned", "minimum_elapsed")
+LEAD_STATUSES = frozenset(
+    {"CLAIMED_PRE_CLOSE_UNVERIFIED", "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON"}
+)
 HOUR = 3_600
 MAX_HOURS = 168
 PLAN_FIELDS = frozenset(
@@ -119,14 +122,7 @@ def audit_elapsed_lead(
             "claimed_issued_at_utc": issued,
             "claimed_github_log_seen_at_utc": seen,
             "target_close_utc": close,
-            "claimed_elapsed_lead_seconds": (
-                close - seen
-                if status in (
-                    "CLAIMED_PRE_CLOSE_UNVERIFIED",
-                    "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON",
-                )
-                else None
-            ),
+            "claimed_elapsed_lead_seconds": close - seen if status in LEAD_STATUSES else None,
         }
 
     # The deployed producer samples one issuance instant per four-horizon batch.
