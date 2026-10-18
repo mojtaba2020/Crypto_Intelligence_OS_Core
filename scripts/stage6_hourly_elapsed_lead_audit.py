@@ -10,9 +10,7 @@ from collections.abc import Mapping, Sequence
 
 HORIZONS = (1, 4, 12, 24)
 CLAIM_SEMANTICS = ("bar_aligned", "minimum_elapsed")
-LEAD_STATUSES = frozenset(
-    {"CLAIMED_PRE_CLOSE_UNVERIFIED", "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON"}
-)
+LEAD_STATUSES = frozenset({"CLAIMED_PRE_CLOSE_UNVERIFIED", "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON"})
 HOUR = 3_600
 MAX_HOURS = 168
 PLAN_FIELDS = frozenset(
