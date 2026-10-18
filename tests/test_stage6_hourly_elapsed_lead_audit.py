@@ -360,8 +360,7 @@ def test_actual_hosted_push_timing_blocks_four_minimum_elapsed_claims():
     assert res["observation"]["status"] == "BLOCKED"
     assert res["observation"]["blocked_or_unknown_claim_count"] == 4
     assert all(
-        x["status"] == "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON"
-        for x in res["observation"]["slots"]
+        x["status"] == "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON" for x in res["observation"]["slots"]
     )
     assert res["scientific_authorization"] == "NO_RUN"
 
@@ -389,14 +388,15 @@ def test_github_bundle_rejects_mismatched_run_job_commit(index, field, bad, matc
 def test_github_bundle_rejects_fabricated_late_or_duplicate_push_log():
     run, job, commit, log, rows = github_bundle()
     with pytest.raises(ValueError, match="one GitHub-hosted"):
-        reconcile_github_push_bundle(
-            run, job, commit, [*log, log[-1]], rows, "bar_aligned"
-        )
+        reconcile_github_push_bundle(run, job, commit, [*log, log[-1]], rows, "bar_aligned")
     with pytest.raises(ValueError, match="outside"):
         reconcile_github_push_bundle(
-            run, job, commit,
+            run,
+            job,
+            commit,
             ["2026-10-18T15:01:00.0000000Z    7570ccf..7a5599d  HEAD -> main"],
-            rows, "bar_aligned"
+            rows,
+            "bar_aligned",
         )
     with pytest.raises(ValueError, match="one GitHub-hosted"):
         reconcile_github_push_bundle(
