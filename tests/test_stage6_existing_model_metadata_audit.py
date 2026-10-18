@@ -171,7 +171,7 @@ def test_invalid_linear_regression_shape_and_coefficients_rejected() -> None:
         _linear(coefficients=(0.1, 0.2)),
         _linear(coefficients=(0.1, 0.2, math.inf)),
     ):
-        with pytest.raises(ValueError, match="coefficients|coefficient"):
+        with pytest.raises(ValueError, match=r"coefficients|coefficient"):
             inspect_existing_model_horizon_metadata(model, "1d", ORIGIN)
 
 
