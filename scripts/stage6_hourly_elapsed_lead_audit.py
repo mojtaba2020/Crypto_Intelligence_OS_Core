@@ -351,7 +351,11 @@ def reconcile_github_push_bundle(
     if observation["missing_slot_count"]:
         raise ValueError("Incomplete four-horizon committed batch")
     return {
-        "status": "GITHUB_LOG_COMMIT_BUNDLE_CONSISTENT_UNVERIFIED",
+        "status": (
+            "GITHUB_LOG_COMMIT_BUNDLE_BLOCKED"
+            if observation["status"] == "BLOCKED"
+            else "GITHUB_LOG_COMMIT_BUNDLE_CONSISTENT_UNVERIFIED"
+        ),
         "run_id_claim": run_id,
         "commit_sha_claim": commit_sha,
         "push_at_utc_claim": push_at.isoformat(),
