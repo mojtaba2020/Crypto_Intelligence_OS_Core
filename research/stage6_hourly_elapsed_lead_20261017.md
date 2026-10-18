@@ -22,7 +22,7 @@ already identified pre-fit timestamp flaw addressed in unmerged PR #89.
 `scripts/stage6_hourly_elapsed_lead_audit.py` accepts only an exact,
 price-free, integer-UTC-seconds schema for one **fixed** 1–168 hour schedule
 and the fixed `(1, 4, 12, 24)` bar-horizon family. The caller must explicitly
-provide `plan.claim_semantics = "bar_aligned"` or `"fixed_elapsed"`; an omitted or
+provide `plan.claim_semantics = "bar_aligned"` or `"minimum_elapsed"`; an omitted or
 unknown choice **fails closed**. Never select claim semantics retrospectively
 based on market outcomes. Each record identifies a
 claimed scheduled GitHub run, completed-bar origin, horizon, local issue
@@ -38,7 +38,7 @@ instant, claimed GitHub log observation, and target close. It:
   not a trusted proof of common issuance, only a negative consistency check.
 - Retains invalid, immature or late claims **as blocked/unknown categories**,
   never silently discards them from scheduled denominators.
-- For explicitly predeclared `fixed_elapsed` claims, checks `target_close -
+- For explicitly predeclared `minimum_elapsed` claims, checks `target_close -
   claimed_github_log_seen_at_utc >= horizon_hours * 3600`. Even a one-second
   shortfall produces `INSUFFICIENT_CLAIMED_ELAPSED_HORIZON`, top-level `BLOCKED`,
   and a separate `short_elapsed_horizon_count`; the *actual claimed lead* is
