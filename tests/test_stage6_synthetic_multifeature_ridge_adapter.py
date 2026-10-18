@@ -325,3 +325,40 @@ def test_feature_observation_exactly_at_completed_source_arrival_is_allowed() ->
         row["observed_at_utc"] = window["origin_observed_at_utc"]
     result = _run(windows=windows, rows=rows)
     assert result["forecast_batch"]["horizon_count"] == 13
+
+
+@pytest.mark.parametrize("horizon", list(HORIZONS))
+def test_model_fitted_to_origin_bar_cannot_precede_terminal_label_arrival(horizon: str) -> None:
+    windows = _windows()
+    envelope = _envelope()
+    for window in windows:
+        if window["horizon"] == horizon:
+            state = envelope["model_states"][horizon]
+            state["last_training_target_utc"] = window["origin_cutoff_utc"]
+            state["model_created_at_utc"] = window["origin_cutoff_utc"] + 1
+    with pytest.raises(ValueError, match="terminal label arrived"):
+        _run(envelope=envelope, windows=windows)
+
+
+@pytest.mark.parametrize("horizon", list(HORIZONS))
+def test_origin_terminal_label_can_be_used_at_actual_source_arrival(horizon: str) -> None:
+    windows = _windows()
+    envelope = _envelope()
+    for window in windows:
+        if window["horizon"] == horizon:
+            state = envelope["model_states"][horizon]
+            state["last_training_target_utc"] = window["origin_cutoff_utc"]
+            state["model_created_at_utc"] = window["origin_observed_at_utc"]
+    output = _run(envelope=envelope, windows=windows)
+    assert output["forecast_batch"]["horizon_count"] == 13
+
+
+def test_terminal_previous_bar_label_cannot_precede_previous_source_arrival() -> None:
+    windows = _windows()
+    envelope = _envelope()
+    state = envelope["model_states"]["1d"]
+    window = next(row for row in windows if row["horizon"] == "1d")
+    state["last_training_target_utc"] = window["previous_cutoff_utc"]
+    state["model_created_at_utc"] = window["previous_cutoff_utc"] + 1
+    with pytest.raises(ValueError, match="terminal label arrived"):
+        _run(envelope=envelope, windows=windows)
