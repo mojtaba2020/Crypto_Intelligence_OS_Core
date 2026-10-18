@@ -230,7 +230,7 @@ def test_synthetic_feature_extra_outcome_or_secret_field_rejected(name: str) -> 
 def test_feature_observed_after_forecast_issuance_is_rejected() -> None:
     rows = _feature_rows()
     rows[0]["observed_at_utc"] = JAN_2 + 61
-    with pytest.raises(ValueError, match="after issuance"):
+    with pytest.raises(ValueError, match="follows issuance"):
         _run(rows=rows)
 
 
@@ -304,3 +304,24 @@ def test_synthetic_bundle_never_accepts_real_data_authorization() -> None:
     envelope["real_data_authorized"] = True
     with pytest.raises(ValueError, match="Mock-only"):
         _run(envelope=envelope)
+
+
+@pytest.mark.parametrize("horizon", list(HORIZONS))
+def test_feature_snapshot_cannot_precede_arrival_of_its_source_bar(horizon: str) -> None:
+    windows = _windows()
+    feature_rows = _feature_rows()
+    for window, row in zip(windows, feature_rows, strict=True):
+        if window["horizon"] == horizon:
+            assert window["origin_observed_at_utc"] == window["origin_cutoff_utc"] + 10
+            row["observed_at_utc"] = window["origin_cutoff_utc"] + 5
+    with pytest.raises(ValueError, match="predates completed source"):
+        _run(windows=windows, rows=feature_rows)
+
+
+def test_feature_observation_exactly_at_completed_source_arrival_is_allowed() -> None:
+    windows = _windows()
+    rows = _feature_rows()
+    for window, row in zip(windows, rows, strict=True):
+        row["observed_at_utc"] = window["origin_observed_at_utc"]
+    result = _run(windows=windows, rows=rows)
+    assert result["forecast_batch"]["horizon_count"] == 13
