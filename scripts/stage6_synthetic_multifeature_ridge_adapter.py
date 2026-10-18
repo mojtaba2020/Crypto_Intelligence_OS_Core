@@ -252,9 +252,7 @@ def bridge_synthetic_multifeature_bundle(
     for window, raw_window in zip(inspected, windows, strict=True):
         horizon = str(window["horizon"])
         state = states[horizon]
-        values = _mock_row(
-            rows_by_horizon[horizon], window, raw_window["origin_observed_at_utc"]
-        )
+        values = _mock_row(rows_by_horizon[horizon], window, raw_window["origin_observed_at_utc"])
         if (
             rows_by_horizon[horizon]["feature_group"] != state["feature_group"]
             or rows_by_horizon[horizon]["feature_names"] != state["feature_names"]
