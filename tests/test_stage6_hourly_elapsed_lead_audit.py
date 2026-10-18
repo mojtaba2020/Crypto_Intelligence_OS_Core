@@ -390,7 +390,7 @@ def test_github_bundle_rejects_fabricated_late_or_duplicate_push_log():
     run, job, commit, log, rows = github_bundle()
     with pytest.raises(ValueError, match="one GitHub-hosted"):
         reconcile_github_push_bundle(
-            run, job, commit, log + [log[-1]], rows, "bar_aligned"
+            run, job, commit, [*log, log[-1]], rows, "bar_aligned"
         )
     with pytest.raises(ValueError, match="outside"):
         reconcile_github_push_bundle(
