@@ -357,6 +357,7 @@ def test_actual_hosted_push_bundle_projection_is_consistent_but_unattested():
 
 def test_actual_hosted_push_timing_blocks_four_minimum_elapsed_claims():
     res = reconcile_github_push_bundle(*github_bundle(), claim_semantics="minimum_elapsed")
+    assert res["status"] == "GITHUB_LOG_COMMIT_BUNDLE_BLOCKED"
     assert res["observation"]["status"] == "BLOCKED"
     assert res["observation"]["blocked_or_unknown_claim_count"] == 4
     assert all(
@@ -422,3 +423,17 @@ def test_github_bundle_rejects_prices_extra_rows_and_horizon_conflicts():
         reconcile_github_push_bundle(run, job, commit, log, rows, "bar_aligned")
     with pytest.raises(ValueError, match="Four metadata"):
         reconcile_github_push_bundle(run, job, commit, log, rows[:3], "bar_aligned")
+
+
+def test_github_bundle_late_preclose_witness_is_blocked_at_top_level():
+    run, job, commit, log, rows = github_bundle()
+    # 13:00 origin, 15:00 first target close; synthetic successful push at 15:01
+    # cannot be inside the original completed run, so use an internally consistent
+    # later run envelope to test fail-closed maturity accounting.
+    run["updated_at"] = "2026-10-18T15:02:00Z"
+    log[-1] = "2026-10-18T15:01:00Z    7570ccf..7a5599d  HEAD -> main"
+    res = reconcile_github_push_bundle(run, job, commit, log, rows, "bar_aligned")
+    assert res["status"] == "GITHUB_LOG_COMMIT_BUNDLE_BLOCKED"
+    assert res["observation"]["blocked_or_unknown_claim_count"] == 1
+    assert res["observation"]["slots"][0]["status"] == "PUBLICATION_CLAIM_AT_OR_AFTER_MATURITY"
+    assert res["scientific_authorization"] == "NO_RUN"
