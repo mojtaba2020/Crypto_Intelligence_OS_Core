@@ -108,7 +108,8 @@ def _feature_rows() -> list[dict[str, object]]:
 
 
 def _run(
-    *, envelope: dict[str, object] | None = None,
+    *,
+    envelope: dict[str, object] | None = None,
     windows: list[dict[str, object]] | None = None,
     rows: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
@@ -121,18 +122,18 @@ def _run(
     )
 
 
-@pytest.mark.parametrize("group,dimension", [
-    ("all", 12),
-    ("no_halving", 10),
-    ("no_extrema", 8),
-    ("momentum_only", 5),
-])
-def test_layout_pins_actual_existing_hybrid_feature_function(
-    group: str, dimension: int
-) -> None:
+@pytest.mark.parametrize(
+    "group,dimension",
+    [
+        ("all", 12),
+        ("no_halving", 10),
+        ("no_extrema", 8),
+        ("momentum_only", 5),
+    ],
+)
+def test_layout_pins_actual_existing_hybrid_feature_function(group: str, dimension: int) -> None:
     synthetic = tuple(
-        Observation(day=date(2024, 1, 1) + timedelta(days=i), close=100.0 + i)
-        for i in range(370)
+        Observation(day=date(2024, 1, 1) + timedelta(days=i), close=100.0 + i) for i in range(370)
     )
     computed = features(synthetic, len(synthetic) - 1, group=group)
     assert len(FEATURE_LAYOUTS[group]) == len(computed) == dimension
@@ -143,7 +144,10 @@ def test_all_thirteen_horizons_work_with_four_real_feature_layout_sizes() -> Non
     output = _run()
     batch = output["forecast_batch"]
     assert output["feature_group_dimensions"] == {
-        "all": 12, "no_halving": 10, "no_extrema": 8, "momentum_only": 5
+        "all": 12,
+        "no_halving": 10,
+        "no_extrema": 8,
+        "momentum_only": 5,
     }
     assert batch["horizon_count"] == 13
     assert [record["horizon"] for record in batch["forecasts"]] == list(HORIZONS)
@@ -251,8 +255,7 @@ def test_blend_zero_means_persistence_as_in_existing_hybrid_formula() -> None:
         state["blend"] = 0.0
     result = _run(envelope=envelope)
     assert all(
-        row["predicted_direction"] == "flat"
-        for row in result["forecast_batch"]["forecasts"]
+        row["predicted_direction"] == "flat" for row in result["forecast_batch"]["forecasts"]
     )
 
 
