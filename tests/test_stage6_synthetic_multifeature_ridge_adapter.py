@@ -211,7 +211,7 @@ def test_conflicting_feature_group_between_mock_state_and_snapshot_fails() -> No
 def test_nonfinite_or_out_of_bounds_mock_features_rejected(bad: object) -> None:
     rows = _feature_rows()
     rows[0]["values"][0] = bad
-    with pytest.raises(ValueError, match="feature.*coefficient"):
+    with pytest.raises(ValueError, match=r"feature.*coefficient"):
         _run(rows=rows)
 
 
@@ -265,7 +265,7 @@ def test_hybrid_blend_is_bounded_mock_scalar(bad: object) -> None:
         with pytest.raises(ValueError, match="Forbidden nonfinite JSON number"):
             inspect_synthetic_multifeature_bundle(raw, _digest(raw))
     else:
-        with pytest.raises(ValueError, match="blend.*coefficient|blend must"):
+        with pytest.raises(ValueError, match=r"blend.*coefficient|blend must"):
             _run(envelope=envelope)
 
 
