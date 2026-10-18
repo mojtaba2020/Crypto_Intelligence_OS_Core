@@ -6,8 +6,8 @@ not authenticated receipts. No network, model fitting, scoring, or promotion.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
 import re
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 
 HORIZONS = (1, 4, 12, 24)
@@ -206,9 +206,9 @@ def audit_elapsed_lead(
 # Parse GitHub-hosted job-log envelopes, not timestamps printed by the forecast program.
 # This is an evidence *consistency* check, not independent remote attestation.
 _GITHUB_PUSH = re.compile(
-    r"^(?P<when>\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?Z)"
-    r"\\s+(?P<old>[0-9a-f]{7,40})\\.\\.(?P<new>[0-9a-f]{7,40})"
-    r"\\s+HEAD -> main$"
+    r"^(?P<when>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z)"
+    r"\s+(?P<old>[0-9a-f]{7,40})\.\.(?P<new>[0-9a-f]{7,40})"
+    r"\s+HEAD -> main$"
 )
 _SHA40 = re.compile(r"^[0-9a-f]{40}$")
 _HOURLY_PATH = ".github/workflows/btc_hourly_prospective.yml"
@@ -296,6 +296,7 @@ def reconcile_github_push_bundle(
     if (
         not isinstance(changed_paths, (list, tuple))
         or "research/hourly_forecasts.jsonl" not in changed_paths
+        or any(not isinstance(p, str) for p in changed_paths)
         or len(changed_paths) != len(set(changed_paths))
         or not set(changed_paths)
         <= {"research/hourly_forecasts.jsonl", "research/hourly_scores.jsonl"}
