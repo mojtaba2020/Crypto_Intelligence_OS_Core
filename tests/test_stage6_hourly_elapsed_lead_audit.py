@@ -219,10 +219,10 @@ def test_schedule_overflow_rejected():
         audit_elapsed_lead(plan(169), [])
 
 
-def test_fixed_elapsed_mode_blocks_50_minute_nominal_hour_claim():
+def test_minimum_elapsed_mode_blocks_50_minute_nominal_hour_claim():
     row = record(issue_lag=2, publication_lag=2)
-    report = audit_elapsed_lead(plan(1, semantics="fixed_elapsed"), [row])
-    assert report["claim_semantics"] == "fixed_elapsed"
+    report = audit_elapsed_lead(plan(1, semantics="minimum_elapsed"), [row])
+    assert report["claim_semantics"] == "minimum_elapsed"
     assert report["slots"][0]["status"] == "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON"
     assert report["slots"][0]["claimed_elapsed_lead_seconds"] == 3598
     assert report["by_horizon"][0]["short_elapsed_horizon_count"] == 1
@@ -232,24 +232,24 @@ def test_fixed_elapsed_mode_blocks_50_minute_nominal_hour_claim():
     assert report["scientific_authorization"] == "NO_RUN"
 
 
-def test_fixed_elapsed_mode_exact_boundary_and_one_second_short():
+def test_minimum_elapsed_mode_exact_boundary_and_one_second_short():
     exact = audit_elapsed_lead(
-        plan(1, semantics="fixed_elapsed"),
+        plan(1, semantics="minimum_elapsed"),
         [record(issue_lag=0, publication_lag=0)],
     )
     assert exact["slots"][0]["status"] == "CLAIMED_PRE_CLOSE_UNVERIFIED"
     assert exact["slots"][0]["claimed_elapsed_lead_seconds"] == 3600
     one_second = audit_elapsed_lead(
-        plan(1, semantics="fixed_elapsed"),
+        plan(1, semantics="minimum_elapsed"),
         [record(issue_lag=0, publication_lag=1)],
     )
     assert one_second["slots"][0]["status"] == "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON"
     assert one_second["slots"][0]["claimed_elapsed_lead_seconds"] == 3599
 
 
-def test_fixed_elapsed_mode_blocks_all_four_bar_horizons_after_origin_close():
+def test_minimum_elapsed_mode_blocks_all_four_bar_horizons_after_origin_close():
     rows = [record(horizon=h, issue_lag=20, publication_lag=30) for h in HORIZONS]
-    result = audit_elapsed_lead(plan(1, semantics="fixed_elapsed"), rows)
+    result = audit_elapsed_lead(plan(1, semantics="minimum_elapsed"), rows)
     assert result["received_claim_count"] == 4
     assert result["missing_slot_count"] == 0
     assert result["blocked_or_unknown_claim_count"] == 4
@@ -283,9 +283,9 @@ def test_unstated_semantics_rejected_instead_of_defaulting():
         audit_elapsed_lead(p, [])
 
 
-def test_fixed_elapsed_claim_cannot_use_missing_publication_witness():
+def test_minimum_elapsed_claim_cannot_use_missing_publication_witness():
     row = record(issue_lag=0, publication_lag=0)
     row["claimed_github_log_seen_at_utc"] = None
-    result = audit_elapsed_lead(plan(1, semantics="fixed_elapsed"), [row])
+    result = audit_elapsed_lead(plan(1, semantics="minimum_elapsed"), [row])
     assert result["slots"][0]["status"] == "NO_PUBLICATION_WITNESS_CLAIM"
     assert result["scientific_authorization"] == "NO_RUN"
