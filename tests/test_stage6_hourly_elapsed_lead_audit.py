@@ -3,7 +3,10 @@
 from datetime import UTC, datetime
 
 import pytest
-from scripts.stage6_hourly_elapsed_lead_audit import audit_elapsed_lead
+from scripts.stage6_hourly_elapsed_lead_audit import (
+    audit_elapsed_lead,
+    reconcile_github_push_bundle,
+)
 
 START = int(datetime(2026, 10, 16, tzinfo=UTC).timestamp())
 HOUR = 3600
@@ -287,3 +290,139 @@ def test_minimum_elapsed_claim_cannot_use_missing_publication_witness():
     result = audit_elapsed_lead(plan(1, semantics="minimum_elapsed"), [row])
     assert result["slots"][0]["status"] == "NO_PUBLICATION_WITNESS_CLAIM"
     assert result["scientific_authorization"] == "NO_RUN"
+
+
+# These are metadata-only projections of a real GitHub run witnessed on
+# 2026-10-18 (run 39136397235). No prices, outcomes, or model weights.
+PUSH_SHA = "7a5599d716dd5ce79b0d012885e08ba17c17bcd3"
+BASE_SHA = "7570ccfac511145cb9689de5bc57f88597cb5f9e"
+
+
+def github_bundle():
+    run = {
+        "id": 39136397235,
+        "path": ".github/workflows/btc_hourly_prospective.yml",
+        "event": "schedule",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": BASE_SHA,
+        "created_at": "2026-10-18T14:31:44Z",
+        "updated_at": "2026-10-18T14:32:01Z",
+    }
+    job = {
+        "id": 117701666173,
+        "run_id": 39136397235,
+        "name": "hourly",
+        "status": "completed",
+        "conclusion": "success",
+    }
+    commit = {
+        "sha": PUSH_SHA,
+        "parents": [BASE_SHA],
+        "changed_paths": ["research/hourly_forecasts.jsonl", "research/hourly_scores.jsonl"],
+    }
+    log = [
+        "2026-10-18T14:31:58.0993346Z To https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core",
+        "2026-10-18T14:31:58.0994084Z    7570ccf..7a5599d  HEAD -> main",
+    ]
+    origin = datetime(2026, 10, 18, 13, tzinfo=UTC)
+    rows = [
+        {
+            "origin_hour_utc": origin.isoformat(),
+            "issued_at_utc": "2026-10-18T14:31:55.995510+00:00",
+            "target_close_utc": (origin.replace(tzinfo=UTC)).isoformat()
+            if False
+            else datetime.fromtimestamp(
+                int(origin.timestamp()) + (horizon + 1) * HOUR, tz=UTC
+            ).isoformat(),
+            "horizon_hours": horizon,
+            "version": "hourly-hybrid-ridge-v2",
+        }
+        for horizon in HORIZONS
+    ]
+    return run, job, commit, log, rows
+
+
+def test_actual_hosted_push_bundle_projection_is_consistent_but_unattested():
+    bundle = github_bundle()
+    res = reconcile_github_push_bundle(*bundle, claim_semantics="bar_aligned")
+    assert res["status"] == "GITHUB_LOG_COMMIT_BUNDLE_CONSISTENT_UNVERIFIED"
+    assert res["run_id_claim"] == 39136397235
+    assert res["commit_sha_claim"] == PUSH_SHA
+    assert res["github_data_origin_authenticated_by_this_code"] is False
+    assert res["projected_forecast_bytes_cryptographically_confirmed"] is False
+    assert res["independent_first_publication_attested"] is False
+    assert res["scientific_authorization"] == "NO_RUN"
+    assert res["observation"]["received_claim_count"] == 4
+    assert res["observation"]["missing_slot_count"] == 0
+    assert res["observation"]["by_horizon"][0]["claimed_preclose_count"] == 1
+    assert res["observation"]["by_horizon"][0]["min_claimed_elapsed_lead_seconds"] == 1682
+
+
+def test_actual_hosted_push_timing_blocks_four_minimum_elapsed_claims():
+    res = reconcile_github_push_bundle(*github_bundle(), claim_semantics="minimum_elapsed")
+    assert res["observation"]["status"] == "BLOCKED"
+    assert res["observation"]["blocked_or_unknown_claim_count"] == 4
+    assert all(
+        x["status"] == "INSUFFICIENT_CLAIMED_ELAPSED_HORIZON"
+        for x in res["observation"]["slots"]
+    )
+    assert res["scientific_authorization"] == "NO_RUN"
+
+
+@pytest.mark.parametrize(
+    ("index", "field", "bad", "match"),
+    [
+        (0, "event", "workflow_dispatch", "scheduled hourly"),
+        (0, "conclusion", "failure", "scheduled hourly"),
+        (0, "head_sha", "deadbeef", "SHA"),
+        (1, "run_id", 39136397234, "belong"),
+        (1, "conclusion", "failure", "scheduled hourly"),
+        (2, "sha", BASE_SHA, "Push SHA"),
+        (2, "parents", [PUSH_SHA], "Push SHA"),
+        (2, "changed_paths", ["research/hourly_scores.jsonl"], "ledger commit"),
+    ],
+)
+def test_github_bundle_rejects_mismatched_run_job_commit(index, field, bad, match):
+    args = list(github_bundle())
+    args[index][field] = bad
+    with pytest.raises(ValueError, match=match):
+        reconcile_github_push_bundle(*args, claim_semantics="bar_aligned")
+
+
+def test_github_bundle_rejects_fabricated_late_or_duplicate_push_log():
+    run, job, commit, log, rows = github_bundle()
+    with pytest.raises(ValueError, match="one GitHub-hosted"):
+        reconcile_github_push_bundle(
+            run, job, commit, log + [log[-1]], rows, "bar_aligned"
+        )
+    with pytest.raises(ValueError, match="outside"):
+        reconcile_github_push_bundle(
+            run, job, commit,
+            ["2026-10-18T15:01:00.0000000Z    7570ccf..7a5599d  HEAD -> main"],
+            rows, "bar_aligned"
+        )
+    with pytest.raises(ValueError, match="one GitHub-hosted"):
+        reconcile_github_push_bundle(
+            run, job, commit, ["2026-10-18T14:31:58Z fake push output"], rows, "bar_aligned"
+        )
+
+
+def test_github_bundle_rejects_claim_after_actual_published_push():
+    run, job, commit, log, rows = github_bundle()
+    rows[0]["issued_at_utc"] = "2026-10-18T14:31:59+00:00"
+    with pytest.raises(ValueError, match="Late/or"):
+        reconcile_github_push_bundle(run, job, commit, log, rows, "bar_aligned")
+
+
+def test_github_bundle_rejects_prices_extra_rows_and_horizon_conflicts():
+    run, job, commit, log, rows = github_bundle()
+    rows[0]["forecast_usd"] = 1
+    with pytest.raises(ValueError, match="price-free"):
+        reconcile_github_push_bundle(run, job, commit, log, rows, "bar_aligned")
+    _, _, _, _, rows = github_bundle()
+    rows[0]["target_close_utc"] = "2026-10-18T18:00:00+00:00"
+    with pytest.raises(ValueError, match="Target close"):
+        reconcile_github_push_bundle(run, job, commit, log, rows, "bar_aligned")
+    with pytest.raises(ValueError, match="Four metadata"):
+        reconcile_github_push_bundle(run, job, commit, log, rows[:3], "bar_aligned")
