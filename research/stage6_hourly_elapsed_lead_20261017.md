@@ -21,7 +21,10 @@ already identified pre-fit timestamp flaw addressed in unmerged PR #89.
 `audit_elapsed_lead(plan, records)` in
 `scripts/stage6_hourly_elapsed_lead_audit.py` accepts only an exact,
 price-free, integer-UTC-seconds schema for one **fixed** 1–168 hour schedule
-and the fixed `(1, 4, 12, 24)` bar-horizon family. Each record identifies a
+and the fixed `(1, 4, 12, 24)` bar-horizon family. The caller must explicitly
+provide `plan.claim_semantics = "bar_aligned"` or `"fixed_elapsed"`; an omitted or
+unknown choice **fails closed**. Never select claim semantics retrospectively
+based on market outcomes. Each record identifies a
 claimed scheduled GitHub run, completed-bar origin, horizon, local issue
 instant, claimed GitHub log observation, and target close. It:
 
@@ -35,6 +38,16 @@ instant, claimed GitHub log observation, and target close. It:
   not a trusted proof of common issuance, only a negative consistency check.
 - Retains invalid, immature or late claims **as blocked/unknown categories**,
   never silently discards them from scheduled denominators.
+- For explicitly predeclared `fixed_elapsed` claims, checks `target_close -
+  claimed_github_log_seen_at_utc >= horizon_hours * 3600`. Even a one-second
+  shortfall produces `INSUFFICIENT_CLAIMED_ELAPSED_HORIZON`, top-level `BLOCKED`,
+  and a separate `short_elapsed_horizon_count`; the *actual claimed lead* is
+  retained diagnostically but not counted among full-horizon claims. This
+  detects the P1 full-elapsed-horizon labeling flaw; it cannot repair the
+  current live producer's target alignment or prove a caller-supplied timestamp.
+- For `bar_aligned` claims, retains observed variable elapsed leads including
+  near-expiry pre-close claims, but **never** calls them a full elapsed horizon
+  or issues scientific PASS. The two definitions are distinct estimands.
 - Sets top-level `status=BLOCKED` if **any** scheduled slot is missing or
   any claim is late, unknown or inconsistent. Even if all claims are present
   and internally ordered, status stays `UNVERIFIED_ELAPSED_LEAD_METADATA_ONLY`,
@@ -66,5 +79,7 @@ using price or direction outcomes. Existing A1–A6 and external custody
 requirements in Issue #81 remain unverified.
 
 Tests: `python -m pytest -q tests/test_stage6_hourly_elapsed_lead_audit.py`.
+Both modes remain `NO_RUN` and are not admissible for statistical confirmation
+without independently authenticated publication and preregistered provenance.
 This isolated helper and its tests are synthetic and do not trigger the
 `btc_hourly_live_smoke.yml` path filter or create new schedules.
