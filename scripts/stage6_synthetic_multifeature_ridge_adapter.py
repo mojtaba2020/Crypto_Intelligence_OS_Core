@@ -56,10 +56,19 @@ FEATURE_LAYOUTS = {
     "momentum_only": MOMENTUM,
 }
 ENVELOPE_KEYS = frozenset({"format", "classification", "real_data_authorized", "model_states"})
-STATE_KEYS = frozenset({
-    "feature_group", "feature_names", "weights", "means", "scales",
-    "blend", "model_code_sha256", "last_training_target_utc", "model_created_at_utc",
-})
+STATE_KEYS = frozenset(
+    {
+        "feature_group",
+        "feature_names",
+        "weights",
+        "means",
+        "scales",
+        "blend",
+        "model_code_sha256",
+        "last_training_target_utc",
+        "model_created_at_utc",
+    }
+)
 ROW_KEYS = frozenset({"horizon", "feature_group", "feature_names", "values", "observed_at_utc"})
 
 
@@ -79,9 +88,12 @@ def _mock_state(state: object) -> dict[str, object]:
     names = _names(group, state["feature_names"])
     weights, means, scales = state["weights"], state["means"], state["scales"]
     if (
-        type(weights) is not list or len(weights) != len(names) + 1
-        or type(means) is not list or len(means) != len(names)
-        or type(scales) is not list or len(scales) != len(names)
+        type(weights) is not list
+        or len(weights) != len(names) + 1
+        or type(means) is not list
+        or len(means) != len(names)
+        or type(scales) is not list
+        or len(scales) != len(names)
     ):
         raise ValueError("Mock hybrid weight, mean and scale dimensions disagree")
     weight_values = [_finite_coefficient(value, "weight") for value in weights]
@@ -131,7 +143,8 @@ def inspect_synthetic_multifeature_bundle(
     if type(document) is not dict or set(document) != ENVELOPE_KEYS:
         raise ValueError("Unknown fields in mock multi-feature envelope")
     if (
-        type(document["format"]) is not str or document["format"] != FORMAT
+        type(document["format"]) is not str
+        or document["format"] != FORMAT
         or document["classification"] != "MOCK_MULTIFEATURE_ONLY"
         or type(document["classification"]) is not str
         or document["real_data_authorized"] is not False
@@ -175,8 +188,12 @@ def _mock_row(row: object, window: dict[str, object]) -> tuple[float, ...]:
     return tuple(_finite_coefficient(value, "synthetic feature") for value in values)
 
 
-def _ridge_signal(weights: tuple[float, ...], means: tuple[float, ...],
-                  scales: tuple[float, ...], values: tuple[float, ...]) -> float:
+def _ridge_signal(
+    weights: tuple[float, ...],
+    means: tuple[float, ...],
+    scales: tuple[float, ...],
+    values: tuple[float, ...],
+) -> float:
     """Compare existing arithmetic against stable summation; reject lost terms."""
     terms: list[float] = []
     for index, value in enumerate(values):
@@ -257,32 +274,32 @@ def bridge_synthetic_multifeature_bundle(
         if mixed != 0.0 and point == origin_price:
             raise ValueError("Mock multi-feature forecast lost direction")
         lo80, hi80, lo95, hi95 = _illustrative_intervals(point)
-        outputs.append({
-            "horizon": horizon,
-            "origin_cutoff_utc": window["origin_cutoff_utc"],
-            "forecast_issued_at_utc": window["forecast_issued_at_utc"],
-            "target_end_utc": window["target_end_utc"],
-            "source_market_id": window["source_market_id"],
-            "origin_price_usd": origin_price,
-            "predicted_target_price_usd": point,
-            "predicted_direction": (
-                "up" if point > origin_price else "down" if point < origin_price else "flat"
-            ),
-            "interval_80_low_usd": lo80,
-            "interval_80_high_usd": hi80,
-            "interval_95_low_usd": lo95,
-            "interval_95_high_usd": hi95,
-            "model_code_sha256": state["model_code_sha256"],
-            "feature_code_sha256": window["feature_code_sha256"],
-            "dataset_manifest_sha256": window["dataset_manifest_sha256"],
-        })
+        outputs.append(
+            {
+                "horizon": horizon,
+                "origin_cutoff_utc": window["origin_cutoff_utc"],
+                "forecast_issued_at_utc": window["forecast_issued_at_utc"],
+                "target_end_utc": window["target_end_utc"],
+                "source_market_id": window["source_market_id"],
+                "origin_price_usd": origin_price,
+                "predicted_target_price_usd": point,
+                "predicted_direction": (
+                    "up" if point > origin_price else "down" if point < origin_price else "flat"
+                ),
+                "interval_80_low_usd": lo80,
+                "interval_80_high_usd": hi80,
+                "interval_95_low_usd": lo95,
+                "interval_95_high_usd": hi95,
+                "model_code_sha256": state["model_code_sha256"],
+                "feature_code_sha256": window["feature_code_sha256"],
+                "dataset_manifest_sha256": window["dataset_manifest_sha256"],
+            }
+        )
     return {
         "status": "SYNTHETIC_MULTIFEATURE_HYBRID_COMPATIBILITY_ONLY",
         "forecast_batch": validate_full_13_horizon_batch(outputs),
         "local_bundle_sha256": bundle["local_bundle_sha256"],
-        "feature_group_dimensions": {
-            group: len(names) for group, names in FEATURE_LAYOUTS.items()
-        },
+        "feature_group_dimensions": {group: len(names) for group, names in FEATURE_LAYOUTS.items()},
         "existing_daily_hybrid_multihorizon_training_supported": False,
         "actual_model_artifacts_loaded": False,
         "trained_model_authenticated": False,
