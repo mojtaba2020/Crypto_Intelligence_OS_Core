@@ -7,6 +7,8 @@ not authenticated receipts. No network, model fitting, scoring, or promotion.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+import re
+from datetime import UTC, datetime
 
 HORIZONS = (1, 4, 12, 24)
 CLAIM_SEMANTICS = ("bar_aligned", "minimum_elapsed")
@@ -198,4 +200,157 @@ def audit_elapsed_lead(
         "stage7_freeze_authorized": False,
         "by_horizon": horizon_summaries,
         "slots": rows,
+    }
+
+
+# Parse GitHub-hosted job-log envelopes, not timestamps printed by the forecast program.
+# This is an evidence *consistency* check, not independent remote attestation.
+_GITHUB_PUSH = re.compile(
+    r"^(?P<when>\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?Z)"
+    r"\\s+(?P<old>[0-9a-f]{7,40})\\.\\.(?P<new>[0-9a-f]{7,40})"
+    r"\\s+HEAD -> main$"
+)
+_SHA40 = re.compile(r"^[0-9a-f]{40}$")
+_HOURLY_PATH = ".github/workflows/btc_hourly_prospective.yml"
+_ROW_META = frozenset(
+    {"origin_hour_utc", "issued_at_utc", "target_close_utc", "horizon_hours", "version"}
+)
+
+
+def _parse_utc(value: object, field: str) -> datetime:
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be UTC text")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"{field} invalid timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None or parsed.utcoffset().total_seconds():
+        raise ValueError(f"{field} must be UTC")
+    return parsed.astimezone(UTC)
+
+
+def _sha(value: object) -> str:
+    if not isinstance(value, str) or _SHA40.fullmatch(value) is None:
+        raise ValueError("Exact full commit SHA required")
+    return value
+
+
+def reconcile_github_push_bundle(
+    run: Mapping[str, object],
+    job: Mapping[str, object],
+    commit: Mapping[str, object],
+    log_lines: Sequence[str],
+    rows: Sequence[Mapping[str, object]],
+    claim_semantics: str,
+) -> dict[str, object]:
+    """Check a projected GitHub-run/commit/push bundle; never certify its origin.
+
+    Inputs MUST be fetched and source-authenticated separately by an independent
+    reviewer. This code has no network, no data-provider access and no credentials.
+    The rows are a *price-free projection*, not proof that those bytes occur in
+    the pushed commit; matching their SHA needs a separately trusted reviewer.
+    """
+    if not all(isinstance(x, Mapping) for x in (run, job, commit)):
+        raise ValueError("Run/job/commit objects required")
+    if (
+        run.get("path") != _HOURLY_PATH
+        or run.get("event") != "schedule"
+        or run.get("status") != "completed"
+        or run.get("conclusion") != "success"
+        or job.get("name") != "hourly"
+        or job.get("status") != "completed"
+        or job.get("conclusion") != "success"
+    ):
+        raise ValueError("Successful scheduled hourly run and job required")
+    run_id = _second(run.get("id"), "run ID")
+    _second(job.get("id"), "job ID")
+    if job.get("run_id") != run_id:
+        raise ValueError("Job does not belong to the claimed run")
+    if not isinstance(log_lines, Sequence) or isinstance(log_lines, (str, bytes)):
+        raise ValueError("Bounded GitHub job log lines required")
+    if len(log_lines) > 2_000 or sum(len(line) for line in log_lines) > 1_000_000:
+        raise ValueError("GitHub log too large")
+    if any(not isinstance(line, str) for line in log_lines):
+        raise ValueError("Invalid log line")
+    push_lines = [match for line in log_lines if (match := _GITHUB_PUSH.fullmatch(line))]
+    if len(push_lines) != 1:
+        raise ValueError("Exactly one GitHub-hosted push-line claim required")
+    push = push_lines[0]
+    push_at = _parse_utc(push.group("when"), "GitHub push log")
+    run_started = _parse_utc(run.get("created_at"), "GitHub run creation")
+    run_updated = _parse_utc(run.get("updated_at"), "GitHub run update")
+    if not run_started <= push_at <= run_updated:
+        raise ValueError("GitHub push event lies outside the recorded run")
+    commit_sha = _sha(commit.get("sha"))
+    parent = _sha(run.get("head_sha"))
+    parents = commit.get("parents")
+    if (
+        not isinstance(parents, (list, tuple))
+        or len(parents) != 1
+        or parents[0] != parent
+        or not parent.startswith(push.group("old"))
+        or not commit_sha.startswith(push.group("new"))
+    ):
+        raise ValueError("Push SHA, checkout head and commit parent conflict")
+    changed_paths = commit.get("changed_paths")
+    if (
+        not isinstance(changed_paths, (list, tuple))
+        or "research/hourly_forecasts.jsonl" not in changed_paths
+        or len(changed_paths) != len(set(changed_paths))
+        or not set(changed_paths)
+        <= {"research/hourly_forecasts.jsonl", "research/hourly_scores.jsonl"}
+    ):
+        raise ValueError("Unexpected ledger commit paths")
+    if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes)) or len(rows) != 4:
+        raise ValueError("Four metadata-only forecast rows required")
+    projected: list[dict[str, object]] = []
+    origin_time: datetime | None = None
+    claimed_issued: datetime | None = None
+    for row in rows:
+        if not isinstance(row, Mapping) or set(row) != _ROW_META:
+            raise ValueError("Exact price-free ledger projection required")
+        origin = _parse_utc(row["origin_hour_utc"], "Origin")
+        issued = _parse_utc(row["issued_at_utc"], "Issued")
+        close = _parse_utc(row["target_close_utc"], "Target close")
+        if issued > push_at or origin.minute or origin.second or origin.microsecond:
+            raise ValueError("Late/or malformed origin or issuance versus GitHub push")
+        if row["version"] != "hourly-hybrid-ridge-v2":
+            raise ValueError("Unknown existing deployed model version")
+        if origin_time is None:
+            origin_time = origin
+            claimed_issued = issued
+        if origin != origin_time or issued != claimed_issued:
+            raise ValueError("Contradictory four-horizon origin or issuance")
+        projected.append(
+            {
+                "github_run_id": run_id,
+                "origin_hour_utc": int(origin.timestamp()),
+                "horizon_hours": row["horizon_hours"],
+                "claimed_issued_at_utc": int(issued.timestamp()),
+                "claimed_github_log_seen_at_utc": int(push_at.timestamp()),
+                "target_close_utc": int(close.timestamp()),
+            }
+        )
+    assert origin_time is not None
+    observation = audit_elapsed_lead(
+        {
+            "first_origin_utc": int(origin_time.timestamp()),
+            "stop_origin_exclusive_utc": int(origin_time.timestamp()) + HOUR,
+            "horizons_hours": HORIZONS,
+            "claim_semantics": claim_semantics,
+        },
+        projected,
+    )
+    if observation["missing_slot_count"]:
+        raise ValueError("Incomplete four-horizon committed batch")
+    return {
+        "status": "GITHUB_LOG_COMMIT_BUNDLE_CONSISTENT_UNVERIFIED",
+        "run_id_claim": run_id,
+        "commit_sha_claim": commit_sha,
+        "push_at_utc_claim": push_at.isoformat(),
+        "github_data_origin_authenticated_by_this_code": False,
+        "projected_forecast_bytes_cryptographically_confirmed": False,
+        "independent_first_publication_attested": False,
+        "scientific_authorization": "NO_RUN",
+        "observation": observation,
     }
