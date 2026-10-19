@@ -151,8 +151,8 @@ This isolated helper and its tests are synthetic and do not trigger the
 
 ## Append-only Git blob binding — independent source still required
 
-The offline \`bind_supplied_git_ledger_append(parent_blob, child_blob,
-parent_git_blob_sha, child_git_blob_sha, expected_projection)\` helper receives
+The offline `bind_supplied_git_ledger_append(parent_blob, child_blob,
+parent_git_blob_sha, child_git_blob_sha, expected_projection)` helper receives
 **exact bytes** of two authorized public forecast-only Git blobs. It checks the
 canonical Git SHA-1 object identifiers, returns an additional SHA-256 digest,
 requires that the child is a byte-for-byte append of the complete parent, and
@@ -180,10 +180,10 @@ not an external immutable first-publication witness, and it cannot close
 A1–A6, make Stage-6 GO, or certify profitability.
 
 A real manual independent GitHub-API case (no numeric prices displayed):
-commit \`7a5599d716dd5ce79b0d012885e08ba17c17bcd3\` has child forecast
-blob \`f795b71d0eb5ad039d77e4090006cf27562228c3\`; parent
-commit \`7570ccfac511145cb9689de5bc57f88597cb5f9e\` has forecast
-blob \`24545ce981bd6a30e542c8856a98cb8dbef0f882\`. The child bytes
+commit `7a5599d716dd5ce79b0d012885e08ba17c17bcd3` has child forecast
+blob `f795b71d0eb5ad039d77e4090006cf27562228c3`; parent
+commit `7570ccfac511145cb9689de5bc57f88597cb5f9e` has forecast
+blob `24545ce981bd6a30e542c8856a98cb8dbef0f882`. The child bytes
 begin with the exact complete parent bytes, followed by exactly four JSONL
 forecast rows; the Git commit's forecast diff additions are identical to
 those appended lines. This case is *observational evidence*, not proof of

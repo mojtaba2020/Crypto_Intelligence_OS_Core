@@ -95,7 +95,7 @@ def audit_elapsed_lead(
         else:
             run_issuance[run_id] = issued
         seen_raw = record["claimed_publication_upper_bound_utc"]
-        seen = None if seen_raw is None else _second(seen_raw, "claimed_publication_upper_bound_utc")
+        seen = None if seen_raw is None else _second(seen_raw, "publication upper bound")
         close = _second(record["target_close_utc"], "target_close_utc")
         if close != origin + (horizon + 1) * HOUR:
             raise ValueError("Target close conflicts with nominal completed-bar convention")
