@@ -29,7 +29,7 @@ def record(hour=0, horizon=1, issue_lag=30, publication_lag=30):
         "origin_hour_utc": origin,
         "horizon_hours": horizon,
         "claimed_issued_at_utc": origin + HOUR + issue_lag,
-        "claimed_github_log_seen_at_utc": origin + HOUR + publication_lag,
+        "claimed_publication_upper_bound_utc": origin + HOUR + publication_lag,
         "target_close_utc": origin + (horizon + 1) * HOUR,
     }
 
@@ -81,7 +81,7 @@ def test_bad_or_late_claims_are_retained_but_blocked(issue_lag, pub_lag, status)
 
 def test_no_claimed_publication_time_is_unknown_not_valid():
     row = record()
-    row["claimed_github_log_seen_at_utc"] = None
+    row["claimed_publication_upper_bound_utc"] = None
     report = audit_elapsed_lead(plan(1), [row])
     assert report["slots"][0]["status"] == "NO_PUBLICATION_WITNESS_CLAIM"
     assert report["by_horizon"][0]["claimed_preclose_count"] == 0
@@ -153,7 +153,7 @@ def test_partial_claims_cannot_make_packet_appear_unblocked():
 
 def test_late_claim_blocks_even_when_all_four_horizons_are_present():
     rows = [record(horizon=h) for h in HORIZONS]
-    rows[0]["claimed_github_log_seen_at_utc"] = START + 2 * HOUR
+    rows[0]["claimed_publication_upper_bound_utc"] = START + 2 * HOUR
     report = audit_elapsed_lead(plan(1), rows)
     assert report["status"] == "BLOCKED"
     assert report["missing_slot_count"] == 0
@@ -286,7 +286,7 @@ def test_unstated_semantics_rejected_instead_of_defaulting():
 
 def test_minimum_elapsed_claim_cannot_use_missing_publication_witness():
     row = record(issue_lag=0, publication_lag=0)
-    row["claimed_github_log_seen_at_utc"] = None
+    row["claimed_publication_upper_bound_utc"] = None
     result = audit_elapsed_lead(plan(1, semantics="minimum_elapsed"), [row])
     assert result["slots"][0]["status"] == "NO_PUBLICATION_WITNESS_CLAIM"
     assert result["scientific_authorization"] == "NO_RUN"
@@ -352,7 +352,9 @@ def test_actual_hosted_push_bundle_projection_is_consistent_but_unattested():
     assert res["observation"]["received_claim_count"] == 4
     assert res["observation"]["missing_slot_count"] == 0
     assert res["observation"]["by_horizon"][0]["claimed_preclose_count"] == 1
-    assert res["observation"]["by_horizon"][0]["min_claimed_elapsed_lead_seconds"] == 1682
+    assert res["observation"]["by_horizon"][0]["min_claimed_elapsed_lead_seconds"] == 1679
+    assert res["conservative_publication_upper_bound_utc_claim"] == "2026-10-18T14:32:01+00:00"
+    assert res["publication_bound_source"] == "github_completed_run_updated_at"
 
 
 def test_actual_hosted_push_timing_blocks_four_minimum_elapsed_claims():
@@ -437,3 +439,30 @@ def test_github_bundle_late_preclose_witness_is_blocked_at_top_level():
     assert res["observation"]["blocked_or_unknown_claim_count"] == 1
     assert res["observation"]["slots"][0]["status"] == "PUBLICATION_CLAIM_AT_OR_AFTER_MATURITY"
     assert res["scientific_authorization"] == "NO_RUN"
+
+
+
+def test_early_push_but_late_completed_run_does_not_qualify_the_batch():
+    run, job, commit, log, rows = github_bundle()
+    # Push was before the 15:00 target, but the completed GitHub run was not.
+    run["updated_at"] = "2026-10-18T15:02:00Z"
+    result = reconcile_github_push_bundle(run, job, commit, log, rows, "bar_aligned")
+    assert result["push_at_utc_claim"] == "2026-10-18T14:31:58.099408+00:00"
+    assert result["conservative_publication_upper_bound_utc_claim"] == (
+        "2026-10-18T15:02:00+00:00"
+    )
+    assert result["status"] == "GITHUB_LOG_COMMIT_BUNDLE_BLOCKED"
+    assert result["observation"]["blocked_or_unknown_claim_count"] == 1
+    assert result["observation"]["slots"][0]["status"] == "PUBLICATION_CLAIM_AT_OR_AFTER_MATURITY"
+    assert result["scientific_authorization"] == "NO_RUN"
+
+
+def test_missing_or_early_run_completion_metadata_fails_closed():
+    run, job, commit, log, rows = github_bundle()
+    del run["updated_at"]
+    with pytest.raises(ValueError, match="UTC text"):
+        reconcile_github_push_bundle(run, job, commit, log, rows, "bar_aligned")
+    run, job, commit, log, rows = github_bundle()
+    run["updated_at"] = "2026-10-18T14:31:57Z"
+    with pytest.raises(ValueError, match="outside"):
+        reconcile_github_push_bundle(run, job, commit, log, rows, "bar_aligned")

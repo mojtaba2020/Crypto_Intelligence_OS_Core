@@ -39,7 +39,7 @@ instant, claimed GitHub log observation, and target close. It:
 - Retains invalid, immature or late claims **as blocked/unknown categories**,
   never silently discards them from scheduled denominators.
 - For explicitly predeclared `minimum_elapsed` claims, checks `target_close -
-  claimed_github_log_seen_at_utc >= horizon_hours * 3600`. Even a one-second
+  claimed_publication_upper_bound_utc >= horizon_hours * 3600`. Even a one-second
   shortfall produces `INSUFFICIENT_CLAIMED_ELAPSED_HORIZON`, top-level `BLOCKED`,
   and a separate `short_elapsed_horizon_count`; the *actual claimed lead* is
   retained diagnostically but not counted among full-horizon claims. This
@@ -52,7 +52,7 @@ instant, claimed GitHub log observation, and target close. It:
   any claim is late, unknown or inconsistent. Even if all claims are present
   and internally ordered, status stays `UNVERIFIED_ELAPSED_LEAD_METADATA_ONLY`,
   never `PASS`; neither state authorizes scientific runs.
-- Computes `target_close - claimed_github_log_seen_at_utc` **only** for
+- Computes `target_close - claimed_publication_upper_bound_utc` **only** for
   internally ordered pre-close claims; reports each claimed elapsed lead in
   seconds and min/max by nominal horizon. It never selects a winner, estimates
   performance or retrospectively chooses a favorable safety-margin threshold.
@@ -83,9 +83,13 @@ A **real** price-blind regression fixture is based on public run
 job `117701666173`, pushed commit
 [`7a5599d`](https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/commit/7a5599d716dd5ce79b0d012885e08ba17c17bcd3),
 and the GitHub-hosted push-line timestamp `2026-10-18T14:31:58.0994084Z`.
-The 1h target closed 15:00 UTC, so the observed push-log-to-target lead was
-approximately **28m 01.90s**, not 60 minutes. The audit's integer-second
-metadata result is **1682 seconds** (rounded at second resolution).
+The 1h target closed 15:00 UTC. The push-log-to-target lead was
+approximately **28m 01.90s**, not 60 minutes. However, because the successful
+GitHub run's own server-provided `updated_at` was **14:32:01 UTC**, the
+reconciler now conservatively uses the **later completion bound**, yielding
+**1679 seconds (27m 59s)** of *claimed* elapsed lead. This protects against a
+push message before maturity followed by a run completing after maturity; it
+can reject otherwise timely posts but must never create false eligible posts.
 `minimum_elapsed` correctly blocks the four nominal 1/4/12/24h full-lead
 claims at that publication time; `bar_aligned` retains actual elapsed
 durations but makes **no full-horizon representation**.
@@ -96,7 +100,12 @@ reviewer must authenticate that each was separately fetched from GitHub's
 actual API/log endpoint and that the price-free projection truly matches bytes
 of the referenced append commit. The function does *not* authenticate that
 projection, prove earliest public GitHub API visibility, provide a signed
-immutable timestamp or approve source as-known-at vintage. It returns explicit
+immutable timestamp or approve source as-known-at vintage. The input field
+`claimed_publication_upper_bound_utc` is unverified when supplied by a caller;
+for GitHub-bundle reconciliation it is populated from the *completed* run's
+`updated_at` rather than the log push instant. The latter remains diagnostic.
+Even this conservative bound needs the run/commit/ledger identity independently
+matched and externally witnessed before any scored prospective eligibility. It returns explicit
 `False` authentication and first-publication-attestation flags and
 `NO_RUN`, never GO. Git author/committer timestamps are not substitutes for
 server evidence.

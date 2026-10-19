@@ -24,7 +24,7 @@ RECORD_FIELDS = frozenset(
         "origin_hour_utc",
         "horizon_hours",
         "claimed_issued_at_utc",
-        "claimed_github_log_seen_at_utc",
+        "claimed_publication_upper_bound_utc",
         "target_close_utc",
     }
 )
@@ -92,8 +92,8 @@ def audit_elapsed_lead(
             inconsistent_origins.add(origin)
         else:
             run_issuance[run_id] = issued
-        seen_raw = record["claimed_github_log_seen_at_utc"]
-        seen = None if seen_raw is None else _second(seen_raw, "claimed_github_log_seen_at_utc")
+        seen_raw = record["claimed_publication_upper_bound_utc"]
+        seen = None if seen_raw is None else _second(seen_raw, "claimed_publication_upper_bound_utc")
         close = _second(record["target_close_utc"], "target_close_utc")
         if close != origin + (horizon + 1) * HOUR:
             raise ValueError("Target close conflicts with nominal completed-bar convention")
@@ -120,7 +120,7 @@ def audit_elapsed_lead(
             "github_run_id_claim": run_id,
             "status": status,
             "claimed_issued_at_utc": issued,
-            "claimed_github_log_seen_at_utc": seen,
+            "claimed_publication_upper_bound_utc": seen,
             "target_close_utc": close,
             "claimed_elapsed_lead_seconds": close - seen if status in LEAD_STATUSES else None,
         }
@@ -255,6 +255,9 @@ def reconcile_github_push_bundle(
     reviewer. This code has no network, no data-provider access and no credentials.
     The rows are a *price-free projection*, not proof that those bytes occur in
     the pushed commit; matching their SHA needs a separately trusted reviewer.
+    For time eligibility, this function uses the completed GitHub run update
+    timestamp as a *conservative* claimed publication upper bound, not the
+    earlier log push timestamp. Both inputs still require external authentication.
     """
     if not all(isinstance(x, Mapping) for x in (run, job, commit)):
         raise ValueError("Run/job/commit objects required")
@@ -334,7 +337,10 @@ def reconcile_github_push_bundle(
                 "origin_hour_utc": int(origin.timestamp()),
                 "horizon_hours": row["horizon_hours"],
                 "claimed_issued_at_utc": int(issued.timestamp()),
-                "claimed_github_log_seen_at_utc": int(push_at.timestamp()),
+                # A successful completed run is a conservative LATER upper bound
+                # than its push-log event. Never qualify a forecast on the
+                # earlier log clock if the job/run finishes after maturity.
+                "claimed_publication_upper_bound_utc": int(run_updated.timestamp()),
                 "target_close_utc": int(close.timestamp()),
             }
         )
@@ -359,6 +365,8 @@ def reconcile_github_push_bundle(
         "run_id_claim": run_id,
         "commit_sha_claim": commit_sha,
         "push_at_utc_claim": push_at.isoformat(),
+        "conservative_publication_upper_bound_utc_claim": run_updated.isoformat(),
+        "publication_bound_source": "github_completed_run_updated_at",
         "github_data_origin_authenticated_by_this_code": False,
         "projected_forecast_bytes_cryptographically_confirmed": False,
         "independent_first_publication_attested": False,
