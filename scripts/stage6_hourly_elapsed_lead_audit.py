@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from bisect import bisect_left
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 
@@ -577,6 +578,7 @@ def _tree_leaf_identifiers(
     ):
         raise ValueError("Complete bounded Git tree entries required")
     all_paths: set[str] = set()
+    directory_paths: list[str] = []
     leaves: dict[str, tuple[str, str, str]] = {}
     for entry in entries:
         if not isinstance(entry, Mapping):
@@ -597,8 +599,16 @@ def _tree_leaf_identifiers(
         )
         if not canonical_git_mode:
             raise ValueError("Noncanonical Git tree entry type/mode")
-        if kind != "tree":
+        if kind == "tree":
+            directory_paths.append(path)
+        else:
             leaves[path] = (kind, mode, sha)
+    sorted_leaves = sorted(leaves)
+    for path in directory_paths:
+        prefix = path + "/"
+        position = bisect_left(sorted_leaves, prefix)
+        if position == len(sorted_leaves) or not sorted_leaves[position].startswith(prefix):
+            raise ValueError("Leafless Git tree directory cannot be ignored")
     forecast = leaves.get(_FORECAST_LEDGER_GIT_PATH)
     if forecast is None:
         raise ValueError("Forecast ledger leaf missing or duplicated in Git tree")

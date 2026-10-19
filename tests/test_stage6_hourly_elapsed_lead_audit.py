@@ -913,3 +913,19 @@ def test_supplied_git_tree_chain_rejects_two_parents_even_as_tuple():
     args[1]["parents"] = (args[0]["sha"], "f" * 40)
     with pytest.raises(ValueError, match="exactly the supplied parent"):
         bind_supplied_git_commit_tree_chain(*args)
+
+
+@pytest.mark.parametrize("directories", [("src/empty",), ("src/empty", "src/empty/nested")])
+def test_git_tree_binder_rejects_unreported_leafless_directory_structure(directories):
+    args = list(_git_commit_tree_fixture())
+    for path in directories:
+        args[3]["entries"].append(
+            {
+                "path": path,
+                "mode": "040000",
+                "type": "tree",
+                "sha": "e" * 40,
+            }
+        )
+    with pytest.raises(ValueError, match="Leafless Git tree directory"):
+        bind_supplied_git_commit_tree_chain(*args)
