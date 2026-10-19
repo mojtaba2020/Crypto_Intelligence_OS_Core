@@ -94,6 +94,17 @@ can reject otherwise timely posts but must never create false eligible posts.
 claims at that publication time; `bar_aligned` retains actual elapsed
 durations but makes **no full-horizon representation**.
 
+**Trust boundary: the helper is NOT an external verifier.** The returned
+primary status is deliberately `GITHUB_RUN_PUSH_PROJECTION_ONLY_UNVERIFIED`
+for internally ordered inputs, or `GITHUB_RUN_PUSH_PROJECTION_BLOCKED`
+when temporal/coverage assertions fail. Neither status means the supplied
+four forecast rows came from the claimed Git commit. In particular, a caller
+can shift all four `issued_at_utc` projections consistently without
+changing the commit SHA, and this metadata-only function cannot detect it.
+Do not upgrade the status to content-bound unless an independent reviewer
+matches exact committed forecast bytes with an authenticated Git blob/tree
+and a separately witnessed server publication time.
+
 **Trust boundary: the helper is NOT an external verifier.** The objects and
 log string supplied to this function can be forged by its caller. An independent
 reviewer must authenticate that each was separately fetched from GitHub's

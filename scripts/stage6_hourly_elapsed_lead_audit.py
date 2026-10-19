@@ -357,10 +357,12 @@ def reconcile_github_push_bundle(
     if observation["missing_slot_count"]:
         raise ValueError("Incomplete four-horizon committed batch")
     return {
+        # Only run/push metadata is cross-checked. The projected forecast rows
+        # are NOT cryptographically bound to the claimed Git commit bytes.
         "status": (
-            "GITHUB_LOG_COMMIT_BUNDLE_BLOCKED"
+            "GITHUB_RUN_PUSH_PROJECTION_BLOCKED"
             if observation["status"] == "BLOCKED"
-            else "GITHUB_LOG_COMMIT_BUNDLE_CONSISTENT_UNVERIFIED"
+            else "GITHUB_RUN_PUSH_PROJECTION_ONLY_UNVERIFIED"
         ),
         "run_id_claim": run_id,
         "commit_sha_claim": commit_sha,

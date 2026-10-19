@@ -342,7 +342,7 @@ def github_bundle():
 def test_actual_hosted_push_bundle_projection_is_consistent_but_unattested():
     bundle = github_bundle()
     res = reconcile_github_push_bundle(*bundle, claim_semantics="bar_aligned")
-    assert res["status"] == "GITHUB_LOG_COMMIT_BUNDLE_CONSISTENT_UNVERIFIED"
+    assert res["status"] == "GITHUB_RUN_PUSH_PROJECTION_ONLY_UNVERIFIED"
     assert res["run_id_claim"] == 39136397235
     assert res["commit_sha_claim"] == PUSH_SHA
     assert res["github_data_origin_authenticated_by_this_code"] is False
@@ -359,7 +359,7 @@ def test_actual_hosted_push_bundle_projection_is_consistent_but_unattested():
 
 def test_actual_hosted_push_timing_blocks_four_minimum_elapsed_claims():
     res = reconcile_github_push_bundle(*github_bundle(), claim_semantics="minimum_elapsed")
-    assert res["status"] == "GITHUB_LOG_COMMIT_BUNDLE_BLOCKED"
+    assert res["status"] == "GITHUB_RUN_PUSH_PROJECTION_BLOCKED"
     assert res["observation"]["status"] == "BLOCKED"
     assert res["observation"]["blocked_or_unknown_claim_count"] == 4
     assert all(
@@ -435,7 +435,7 @@ def test_github_bundle_late_preclose_witness_is_blocked_at_top_level():
     run["updated_at"] = "2026-10-18T15:02:00Z"
     log[-1] = "2026-10-18T15:01:00Z    7570ccf..7a5599d  HEAD -> main"
     res = reconcile_github_push_bundle(run, job, commit, log, rows, "bar_aligned")
-    assert res["status"] == "GITHUB_LOG_COMMIT_BUNDLE_BLOCKED"
+    assert res["status"] == "GITHUB_RUN_PUSH_PROJECTION_BLOCKED"
     assert res["observation"]["blocked_or_unknown_claim_count"] == 1
     assert res["observation"]["slots"][0]["status"] == "PUBLICATION_CLAIM_AT_OR_AFTER_MATURITY"
     assert res["scientific_authorization"] == "NO_RUN"
@@ -451,7 +451,7 @@ def test_early_push_but_late_completed_run_does_not_qualify_the_batch():
     assert result["conservative_publication_upper_bound_utc_claim"] == (
         "2026-10-18T15:02:00+00:00"
     )
-    assert result["status"] == "GITHUB_LOG_COMMIT_BUNDLE_BLOCKED"
+    assert result["status"] == "GITHUB_RUN_PUSH_PROJECTION_BLOCKED"
     assert result["observation"]["blocked_or_unknown_claim_count"] == 1
     assert result["observation"]["slots"][0]["status"] == "PUBLICATION_CLAIM_AT_OR_AFTER_MATURITY"
     assert result["scientific_authorization"] == "NO_RUN"
@@ -466,3 +466,17 @@ def test_missing_or_early_run_completion_metadata_fails_closed():
     run["updated_at"] = "2026-10-18T14:31:57Z"
     with pytest.raises(ValueError, match="outside"):
         reconcile_github_push_bundle(run, job, commit, log, rows, "bar_aligned")
+
+
+def test_unbound_projection_never_claims_commit_row_consistency():
+    run, job, commit, log, rows = github_bundle()
+    # All four rows now claim a different issuance timestamp than the actual
+    # GitHub-committed batch. The metadata-only helper cannot detect that;
+    # critically, it must NOT claim forecast-content/commit consistency.
+    for row in rows:
+        row["issued_at_utc"] = "2026-10-18T14:31:55+00:00"
+    result = reconcile_github_push_bundle(run, job, commit, log, rows, "bar_aligned")
+    assert result["status"] == "GITHUB_RUN_PUSH_PROJECTION_ONLY_UNVERIFIED"
+    assert result["projected_forecast_bytes_cryptographically_confirmed"] is False
+    assert result["independent_first_publication_attested"] is False
+    assert result["scientific_authorization"] == "NO_RUN"
