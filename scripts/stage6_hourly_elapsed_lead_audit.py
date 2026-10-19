@@ -402,7 +402,6 @@ def reconcile_github_push_bundle(
     }
 
 
-
 _GIT_LEDGER_MAX_BYTES = 8_000_000
 _DEPLOYED_FORECAST_KEYS = frozenset(
     {

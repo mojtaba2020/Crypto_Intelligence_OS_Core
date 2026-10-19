@@ -445,16 +445,14 @@ def test_github_bundle_late_preclose_witness_is_blocked_at_top_level():
     assert res["scientific_authorization"] == "NO_RUN"
 
 
-
 def test_early_push_but_late_completed_run_does_not_qualify_the_batch():
     run, job, commit, log, rows = github_bundle()
     # Push was before the 15:00 target, but the completed GitHub run was not.
     run["updated_at"] = "2026-10-18T15:02:00Z"
     result = reconcile_github_push_bundle(run, job, commit, log, rows, "bar_aligned")
     assert result["push_at_utc_claim"] == "2026-10-18T14:31:58.099408+00:00"
-    assert result["conservative_publication_upper_bound_utc_claim"] == (
-        "2026-10-18T15:02:00Z"
-    )
+    expected_completion = "2026-10-18T15:02:00Z"
+    assert result["conservative_publication_upper_bound_utc_claim"] == expected_completion
     assert result["status"] == "GITHUB_RUN_PUSH_PROJECTION_BLOCKED"
     assert result["observation"]["blocked_or_unknown_claim_count"] == 1
     assert result["observation"]["slots"][0]["status"] == "PUBLICATION_CLAIM_AT_OR_AFTER_MATURITY"
@@ -522,7 +520,6 @@ def test_unsupported_github_completion_formats_fail_closed(bad):
     run["updated_at"] = bad
     with pytest.raises(ValueError, match="UTC Z timestamp"):
         reconcile_github_push_bundle(run, job, commit, log, rows, "bar_aligned")
-
 
 
 def _synthetic_git_append_fixture():
