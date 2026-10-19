@@ -852,3 +852,49 @@ def test_git_tree_binder_accepts_recursive_directory_tree_sha_changes():
     result = bind_supplied_git_commit_tree_chain(*args)
     assert result["scientific_authorization"] == "NO_RUN"
     assert result["forecast_rows_bound_to_supplied_tree_and_blob_metadata"] is True
+
+
+@pytest.mark.parametrize(
+    ("kind", "mode"),
+    [
+        ("tree", "100644"),
+        ("tree", "160000"),
+        ("blob", "040000"),
+        ("blob", "160000"),
+        ("commit", "100644"),
+        ("commit", "040000"),
+        ("blob", "777777"),
+    ],
+)
+def test_git_tree_binder_rejects_disguised_file_as_directory(kind, mode):
+    args = list(_git_commit_tree_fixture())
+    for position, sha in ((2, "3" * 40), (3, "4" * 40)):
+        args[position]["entries"].append(
+            {
+                "path": "src/security.py",
+                "mode": mode,
+                "type": kind,
+                "sha": sha,
+            }
+        )
+    with pytest.raises(ValueError, match="Noncanonical Git tree entry type/mode"):
+        bind_supplied_git_commit_tree_chain(*args)
+
+
+@pytest.mark.parametrize(
+    ("kind", "mode"),
+    [("blob", "100755"), ("blob", "120000"), ("commit", "160000")],
+)
+def test_git_tree_binder_detects_changed_executable_symlink_or_submodule(kind, mode):
+    args = list(_git_commit_tree_fixture())
+    for position, sha in ((2, "3" * 40), (3, "4" * 40)):
+        args[position]["entries"].append(
+            {
+                "path": "src/hidden_artifact",
+                "mode": mode,
+                "type": kind,
+                "sha": sha,
+            }
+        )
+    with pytest.raises(ValueError, match="changed paths disagree"):
+        bind_supplied_git_commit_tree_chain(*args)
