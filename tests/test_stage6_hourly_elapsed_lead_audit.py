@@ -645,9 +645,8 @@ def test_git_blob_binding_rejects_incorrect_parent_sha_and_non_bytes():
 def _rewrite_synthetic_appended_row(parent, child, key, value):
     old_rows = [json.loads(line) for line in child[len(parent) :].splitlines()]
     old_rows[0][key] = value
-    rewritten = parent + "".join(
-        json.dumps(row, sort_keys=True) + "\n" for row in old_rows
-    ).encode("utf-8")
+    serialized = "".join(json.dumps(row, sort_keys=True) + "\n" for row in old_rows)
+    rewritten = parent + serialized.encode("utf-8")
     child_git_sha = hashlib.sha1(
         b"blob " + str(len(rewritten)).encode() + b"\0" + rewritten,
         usedforsecurity=False,
