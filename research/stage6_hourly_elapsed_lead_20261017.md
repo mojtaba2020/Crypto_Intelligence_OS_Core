@@ -209,3 +209,12 @@ It does not establish a public first-publication timestamp, custody signature,
 model skill or scientific clearance. An independent reader must fetch the real
 GitHub objects (or a separately witnessed mirror) and verify exact commit and
 tree IDs before upgrading their provenance status. NO_RUN/NO_FREEZE remains.
+
+This full-tree wrapper also **derives changed file paths from the leaf identities**
+of both nontruncated recursive Git tree listings (including additions, deletions
+and mode changes), ignoring directory tree SHA churn. It requires exact equality
+between the derived changes and the allowed declared commit diff paths. A forged
+unlisted `src/security.py` modification therefore blocks the receipt even if
+the forecast ledger blob and SHA themselves match. Complete tree authenticity
+still requires independently fetched GitHub objects; this is not external
+publication timestamp attestation.

@@ -558,8 +558,14 @@ _ALLOWED_APPEND_COMMIT_PATHS = frozenset(
 )
 
 
-def _tree_forecast_blob(tree: Mapping[str, object]) -> str:
-    """Read a uniquely named ledger leaf from caller-supplied Git tree metadata."""
+def _tree_leaf_identifiers(
+    tree: Mapping[str, object],
+) -> dict[str, tuple[str, str, str]]:
+    """Project every supplied non-directory Git tree leaf to its identity.
+
+    Recursive tree listings include directory nodes whose tree SHA necessarily
+    changes when a child changes. Compare the leaf identities, not directories.
+    """
     if not isinstance(tree, Mapping):
         raise ValueError("Exact Git tree metadata required")
     _sha(tree.get("sha"))
@@ -570,22 +576,28 @@ def _tree_forecast_blob(tree: Mapping[str, object]) -> str:
         or len(entries) > 100_000
     ):
         raise ValueError("Complete bounded Git tree entries required")
-    paths: set[str] = set()
-    matches: list[str] = []
+    all_paths: set[str] = set()
+    leaves: dict[str, tuple[str, str, str]] = {}
     for entry in entries:
         if not isinstance(entry, Mapping):
             raise ValueError("Malformed Git tree entry")
         path = entry.get("path")
-        if not isinstance(path, str) or not path or path in paths:
+        if not isinstance(path, str) or not path or path in all_paths:
             raise ValueError("Duplicate or invalid Git tree path")
-        paths.add(path)
-        if path == _FORECAST_LEDGER_GIT_PATH:
-            if entry.get("type") != "blob" or entry.get("mode") != "100644":
-                raise ValueError("Forecast ledger must be an ordinary Git blob")
-            matches.append(_sha(entry.get("sha")))
-    if len(matches) != 1:
+        all_paths.add(path)
+        kind = entry.get("type")
+        mode = entry.get("mode")
+        sha = _sha(entry.get("sha"))
+        if kind not in ("tree", "blob", "commit") or not isinstance(mode, str):
+            raise ValueError("Unexpected Git tree leaf identity")
+        if kind != "tree":
+            leaves[path] = (kind, mode, sha)
+    forecast = leaves.get(_FORECAST_LEDGER_GIT_PATH)
+    if forecast is None:
         raise ValueError("Forecast ledger leaf missing or duplicated in Git tree")
-    return matches[0]
+    if forecast[:2] != ("blob", "100644"):
+        raise ValueError("Forecast ledger must be an ordinary Git blob")
+    return leaves
 
 
 def bind_supplied_git_commit_tree_chain(
@@ -622,15 +634,25 @@ def bind_supplied_git_commit_tree_chain(
     changed_paths = child_commit.get("changed_paths")
     if (
         type(changed_paths) not in (tuple, list)
+        or not all(isinstance(path, str) for path in changed_paths)
         or len(changed_paths) != len(set(changed_paths))
         or _FORECAST_LEDGER_GIT_PATH not in changed_paths
         or not set(changed_paths) <= _ALLOWED_APPEND_COMMIT_PATHS
     ):
         raise ValueError("Unexpected Git commit paths or no appended forecast ledger")
-    parent_blob_sha = _tree_forecast_blob(parent_tree)
-    child_blob_sha = _tree_forecast_blob(child_tree)
-    if parent_blob_sha == child_blob_sha:
-        raise ValueError("Forecast Git blob unchanged by alleged append commit")
+    parent_leaves = _tree_leaf_identifiers(parent_tree)
+    child_leaves = _tree_leaf_identifiers(child_tree)
+    actual_changes = {
+        path
+        for path in parent_leaves.keys() | child_leaves.keys()
+        if parent_leaves.get(path) != child_leaves.get(path)
+    }
+    if actual_changes != set(changed_paths):
+        raise ValueError("Git tree changed paths disagree with commit change list")
+    parent_blob_sha = parent_leaves[_FORECAST_LEDGER_GIT_PATH][2]
+    child_blob_sha = child_leaves[_FORECAST_LEDGER_GIT_PATH][2]
+    if parent_blob_sha == child_blob_sha or parent_tree_sha == child_tree_sha:
+        raise ValueError("Forecast Git blob/tree unchanged by alleged append commit")
     byte_binding = bind_supplied_git_ledger_append(
         parent_forecast_blob,
         child_forecast_blob,
