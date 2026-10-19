@@ -235,6 +235,27 @@ def _sha(value: object) -> str:
     return value
 
 
+_GITHUB_COMPLETED_RUN_UTC = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.(?P<fraction>\d{1,9}))?Z$"
+)
+
+
+def _ceil_github_run_second(value: object) -> int:
+    """Return a conservative whole-second upper bound for GitHub run updates.
+
+    datetime.fromisoformat truncates beyond microseconds; inspect all nine
+    fractional digits before rounding *toward the future*, not into the past.
+    """
+    if not isinstance(value, str):
+        raise ValueError("GitHub run update must be UTC Z timestamp")
+    match = _GITHUB_COMPLETED_RUN_UTC.fullmatch(value)
+    if match is None:
+        raise ValueError("GitHub run update must be UTC Z timestamp")
+    whole = _parse_utc(value, "GitHub run update").replace(microsecond=0)
+    fraction = match.group("fraction") or ""
+    return int(whole.timestamp()) + int(any(digit != "0" for digit in fraction))
+
+
 def _github_numeric_id(value: object, field: str) -> int:
     if type(value) is not int or not 0 < value < 10**16:
         raise ValueError(f"{field} must be a positive GitHub ID")
@@ -288,6 +309,7 @@ def reconcile_github_push_bundle(
     push_at = _parse_utc(push.group("when"), "GitHub push log")
     run_started = _parse_utc(run.get("created_at"), "GitHub run creation")
     run_updated = _parse_utc(run.get("updated_at"), "GitHub run update")
+    conservative_publication_second = _ceil_github_run_second(run.get("updated_at"))
     if not run_started <= push_at <= run_updated:
         raise ValueError("GitHub push event lies outside the recorded run")
     commit_sha = _sha(commit.get("sha"))
@@ -340,7 +362,7 @@ def reconcile_github_push_bundle(
                 # A successful completed run is a conservative LATER upper bound
                 # than its push-log event. Never qualify a forecast on the
                 # earlier log clock if the job/run finishes after maturity.
-                "claimed_publication_upper_bound_utc": int(run_updated.timestamp()),
+                "claimed_publication_upper_bound_utc": conservative_publication_second,
                 "target_close_utc": int(close.timestamp()),
             }
         )
@@ -367,7 +389,8 @@ def reconcile_github_push_bundle(
         "run_id_claim": run_id,
         "commit_sha_claim": commit_sha,
         "push_at_utc_claim": push_at.isoformat(),
-        "conservative_publication_upper_bound_utc_claim": run_updated.isoformat(),
+        "conservative_publication_upper_bound_utc_claim": run["updated_at"],
+        "conservative_publication_upper_bound_ceiled_epoch_second": conservative_publication_second,
         "publication_bound_source": "github_completed_run_updated_at",
         "github_data_origin_authenticated_by_this_code": False,
         "projected_forecast_bytes_cryptographically_confirmed": False,

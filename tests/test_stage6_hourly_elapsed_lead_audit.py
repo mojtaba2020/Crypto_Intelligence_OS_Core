@@ -353,7 +353,8 @@ def test_actual_hosted_push_bundle_projection_is_consistent_but_unattested():
     assert res["observation"]["missing_slot_count"] == 0
     assert res["observation"]["by_horizon"][0]["claimed_preclose_count"] == 1
     assert res["observation"]["by_horizon"][0]["min_claimed_elapsed_lead_seconds"] == 1679
-    assert res["conservative_publication_upper_bound_utc_claim"] == "2026-10-18T14:32:01+00:00"
+    assert res["conservative_publication_upper_bound_utc_claim"] == "2026-10-18T14:32:01Z"
+    assert res["conservative_publication_upper_bound_ceiled_epoch_second"] == 1792333921
     assert res["publication_bound_source"] == "github_completed_run_updated_at"
 
 
@@ -449,7 +450,7 @@ def test_early_push_but_late_completed_run_does_not_qualify_the_batch():
     result = reconcile_github_push_bundle(run, job, commit, log, rows, "bar_aligned")
     assert result["push_at_utc_claim"] == "2026-10-18T14:31:58.099408+00:00"
     assert result["conservative_publication_upper_bound_utc_claim"] == (
-        "2026-10-18T15:02:00+00:00"
+        "2026-10-18T15:02:00Z"
     )
     assert result["status"] == "GITHUB_RUN_PUSH_PROJECTION_BLOCKED"
     assert result["observation"]["blocked_or_unknown_claim_count"] == 1
@@ -480,3 +481,41 @@ def test_unbound_projection_never_claims_commit_row_consistency():
     assert result["projected_forecast_bytes_cryptographically_confirmed"] is False
     assert result["independent_first_publication_attested"] is False
     assert result["scientific_authorization"] == "NO_RUN"
+
+
+@pytest.mark.parametrize("fraction", [".000001", ".000000001", ".999999999"])
+def test_fractional_completion_clock_rounds_forward_and_full_lead_blocks(fraction):
+    run, job, commit, log, rows = github_bundle()
+    run["created_at"] = "2026-10-18T13:59:59Z"
+    run["updated_at"] = f"2026-10-18T14:00:00{fraction}Z"
+    log[-1] = "2026-10-18T14:00:00Z    7570ccf..7a5599d  HEAD -> main"
+    for row in rows:
+        row["issued_at_utc"] = "2026-10-18T14:00:00+00:00"
+    result = reconcile_github_push_bundle(run, job, commit, log, rows, "minimum_elapsed")
+    assert result["status"] == "GITHUB_RUN_PUSH_PROJECTION_BLOCKED"
+    assert result["observation"]["blocked_or_unknown_claim_count"] == 4
+    assert result["observation"]["slots"][0]["claimed_elapsed_lead_seconds"] == 3599
+    assert result["conservative_publication_upper_bound_ceiled_epoch_second"] == 1792332001
+
+
+@pytest.mark.parametrize("suffix", ["Z", ".000000000Z"])
+def test_exact_whole_second_completion_remains_unverified_not_blocked(suffix):
+    run, job, commit, log, rows = github_bundle()
+    run["created_at"] = "2026-10-18T13:59:59Z"
+    run["updated_at"] = "2026-10-18T14:00:00" + suffix
+    log[-1] = "2026-10-18T14:00:00Z    7570ccf..7a5599d  HEAD -> main"
+    for row in rows:
+        row["issued_at_utc"] = "2026-10-18T14:00:00+00:00"
+    result = reconcile_github_push_bundle(run, job, commit, log, rows, "minimum_elapsed")
+    assert result["status"] == "GITHUB_RUN_PUSH_PROJECTION_ONLY_UNVERIFIED"
+    assert result["observation"]["blocked_or_unknown_claim_count"] == 0
+    assert result["observation"]["slots"][0]["claimed_elapsed_lead_seconds"] == 3600
+    assert result["independent_first_publication_attested"] is False
+
+
+@pytest.mark.parametrize("bad", ["2026-10-18T14:00:00.1234567890Z", "2026-10-18T14:00:00+00:00"])
+def test_unsupported_github_completion_formats_fail_closed(bad):
+    run, job, commit, log, rows = github_bundle()
+    run["updated_at"] = bad
+    with pytest.raises(ValueError, match="UTC Z timestamp"):
+        reconcile_github_push_bundle(run, job, commit, log, rows, "bar_aligned")
