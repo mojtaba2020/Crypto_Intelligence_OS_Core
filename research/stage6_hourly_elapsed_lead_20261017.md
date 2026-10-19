@@ -157,9 +157,11 @@ parent_git_blob_sha, child_git_blob_sha, expected_projection)` helper receives
 canonical Git SHA-1 object identifiers, returns an additional SHA-256 digest,
 requires that the child is a byte-for-byte append of the complete parent, and
 allows **exactly four** new JSONL rows, not a changed historical prefix or a
-silent additional forecast. It extracts only the known UTC/origin/horizon/version
-metadata from the four new rows and checks every value against the *claimed*
-projection. It rejects duplicate JSON keys, non-finite constants, unexpected
+silent additional forecast. It parses and checks UTC origin/issuance/target timestamps, requires
+hour-aligned origins, enforces both `target_hour=origin+horizon` and
+`target_close=target_hour+1h`, and checks each known metadata value against
+the *claimed* projection. Thus valid Git hashes cannot disguise a target-hour
+or maturity-calendar inconsistency. It rejects duplicate JSON keys, non-finite constants, unexpected
 outcome keys, missing fields and malformed line endings. The result never
 returns any numerical market/forecast price or scored outcomes.
 

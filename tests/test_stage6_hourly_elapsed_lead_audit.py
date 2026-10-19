@@ -640,3 +640,54 @@ def test_git_blob_binding_rejects_incorrect_parent_sha_and_non_bytes():
         bind_supplied_git_ledger_append(old, new, "0" * 40, new_sha, projection)
     with pytest.raises(ValueError, match="exact bytes"):
         bind_supplied_git_ledger_append(old.decode(), new, "0" * 40, new_sha, projection)
+
+
+def _rewrite_synthetic_appended_row(parent, child, key, value):
+    old_rows = [json.loads(line) for line in child[len(parent) :].splitlines()]
+    old_rows[0][key] = value
+    rewritten = parent + "".join(
+        json.dumps(row, sort_keys=True) + "\n" for row in old_rows
+    ).encode("utf-8")
+    child_git_sha = hashlib.sha1(
+        b"blob " + str(len(rewritten)).encode() + b"\0" + rewritten,
+        usedforsecurity=False,
+    ).hexdigest()
+    return rewritten, child_git_sha
+
+
+def test_git_binding_rejects_wrong_target_bar_even_when_projection_unchanged():
+    parent, child, parent_sha, _, projection = _synthetic_git_append_fixture()
+    changed, child_sha = _rewrite_synthetic_appended_row(
+        parent, child, "target_hour_utc", "2026-10-18T20:00:00+00:00"
+    )
+    with pytest.raises(ValueError, match="Target hour inconsistent"):
+        bind_supplied_git_ledger_append(parent, changed, parent_sha, child_sha, projection)
+
+
+def test_git_binding_rejects_wrong_target_close_even_with_matching_claim():
+    parent, child, parent_sha, _, projection = _synthetic_git_append_fixture()
+    wrong_close = "2026-10-18T17:00:00+00:00"
+    changed, child_sha = _rewrite_synthetic_appended_row(
+        parent, child, "target_close_utc", wrong_close
+    )
+    projection[0]["target_close_utc"] = wrong_close
+    with pytest.raises(ValueError, match="Target close inconsistent"):
+        bind_supplied_git_ledger_append(parent, changed, parent_sha, child_sha, projection)
+
+
+@pytest.mark.parametrize("origin", [1792328400, "2026-10-18T13:00:00", "bad timestamp"])
+def test_git_binding_rejects_non_utc_or_non_string_origin(origin):
+    parent, child, parent_sha, _, projection = _synthetic_git_append_fixture()
+    changed, child_sha = _rewrite_synthetic_appended_row(parent, child, "origin_hour_utc", origin)
+    projection[0]["origin_hour_utc"] = origin
+    with pytest.raises(ValueError, match="Origin"):
+        bind_supplied_git_ledger_append(parent, changed, parent_sha, child_sha, projection)
+
+
+def test_git_binding_rejects_issuance_before_source_candle_close():
+    parent, child, parent_sha, _, projection = _synthetic_git_append_fixture()
+    early = "2026-10-18T13:30:00+00:00"
+    changed, child_sha = _rewrite_synthetic_appended_row(parent, child, "issued_at_utc", early)
+    projection[0]["issued_at_utc"] = early
+    with pytest.raises(ValueError, match="precedes source candle close"):
+        bind_supplied_git_ledger_append(parent, changed, parent_sha, child_sha, projection)

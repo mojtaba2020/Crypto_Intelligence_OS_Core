@@ -10,7 +10,7 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 HORIZONS = (1, 4, 12, 24)
 CLAIM_SEMANTICS = ("bar_aligned", "minimum_elapsed")
@@ -509,6 +509,19 @@ def bind_supplied_git_ledger_append(
             or type(row.get("horizon_hours")) is not int
         ):
             raise ValueError("Unexpected deployed forecast row schema")
+        horizon = row["horizon_hours"]
+        origin = _parse_utc(row["origin_hour_utc"], "Origin")
+        issued = _parse_utc(row["issued_at_utc"], "Issued")
+        target_hour = _parse_utc(row["target_hour_utc"], "Target hour")
+        target_close = _parse_utc(row["target_close_utc"], "Target close")
+        if origin != origin.replace(minute=0, second=0, microsecond=0):
+            raise ValueError("Forecast origin must be UTC hour-aligned")
+        if target_hour != origin + timedelta(hours=horizon):
+            raise ValueError("Target hour inconsistent with origin and horizon")
+        if target_close != target_hour + timedelta(hours=1):
+            raise ValueError("Target close inconsistent with target hour")
+        if issued < origin + timedelta(hours=1):
+            raise ValueError("Claimed issuance precedes source candle close")
         projected = {key: row[key] for key in _ROW_META}
         expected = expected_projection[index]
         if not isinstance(expected, Mapping) or set(expected) != _ROW_META:
