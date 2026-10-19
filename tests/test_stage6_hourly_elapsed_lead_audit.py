@@ -900,7 +900,6 @@ def test_git_tree_binder_detects_changed_executable_symlink_or_submodule(kind, m
         bind_supplied_git_commit_tree_chain(*args)
 
 
-
 def test_supplied_git_tree_chain_accepts_single_parent_tuple():
     args = list(_git_commit_tree_fixture())
     args[1]["parents"] = tuple(args[1]["parents"])
