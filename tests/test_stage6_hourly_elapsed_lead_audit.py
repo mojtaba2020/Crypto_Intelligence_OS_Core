@@ -8,6 +8,7 @@ import pytest
 from scripts.stage6_hourly_elapsed_lead_audit import (
     audit_elapsed_lead,
     bind_supplied_git_ledger_append,
+    bind_supplied_git_commit_tree_chain,
     reconcile_github_push_bundle,
 )
 
@@ -690,3 +691,98 @@ def test_git_binding_rejects_issuance_before_source_candle_close():
     projection[0]["issued_at_utc"] = early
     with pytest.raises(ValueError, match="precedes source candle close"):
         bind_supplied_git_ledger_append(parent, changed, parent_sha, child_sha, projection)
+
+def _git_commit_tree_fixture():
+    old, new, old_sha, new_sha, projection = _synthetic_git_append_fixture()
+    psha = "a" * 40
+    csha = "b" * 40
+    ptsha = "c" * 40
+    ctsha = "d" * 40
+    parent_commit = {"sha": psha, "tree_sha": ptsha}
+    child_commit = {
+        "sha": csha,
+        "tree_sha": ctsha,
+        "parents": [psha],
+        "changed_paths": [
+            "research/hourly_forecasts.jsonl",
+            "research/hourly_scores.jsonl",
+        ],
+    }
+    parent_tree = {
+        "sha": ptsha,
+        "truncated": False,
+        "entries": [{
+            "path": "research/hourly_forecasts.jsonl",
+            "mode": "100644",
+            "type": "blob",
+            "sha": old_sha,
+        }],
+    }
+    child_tree = {
+        "sha": ctsha,
+        "truncated": False,
+        "entries": [{
+            "path": "research/hourly_forecasts.jsonl",
+            "mode": "100644",
+            "type": "blob",
+            "sha": new_sha,
+        }],
+    }
+    return parent_commit, child_commit, parent_tree, child_tree, old, new, projection
+
+
+def test_supplied_git_commit_tree_chain_binds_to_exact_append_without_go():
+    inputs = _git_commit_tree_fixture()
+    result = bind_supplied_git_commit_tree_chain(*inputs)
+    assert result["forecast_rows_bound_to_supplied_tree_and_blob_metadata"] is True
+    assert result["byte_binding"]["appended_forecast_count"] == 4
+    assert result["server_first_publication_independently_attested"] is False
+    assert result["fetched_git_tree_objects_independently_authenticated_by_this_code"] is False
+    assert result["scientific_authorization"] == "NO_RUN"
+    assert result["byte_binding"]["price_or_outcome_values_returned"] is False
+
+
+@pytest.mark.parametrize(
+    ("slot", "field", "newvalue", "pattern"),
+    [
+        (1, "parents", ["f" * 40], "parent SHA"),
+        (1, "tree_sha", "e" * 40, "Git tree SHA"),
+        (1, "changed_paths", ["research/hourly_scores.jsonl"], "commit paths"),
+        (3, "truncated", True, "Complete bounded"),
+    ],
+)
+def test_supplied_git_commit_tree_chain_rejects_mismatched_objects(
+    slot, field, newvalue, pattern
+):
+    values = list(_git_commit_tree_fixture())
+    values[slot][field] = newvalue
+    with pytest.raises(ValueError, match=pattern):
+        bind_supplied_git_commit_tree_chain(*values)
+
+
+def test_supplied_git_commit_tree_chain_rejects_blob_substitution():
+    inputs = list(_git_commit_tree_fixture())
+    inputs[3]["entries"][0]["sha"] = "f" * 40
+    with pytest.raises(ValueError, match="Child Git blob SHA"):
+        bind_supplied_git_commit_tree_chain(*inputs)
+
+
+def test_supplied_git_commit_tree_chain_rejects_duplicate_paths():
+    inputs = list(_git_commit_tree_fixture())
+    inputs[3]["entries"].append(dict(inputs[3]["entries"][0]))
+    with pytest.raises(ValueError, match="Duplicate or invalid"):
+        bind_supplied_git_commit_tree_chain(*inputs)
+
+
+def test_supplied_git_commit_tree_chain_rejects_non_blob_forecast_path():
+    inputs = list(_git_commit_tree_fixture())
+    inputs[2]["entries"][0]["type"] = "tree"
+    with pytest.raises(ValueError, match="ordinary Git blob"):
+        bind_supplied_git_commit_tree_chain(*inputs)
+
+
+def test_supplied_git_commit_tree_chain_rejects_forged_projection():
+    inputs = list(_git_commit_tree_fixture())
+    inputs[-1][1]["issued_at_utc"] = "2026-10-18T14:31:56+00:00"
+    with pytest.raises(ValueError, match="differs from committed"):
+        bind_supplied_git_commit_tree_chain(*inputs)

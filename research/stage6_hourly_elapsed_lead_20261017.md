@@ -190,3 +190,22 @@ begin with the exact complete parent bytes, followed by exactly four JSONL
 forecast rows; the Git commit's forecast diff additions are identical to
 those appended lines. This case is *observational evidence*, not proof of
 independent timestamp publication or prospective predictive skill.
+## Supplied Git commit/tree chain (offline only)
+
+`bind_supplied_git_commit_tree_chain` adds checks *above* the byte-append
+binder: the supplied child commit has exactly the supplied parent; each
+commit's `tree_sha` matches the corresponding supplied tree metadata; the
+full (nontruncated) tree has one ordinary blob at the exact
+`research/hourly_forecasts.jsonl` path; the tree's forecast blob ID must
+match the actual supplied file bytes; and the child is a four-row append of
+the parent, with no changed paths beyond forecast and scores ledgers.
+Duplicates, missing leaves, changed object identities and forged projected
+timestamps reject. The wrapper returns **no raw prices or outcomes**.
+
+Crucially, all commit metadata and tree listings are *inputs*. This is an
+**internal cross-consistency verifier**, not authenticated GitHub REST retrieval
+or independent cryptographic verification of the entire Git tree structure.
+It does not establish a public first-publication timestamp, custody signature,
+model skill or scientific clearance. An independent reader must fetch the real
+GitHub objects (or a separately witnessed mirror) and verify exact commit and
+tree IDs before upgrading their provenance status. NO_RUN/NO_FREEZE remains.

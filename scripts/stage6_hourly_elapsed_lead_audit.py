@@ -550,3 +550,103 @@ def bind_supplied_git_ledger_append(
         "scientific_authorization": "NO_RUN",
         "projected_metadata": bound_projection,
     }
+_FORECAST_LEDGER_GIT_PATH = "research/hourly_forecasts.jsonl"
+_ALLOWED_APPEND_COMMIT_PATHS = frozenset(
+    {"research/hourly_forecasts.jsonl", "research/hourly_scores.jsonl"}
+)
+
+
+def _tree_forecast_blob(tree: Mapping[str, object]) -> str:
+    """Read a uniquely named ledger leaf from caller-supplied Git tree metadata."""
+    if not isinstance(tree, Mapping):
+        raise ValueError("Exact Git tree metadata required")
+    _sha(tree.get("sha"))
+    entries = tree.get("entries")
+    if (
+        tree.get("truncated") is not False
+        or not isinstance(entries, (list, tuple))
+        or len(entries) > 100_000
+    ):
+        raise ValueError("Complete bounded Git tree entries required")
+    paths: set[str] = set()
+    matches: list[str] = []
+    for entry in entries:
+        if not isinstance(entry, Mapping):
+            raise ValueError("Malformed Git tree entry")
+        path = entry.get("path")
+        if not isinstance(path, str) or not path or path in paths:
+            raise ValueError("Duplicate or invalid Git tree path")
+        paths.add(path)
+        if path == _FORECAST_LEDGER_GIT_PATH:
+            if entry.get("type") != "blob" or entry.get("mode") != "100644":
+                raise ValueError("Forecast ledger must be an ordinary Git blob")
+            matches.append(_sha(entry.get("sha")))
+    if len(matches) != 1:
+        raise ValueError("Forecast ledger leaf missing or duplicated in Git tree")
+    return matches[0]
+
+
+def bind_supplied_git_commit_tree_chain(
+    parent_commit: Mapping[str, object],
+    child_commit: Mapping[str, object],
+    parent_tree: Mapping[str, object],
+    child_tree: Mapping[str, object],
+    parent_forecast_blob: bytes,
+    child_forecast_blob: bytes,
+    expected_projection: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    """Cross-check supplied Git commit ancestry/tree paths and ledger byte append.
+
+    Callers must independently fetch all objects from a trusted GitHub API,
+    verify endpoint identity, and preserve the fetched responses. This helper
+    does NOT authenticate the server, timestamp, or full Git tree object bytes.
+    """
+    if not isinstance(parent_commit, Mapping) or not isinstance(child_commit, Mapping):
+        raise ValueError("Supplied Git commit metadata required")
+    parent_sha = _sha(parent_commit.get("sha"))
+    child_sha = _sha(child_commit.get("sha"))
+    if parent_sha == child_sha:
+        raise ValueError("Child Git commit must differ from its parent")
+    parents = child_commit.get("parents")
+    if type(parents) not in (tuple, list) or parents != [parent_sha]:
+        raise ValueError("Child Git commit must have exactly the supplied parent SHA")
+    parent_tree_sha = _sha(parent_commit.get("tree_sha"))
+    child_tree_sha = _sha(child_commit.get("tree_sha"))
+    if (
+        _sha(parent_tree.get("sha")) != parent_tree_sha
+        or _sha(child_tree.get("sha")) != child_tree_sha
+    ):
+        raise ValueError("Git tree SHA does not match its claimed commit")
+    changed_paths = child_commit.get("changed_paths")
+    if (
+        type(changed_paths) not in (tuple, list)
+        or len(changed_paths) != len(set(changed_paths))
+        or _FORECAST_LEDGER_GIT_PATH not in changed_paths
+        or not set(changed_paths) <= _ALLOWED_APPEND_COMMIT_PATHS
+    ):
+        raise ValueError("Unexpected Git commit paths or no appended forecast ledger")
+    parent_blob_sha = _tree_forecast_blob(parent_tree)
+    child_blob_sha = _tree_forecast_blob(child_tree)
+    if parent_blob_sha == child_blob_sha:
+        raise ValueError("Forecast Git blob unchanged by alleged append commit")
+    byte_binding = bind_supplied_git_ledger_append(
+        parent_forecast_blob,
+        child_forecast_blob,
+        parent_blob_sha,
+        child_blob_sha,
+        expected_projection,
+    )
+    return {
+        "status": "SUPPLIED_GIT_COMMIT_TREE_FORECAST_APPEND_MATCH_UNAUTHENTICATED",
+        "claimed_parent_commit_sha": parent_sha,
+        "claimed_child_commit_sha": child_sha,
+        "claimed_parent_tree_sha": parent_tree_sha,
+        "claimed_child_tree_sha": child_tree_sha,
+        "claimed_parent_forecast_git_blob_sha": parent_blob_sha,
+        "claimed_child_forecast_git_blob_sha": child_blob_sha,
+        "forecast_rows_bound_to_supplied_tree_and_blob_metadata": True,
+        "fetched_git_tree_objects_independently_authenticated_by_this_code": False,
+        "server_first_publication_independently_attested": False,
+        "scientific_authorization": "NO_RUN",
+        "byte_binding": byte_binding,
+    }
