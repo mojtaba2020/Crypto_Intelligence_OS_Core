@@ -6,6 +6,8 @@ not authenticated receipts. No network, model fitting, scoring, or promotion.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
@@ -397,4 +399,142 @@ def reconcile_github_push_bundle(
         "independent_first_publication_attested": False,
         "scientific_authorization": "NO_RUN",
         "observation": observation,
+    }
+
+
+
+_GIT_LEDGER_MAX_BYTES = 8_000_000
+_DEPLOYED_FORECAST_KEYS = frozenset(
+    {
+        "version",
+        "issued_at_utc",
+        "origin_hour_utc",
+        "target_hour_utc",
+        "target_close_utc",
+        "horizon_hours",
+        "origin_close_usd",
+        "forecast_usd",
+        "persistence_usd",
+        "observed_volatility_hourly",
+        "training_hours",
+        "resolved_training_examples",
+        "holdout_selected_blend",
+        "source",
+        "research_only",
+    }
+)
+
+
+def _git_blob_hash(payload: bytes) -> str:
+    """Verify the Git object format, NOT third-party first-publication custody."""
+    header = b"blob " + str(len(payload)).encode("ascii") + b"\0"
+    # The Git object store uses SHA-1. Its known collision limitations are
+    # separate from the additional SHA-256 digest returned for custody work.
+    return hashlib.sha1(header + payload, usedforsecurity=False).hexdigest()
+
+
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    found: dict[str, object] = {}
+    for name, value in pairs:
+        if name in found:
+            raise ValueError("Duplicate key in appended forecast JSON")
+        found[name] = value
+    return found
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"Non-finite or invalid forecast JSON value: {value}")
+
+
+def bind_supplied_git_ledger_append(
+    parent_blob: bytes,
+    child_blob: bytes,
+    parent_git_blob_sha: str,
+    child_git_blob_sha: str,
+    expected_projection: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    """Byte-bind four forecast metadata projections to supplied Git blobs.
+
+    This has no network and no price calculations. Raw files *can contain*
+    forecast prices; never pass locked outcomes or return their numeric values.
+    SHA identifiers and bytes remain caller-supplied unless an independent
+    reviewer authenticates both commits' Git trees and returned blob bodies.
+    """
+    if type(parent_blob) is not bytes or type(child_blob) is not bytes:
+        raise ValueError("Both ledger Git blobs must be exact bytes")
+    if (
+        not parent_blob
+        or not parent_blob.endswith(b"\n")
+        or not child_blob.endswith(b"\n")
+        or len(child_blob) > _GIT_LEDGER_MAX_BYTES
+        or len(parent_blob) > _GIT_LEDGER_MAX_BYTES
+    ):
+        raise ValueError("Invalid or oversized newline-complete Git ledger blobs")
+    if _git_blob_hash(parent_blob) != _sha(parent_git_blob_sha):
+        raise ValueError("Parent Git blob SHA differs from supplied ledger bytes")
+    if _git_blob_hash(child_blob) != _sha(child_git_blob_sha):
+        raise ValueError("Child Git blob SHA differs from supplied ledger bytes")
+    if not child_blob.startswith(parent_blob):
+        raise ValueError("Child ledger is not byte-for-byte append-only")
+    appendix = child_blob[len(parent_blob) :]
+    if not appendix or b"\r" in appendix:
+        raise ValueError("Noncanonical appended forecast ledger bytes")
+    appended_lines = appendix.splitlines(keepends=True)
+    if len(appended_lines) != len(HORIZONS) or any(
+        not line.endswith(b"\n") or not line.strip() for line in appended_lines
+    ):
+        raise ValueError("Exactly four newline-complete appended forecast records required")
+    if (
+        not isinstance(expected_projection, Sequence)
+        or isinstance(expected_projection, (str, bytes))
+        or len(expected_projection) != len(HORIZONS)
+    ):
+        raise ValueError("Exactly four expected price-free metadata projections required")
+
+    bound_projection: list[dict[str, object]] = []
+    for index, line in enumerate(appended_lines):
+        try:
+            row = json.loads(
+                line.decode("utf-8"),
+                object_pairs_hook=_reject_duplicate_json_keys,
+                parse_constant=_reject_json_constant,
+            )
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("Malformed appended forecast JSON") from exc
+        if (
+            type(row) is not dict
+            or set(row) != _DEPLOYED_FORECAST_KEYS
+            or row.get("research_only") is not True
+            or row.get("source") != "coinbase:exchange:BTC-USD:1h:close"
+            or row.get("version") != "hourly-hybrid-ridge-v2"
+            or type(row.get("horizon_hours")) is not int
+        ):
+            raise ValueError("Unexpected deployed forecast row schema")
+        projected = {key: row[key] for key in _ROW_META}
+        expected = expected_projection[index]
+        if not isinstance(expected, Mapping) or set(expected) != _ROW_META:
+            raise ValueError("Exact price-free expected projection required")
+        if projected != expected:
+            raise ValueError("Claimed forecast projection differs from committed blob row")
+        bound_projection.append(projected)
+    if sorted(row["horizon_hours"] for row in bound_projection) != list(HORIZONS):
+        raise ValueError("Four canonical forecast horizons required in appended blob")
+    if len({row["origin_hour_utc"] for row in bound_projection}) != 1:
+        raise ValueError("Append contains mismatched forecast origins")
+    if len({row["issued_at_utc"] for row in bound_projection}) != 1:
+        raise ValueError("Append contains mismatched issuance timestamps")
+
+    return {
+        "status": "SUPPLIED_GIT_FORECAST_APPEND_BYTES_MATCH_UNAUTHENTICATED",
+        "forecast_rows_bound_to_supplied_git_blob_bytes": True,
+        "appended_forecast_count": len(bound_projection),
+        "parent_git_blob_sha_claim": parent_git_blob_sha,
+        "child_git_blob_sha_claim": child_git_blob_sha,
+        "parent_blob_sha256": hashlib.sha256(parent_blob).hexdigest(),
+        "child_blob_sha256": hashlib.sha256(child_blob).hexdigest(),
+        "github_tree_shas_independently_authenticated_by_this_code": False,
+        "independent_first_publication_attested": False,
+        "price_or_outcome_values_returned": False,
+        "scientific_authorization": "NO_RUN",
+        "projected_metadata": bound_projection,
     }

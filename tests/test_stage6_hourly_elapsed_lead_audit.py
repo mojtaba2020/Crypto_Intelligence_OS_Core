@@ -1,10 +1,13 @@
 """Synthetic-only elapsed lead audit tests; no network or market prices."""
 
+import hashlib
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
 from scripts.stage6_hourly_elapsed_lead_audit import (
     audit_elapsed_lead,
+    bind_supplied_git_ledger_append,
     reconcile_github_push_bundle,
 )
 
@@ -519,3 +522,124 @@ def test_unsupported_github_completion_formats_fail_closed(bad):
     run["updated_at"] = bad
     with pytest.raises(ValueError, match="UTC Z timestamp"):
         reconcile_github_push_bundle(run, job, commit, log, rows, "bar_aligned")
+
+
+
+def _synthetic_git_append_fixture():
+    original = b'{"older_prospective_batch":"opaque"}\n'
+    template = {
+        "version": "hourly-hybrid-ridge-v2",
+        "issued_at_utc": "2026-10-18T14:31:55+00:00",
+        "origin_hour_utc": "2026-10-18T13:00:00+00:00",
+        "target_hour_utc": "",
+        "target_close_utc": "",
+        "horizon_hours": 1,
+        "origin_close_usd": 10.0,
+        "forecast_usd": 11.0,
+        "persistence_usd": 10.0,
+        "observed_volatility_hourly": 0.1,
+        "training_hours": 720,
+        "resolved_training_examples": 500,
+        "holdout_selected_blend": 0.25,
+        "source": "coinbase:exchange:BTC-USD:1h:close",
+        "research_only": True,
+    }
+    origin = datetime(2026, 10, 18, 13, tzinfo=UTC)
+    rows = []
+    for h in HORIZONS:
+        row = {
+            **template,
+            "horizon_hours": h,
+            "target_hour_utc": (origin + timedelta(hours=h)).isoformat(),
+            "target_close_utc": (origin + timedelta(hours=h + 1)).isoformat(),
+        }
+        rows.append(row)
+    delta = "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows).encode()
+    appended = original + delta
+
+    def git_sha(blob):
+        return hashlib.sha1(
+            b"blob " + str(len(blob)).encode() + b"\0" + blob,
+            usedforsecurity=False,
+        ).hexdigest()
+
+    projection_keys = (
+        "origin_hour_utc",
+        "issued_at_utc",
+        "target_close_utc",
+        "horizon_hours",
+        "version",
+    )
+    projections = [{key: row[key] for key in projection_keys} for row in rows]
+    return original, appended, git_sha(original), git_sha(appended), projections
+
+
+def test_git_blob_byte_append_binding_preserves_exact_metadata_without_price_output():
+    args = _synthetic_git_append_fixture()
+    result = bind_supplied_git_ledger_append(*args)
+    assert result["forecast_rows_bound_to_supplied_git_blob_bytes"] is True
+    assert result["appended_forecast_count"] == 4
+    assert result["price_or_outcome_values_returned"] is False
+    assert result["github_tree_shas_independently_authenticated_by_this_code"] is False
+    assert result["independent_first_publication_attested"] is False
+    assert result["scientific_authorization"] == "NO_RUN"
+    assert all("forecast_usd" not in row for row in result["projected_metadata"])
+    assert result["child_blob_sha256"] == hashlib.sha256(args[1]).hexdigest()
+
+
+def test_git_blob_binding_rejects_a_tampered_projection_even_if_blob_sha_matches():
+    old, new, old_sha, new_sha, projection = _synthetic_git_append_fixture()
+    projection[0]["issued_at_utc"] = "2026-10-18T14:31:56+00:00"
+    with pytest.raises(ValueError, match="differs"):
+        bind_supplied_git_ledger_append(old, new, old_sha, new_sha, projection)
+
+
+def test_git_blob_binding_rejects_changed_forecast_bytes_with_old_sha():
+    old, new, old_sha, new_sha, projection = _synthetic_git_append_fixture()
+    changed = new.replace(b'"forecast_usd": 11.0', b'"forecast_usd": 12.0')
+    with pytest.raises(ValueError, match="Child Git blob SHA"):
+        bind_supplied_git_ledger_append(old, changed, old_sha, new_sha, projection)
+
+
+def test_git_blob_binding_rejects_history_rewrite_even_if_child_rehashed():
+    old, new, old_sha, _, projection = _synthetic_git_append_fixture()
+    changed = new.replace(b"older_prospective_batch", b"edited_prospective_batch")
+    child_sha = hashlib.sha1(
+        b"blob " + str(len(changed)).encode() + b"\0" + changed,
+        usedforsecurity=False,
+    ).hexdigest()
+    with pytest.raises(ValueError, match="append-only"):
+        bind_supplied_git_ledger_append(old, changed, old_sha, child_sha, projection)
+
+
+def test_git_blob_binding_rejects_extra_fifth_record_even_if_rehashed():
+    old, new, old_sha, _, projection = _synthetic_git_append_fixture()
+    changed = new + b'{"extra":"forecast"}\n'
+    child_sha = hashlib.sha1(
+        b"blob " + str(len(changed)).encode() + b"\0" + changed,
+        usedforsecurity=False,
+    ).hexdigest()
+    with pytest.raises(ValueError, match="Exactly four"):
+        bind_supplied_git_ledger_append(old, changed, old_sha, child_sha, projection)
+
+
+def test_git_blob_binding_rejects_unexpected_future_outcome_field():
+    old, new, old_sha, _, projection = _synthetic_git_append_fixture()
+    changed = new.replace(
+        b'"research_only": true',
+        b'"actual_close_usd": 100.0, "research_only": true',
+    )
+    child_sha = hashlib.sha1(
+        b"blob " + str(len(changed)).encode() + b"\0" + changed,
+        usedforsecurity=False,
+    ).hexdigest()
+    with pytest.raises(ValueError, match="schema"):
+        bind_supplied_git_ledger_append(old, changed, old_sha, child_sha, projection)
+
+
+def test_git_blob_binding_rejects_incorrect_parent_sha_and_non_bytes():
+    old, new, _, new_sha, projection = _synthetic_git_append_fixture()
+    with pytest.raises(ValueError, match="Parent Git blob SHA"):
+        bind_supplied_git_ledger_append(old, new, "0" * 40, new_sha, projection)
+    with pytest.raises(ValueError, match="exact bytes"):
+        bind_supplied_git_ledger_append(old.decode(), new, "0" * 40, new_sha, projection)

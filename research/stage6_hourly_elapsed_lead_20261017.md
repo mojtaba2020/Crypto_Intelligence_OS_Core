@@ -147,3 +147,44 @@ Both modes remain `NO_RUN` and are not admissible for statistical confirmation
 without independently authenticated publication and preregistered provenance.
 This isolated helper and its tests are synthetic and do not trigger the
 `btc_hourly_live_smoke.yml` path filter or create new schedules.
+
+
+## Append-only Git blob binding — independent source still required
+
+The offline \`bind_supplied_git_ledger_append(parent_blob, child_blob,
+parent_git_blob_sha, child_git_blob_sha, expected_projection)\` helper receives
+**exact bytes** of two authorized public forecast-only Git blobs. It checks the
+canonical Git SHA-1 object identifiers, returns an additional SHA-256 digest,
+requires that the child is a byte-for-byte append of the complete parent, and
+allows **exactly four** new JSONL rows, not a changed historical prefix or a
+silent additional forecast. It extracts only the known UTC/origin/horizon/version
+metadata from the four new rows and checks every value against the *claimed*
+projection. It rejects duplicate JSON keys, non-finite constants, unexpected
+outcome keys, missing fields and malformed line endings. The result never
+returns any numerical market/forecast price or scored outcomes.
+
+**Explicit data-scope distinction:** the original elapsed-lead audit consumes
+*only metadata*. The optional new byte binder necessarily receives the raw
+forecast ledger bytes, which include forecast prices, in memory to validate
+Git object identity. It does not perform numeric forecasting, price analysis,
+backtesting or score comparison. Never supply locked OOS or non-approved data.
+
+A successful response certifies only that the **supplied bytes and claimed
+Git blob SHA IDs are internally consistent**. The helper has no GitHub network
+credentials and **cannot authenticate that the two SHA IDs came from the
+actual parent and child commit trees**. The independent reviewer must fetch
+both Git commits, their exact tree paths/blobs, and the published job/run
+envelope via trusted API; then compare these anchored identities before
+qualifying any metadata evidence. Even that is same-provider GitHub evidence,
+not an external immutable first-publication witness, and it cannot close
+A1–A6, make Stage-6 GO, or certify profitability.
+
+A real manual independent GitHub-API case (no numeric prices displayed):
+commit \`7a5599d716dd5ce79b0d012885e08ba17c17bcd3\` has child forecast
+blob \`f795b71d0eb5ad039d77e4090006cf27562228c3\`; parent
+commit \`7570ccfac511145cb9689de5bc57f88597cb5f9e\` has forecast
+blob \`24545ce981bd6a30e542c8856a98cb8dbef0f882\`. The child bytes
+begin with the exact complete parent bytes, followed by exactly four JSONL
+forecast rows; the Git commit's forecast diff additions are identical to
+those appended lines. This case is *observational evidence*, not proof of
+independent timestamp publication or prospective predictive skill.
