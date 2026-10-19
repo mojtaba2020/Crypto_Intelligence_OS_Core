@@ -550,6 +550,8 @@ def bind_supplied_git_ledger_append(
         "scientific_authorization": "NO_RUN",
         "projected_metadata": bound_projection,
     }
+
+
 _FORECAST_LEDGER_GIT_PATH = "research/hourly_forecasts.jsonl"
 _ALLOWED_APPEND_COMMIT_PATHS = frozenset(
     {"research/hourly_forecasts.jsonl", "research/hourly_scores.jsonl"}

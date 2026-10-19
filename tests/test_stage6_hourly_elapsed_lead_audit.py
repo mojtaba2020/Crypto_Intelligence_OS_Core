@@ -692,6 +692,7 @@ def test_git_binding_rejects_issuance_before_source_candle_close():
     with pytest.raises(ValueError, match="precedes source candle close"):
         bind_supplied_git_ledger_append(parent, changed, parent_sha, child_sha, projection)
 
+
 def _git_commit_tree_fixture():
     old, new, old_sha, new_sha, projection = _synthetic_git_append_fixture()
     psha = "a" * 40
@@ -711,22 +712,26 @@ def _git_commit_tree_fixture():
     parent_tree = {
         "sha": ptsha,
         "truncated": False,
-        "entries": [{
-            "path": "research/hourly_forecasts.jsonl",
-            "mode": "100644",
-            "type": "blob",
-            "sha": old_sha,
-        }],
+        "entries": [
+            {
+                "path": "research/hourly_forecasts.jsonl",
+                "mode": "100644",
+                "type": "blob",
+                "sha": old_sha,
+            }
+        ],
     }
     child_tree = {
         "sha": ctsha,
         "truncated": False,
-        "entries": [{
-            "path": "research/hourly_forecasts.jsonl",
-            "mode": "100644",
-            "type": "blob",
-            "sha": new_sha,
-        }],
+        "entries": [
+            {
+                "path": "research/hourly_forecasts.jsonl",
+                "mode": "100644",
+                "type": "blob",
+                "sha": new_sha,
+            }
+        ],
     }
     return parent_commit, child_commit, parent_tree, child_tree, old, new, projection
 
@@ -751,9 +756,7 @@ def test_supplied_git_commit_tree_chain_binds_to_exact_append_without_go():
         (3, "truncated", True, "Complete bounded"),
     ],
 )
-def test_supplied_git_commit_tree_chain_rejects_mismatched_objects(
-    slot, field, newvalue, pattern
-):
+def test_supplied_git_commit_tree_chain_rejects_mismatched_objects(slot, field, newvalue, pattern):
     values = list(_git_commit_tree_fixture())
     values[slot][field] = newvalue
     with pytest.raises(ValueError, match=pattern):
