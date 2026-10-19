@@ -804,6 +804,7 @@ def test_supplied_git_commit_tree_chain_rejects_forged_projection():
 
 
 
+
 def test_git_tree_binder_rejects_hidden_unexpected_security_file_change():
     args = list(_git_commit_tree_fixture())
     parent_entry = {
@@ -820,30 +821,36 @@ def test_git_tree_binder_rejects_hidden_unexpected_security_file_change():
 
 def test_git_tree_binder_rejects_unreported_leaf_removal():
     args = list(_git_commit_tree_fixture())
-    args[2]["entries"].append({
-        "path": "src/security.py",
-        "mode": "100644",
-        "type": "blob",
-        "sha": "3" * 40,
-    })
+    args[2]["entries"].append(
+        {
+            "path": "src/security.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3" * 40,
+        }
+    )
     with pytest.raises(ValueError, match="changed paths disagree"):
         bind_supplied_git_commit_tree_chain(*args)
 
 
 def test_git_tree_binder_accepts_recursive_directory_tree_sha_changes():
     args = list(_git_commit_tree_fixture())
-    args[2]["entries"].append({
-        "path": "research",
-        "mode": "040000",
-        "type": "tree",
-        "sha": "5" * 40,
-    })
-    args[3]["entries"].append({
-        "path": "research",
-        "mode": "040000",
-        "type": "tree",
-        "sha": "6" * 40,
-    })
+    args[2]["entries"].append(
+        {
+            "path": "research",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "5" * 40,
+        }
+    )
+    args[3]["entries"].append(
+        {
+            "path": "research",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "6" * 40,
+        }
+    )
     result = bind_supplied_git_commit_tree_chain(*args)
     assert result["scientific_authorization"] == "NO_RUN"
     assert result["forecast_rows_bound_to_supplied_tree_and_blob_metadata"] is True
