@@ -7,8 +7,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from scripts.stage6_hourly_elapsed_lead_audit import (
     audit_elapsed_lead,
-    bind_supplied_git_ledger_append,
     bind_supplied_git_commit_tree_chain,
+    bind_supplied_git_ledger_append,
     reconcile_github_push_bundle,
 )
 
