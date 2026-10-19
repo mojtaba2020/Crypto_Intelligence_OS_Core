@@ -629,7 +629,7 @@ def bind_supplied_git_commit_tree_chain(
     if parent_sha == child_sha:
         raise ValueError("Child Git commit must differ from its parent")
     parents = child_commit.get("parents")
-    if type(parents) not in (tuple, list) or parents != [parent_sha]:
+    if type(parents) not in (tuple, list) or len(parents) != 1 or parents[0] != parent_sha:
         raise ValueError("Child Git commit must have exactly the supplied parent SHA")
     parent_tree_sha = _sha(parent_commit.get("tree_sha"))
     child_tree_sha = _sha(child_commit.get("tree_sha"))

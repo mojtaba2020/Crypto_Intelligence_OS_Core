@@ -898,3 +898,19 @@ def test_git_tree_binder_detects_changed_executable_symlink_or_submodule(kind, m
         )
     with pytest.raises(ValueError, match="changed paths disagree"):
         bind_supplied_git_commit_tree_chain(*args)
+
+
+
+def test_supplied_git_tree_chain_accepts_single_parent_tuple():
+    args = list(_git_commit_tree_fixture())
+    args[1]["parents"] = tuple(args[1]["parents"])
+    result = bind_supplied_git_commit_tree_chain(*args)
+    assert result["forecast_rows_bound_to_supplied_tree_and_blob_metadata"] is True
+    assert result["scientific_authorization"] == "NO_RUN"
+
+
+def test_supplied_git_tree_chain_rejects_two_parents_even_as_tuple():
+    args = list(_git_commit_tree_fixture())
+    args[1]["parents"] = (args[0]["sha"], "f" * 40)
+    with pytest.raises(ValueError, match="exactly the supplied parent"):
+        bind_supplied_git_commit_tree_chain(*args)
