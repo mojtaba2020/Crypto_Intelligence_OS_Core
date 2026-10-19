@@ -590,6 +590,8 @@ def _tree_leaf_identifiers(
         sha = _sha(entry.get("sha"))
         if kind not in ("tree", "blob", "commit") or not isinstance(mode, str):
             raise ValueError("Unexpected Git tree leaf identity")
+        if path == _FORECAST_LEDGER_GIT_PATH and (kind, mode) != ("blob", "100644"):
+            raise ValueError("Forecast ledger must be an ordinary Git blob")
         if kind != "tree":
             leaves[path] = (kind, mode, sha)
     forecast = leaves.get(_FORECAST_LEDGER_GIT_PATH)
