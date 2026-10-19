@@ -803,8 +803,6 @@ def test_supplied_git_commit_tree_chain_rejects_forged_projection():
         bind_supplied_git_commit_tree_chain(*inputs)
 
 
-
-
 def test_git_tree_binder_rejects_hidden_unexpected_security_file_change():
     args = list(_git_commit_tree_fixture())
     parent_entry = {
