@@ -977,9 +977,7 @@ def test_old_version_cannot_relabel_future_target_as_existing_forecast():
     for i, row in enumerate(rows):
         row["version"] = "hourly-hybrid-ridge-v2"
         projections[i]["version"] = "hourly-hybrid-ridge-v2"
-    changed = old + "".join(
-        json.dumps(row, sort_keys=True) + "\n" for row in rows
-    ).encode()
+    changed = old + "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows).encode()
     child_sha = hashlib.sha1(
         b"blob " + str(len(changed)).encode() + b"\0" + changed,
         usedforsecurity=False,
@@ -994,9 +992,7 @@ def test_full_elapsed_version_cannot_use_old_shortened_target_calendar():
     for i, row in enumerate(rows):
         row["version"] = "stage6-hourly-full-elapsed-v1-research-only"
         projections[i]["version"] = "stage6-hourly-full-elapsed-v1-research-only"
-    changed = old + "".join(
-        json.dumps(row, sort_keys=True) + "\n" for row in rows
-    ).encode()
+    changed = old + "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows).encode()
     child_sha = hashlib.sha1(
         b"blob " + str(len(changed)).encode() + b"\0" + changed,
         usedforsecurity=False,
@@ -1013,9 +1009,7 @@ def test_mixed_version_targets_cannot_pass_as_single_hourly_forecast_batch():
     rows[0]["target_close_utc"] = "2026-10-18T15:00:00+00:00"
     projections[0]["version"] = rows[0]["version"]
     projections[0]["target_close_utc"] = rows[0]["target_close_utc"]
-    changed = old + "".join(
-        json.dumps(row, sort_keys=True) + "\n" for row in rows
-    ).encode()
+    changed = old + "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows).encode()
     child_sha = hashlib.sha1(
         b"blob " + str(len(changed)).encode() + b"\0" + changed,
         usedforsecurity=False,
