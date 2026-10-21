@@ -10,7 +10,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-
 import scripts.stage6_rfc3161_seal as seal_module
 from scripts.stage6_rfc3161_seal import verify_future_only_rfc3161_seal
 
