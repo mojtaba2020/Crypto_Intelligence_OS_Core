@@ -15,6 +15,8 @@ import scripts.stage6_rfc3161_seal as seal_module
 from scripts.stage6_rfc3161_seal import verify_future_only_rfc3161_seal
 
 POLICY = "1.3.6.1.4.1.57615.6.1"
+
+
 def _mock_future_forecast_bundle(origin_hour: int) -> bytes:
     source = datetime.fromtimestamp(origin_hour, tz=UTC)
     issued = (source + timedelta(hours=1)).isoformat()
@@ -369,15 +371,32 @@ def _resign_mock_bundle(
     query = tmp_path / "new_query.tsq"
     reply = tmp_path / "new_response.tsr"
     _call(
-        "openssl", "ts", "-query", "-data", str(path), "-sha256",
-        "-cert", "-out", str(query),
+        "openssl",
+        "ts",
+        "-query",
+        "-data",
+        str(path),
+        "-sha256",
+        "-cert",
+        "-out",
+        str(query),
     )
     _call(
-        "openssl", "ts", "-reply", "-queryfile", str(query),
-        "-signer", str(source["signer_cert_path"]),
-        "-inkey", str(source["signer_key_path"]),
-        "-chain", str(source["root_certificate_path"]),
-        "-tspolicy", POLICY, "-out", str(reply),
+        "openssl",
+        "ts",
+        "-reply",
+        "-queryfile",
+        str(query),
+        "-signer",
+        str(source["signer_cert_path"]),
+        "-inkey",
+        str(source["signer_key_path"]),
+        "-chain",
+        str(source["root_certificate_path"]),
+        "-tspolicy",
+        POLICY,
+        "-out",
+        str(reply),
     )
     return query.read_bytes(), reply.read_bytes()
 
@@ -420,7 +439,8 @@ def test_duplicate_signed_origin_metadata_key_rejected(synthetic_tsa, tmp_path: 
     origin = int(synthetic_tsa["origin_hour"])
     bundle = _mock_future_forecast_bundle(origin)
     replaced = bundle.replace(
-        b'"origin_hour_utc": ', b'"origin_hour_utc": "forged", "origin_hour_utc": ',
+        b'"origin_hour_utc": ',
+        b'"origin_hour_utc": "forged", "origin_hour_utc": ',
         1,
     )
     query, response = _resign_mock_bundle(synthetic_tsa, tmp_path, replaced)

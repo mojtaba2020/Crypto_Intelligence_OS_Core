@@ -27,9 +27,7 @@ SECOND_NS = 1_000_000_000
 HOUR_NS = 3600 * SECOND_NS
 POLICY_OID = re.compile(r"^[0-2](?:\.(?:0|[1-9]\d*)){2,18}$")
 SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
-BUNDLE_TIMESTAMP_RE = re.compile(
-    r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,6})?(?:Z|\+00:00)$"
-)
+BUNDLE_TIMESTAMP_RE = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,6})?(?:Z|\+00:00)$")
 SIGNED_FORECAST_VERSION = "stage6-hourly-full-elapsed-v1-research-only"
 SIGNED_ROW_FIELDS = frozenset(
     {
