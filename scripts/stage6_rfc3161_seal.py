@@ -10,6 +10,7 @@ from __future__ import annotations
 import calendar
 import hashlib
 import hmac
+import json
 import os
 import re
 import shutil
@@ -26,6 +27,29 @@ SECOND_NS = 1_000_000_000
 HOUR_NS = 3600 * SECOND_NS
 POLICY_OID = re.compile(r"^[0-2](?:\.(?:0|[1-9]\d*)){2,18}$")
 SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
+BUNDLE_TIMESTAMP_RE = re.compile(
+    r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,6})?(?:Z|\+00:00)$"
+)
+SIGNED_FORECAST_VERSION = "stage6-hourly-full-elapsed-v1-research-only"
+SIGNED_ROW_FIELDS = frozenset(
+    {
+        "version",
+        "issued_at_utc",
+        "origin_hour_utc",
+        "target_hour_utc",
+        "target_close_utc",
+        "horizon_hours",
+        "origin_close_usd",
+        "forecast_usd",
+        "persistence_usd",
+        "observed_volatility_hourly",
+        "training_hours",
+        "resolved_training_examples",
+        "holdout_selected_blend",
+        "source",
+        "research_only",
+    }
+)
 STAMP_RE = re.compile(
     r"^Time stamp: (?P<date>[A-Z][a-z]{2} +\d{1,2} +\d{2}:\d{2}:\d{2} +\d{4})"
     r"(?P<subseconds>\.\d{1,9})? GMT$",
@@ -70,6 +94,76 @@ def _stamp_ns(text: str) -> int:
         raise ValueError("Invalid signed UTC timestamp") from exc
     nanos = int(fraction[1:].ljust(9, "0")) if fraction else 0
     return calendar.timegm(stamp.timetuple()) * SECOND_NS + nanos
+
+
+def _unique_json_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("Duplicate key in signed forecast record")
+        result[key] = value
+    return result
+
+
+def _invalid_json_constant(value: str) -> None:
+    raise ValueError("Non-finite signed JSON value not permitted")
+
+
+def _strict_utc_ns(value: object, field: str) -> int:
+    if not isinstance(value, str) or not BUNDLE_TIMESTAMP_RE.fullmatch(value):
+        raise ValueError(f"Signed {field} must be UTC with explicit Z or +00:00")
+    try:
+        stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"Invalid signed {field}") from exc
+    if stamp.utcoffset() is None or stamp.utcoffset().total_seconds() != 0:
+        raise ValueError(f"Signed {field} must use UTC")
+    return calendar.timegm(stamp.timetuple()) * SECOND_NS + stamp.microsecond * 1000
+
+
+def _check_four_signed_forecasts(bundle: bytes, source_origin: int, gen_ns: int) -> None:
+    """Derive the origin and H+1 targets from signed bytes, never caller metadata."""
+    if b"\r" in bundle or not bundle.endswith(b"\n"):
+        raise ValueError("Signed forecast bundle must be canonical newline-complete JSONL")
+    lines = bundle.splitlines(keepends=True)
+    if len(lines) != len(HORIZONS_HOURS) or any(not line.endswith(b"\n") for line in lines):
+        raise ValueError("Exactly four signed forecast JSONL rows required")
+    expected_origin_ns = source_origin * SECOND_NS
+    issues: set[int] = set()
+    for line, horizon in zip(lines, HORIZONS_HOURS, strict=True):
+        try:
+            row = json.loads(
+                line.decode("utf-8"),
+                object_pairs_hook=_unique_json_pairs,
+                parse_constant=_invalid_json_constant,
+            )
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("Malformed signed forecast JSONL") from exc
+        if (
+            type(row) is not dict
+            or set(row) != SIGNED_ROW_FIELDS
+            or row.get("version") != SIGNED_FORECAST_VERSION
+            or row.get("research_only") is not True
+            or row.get("source") != "coinbase:exchange:BTC-USD:1h:close"
+            or type(row.get("horizon_hours")) is not int
+            or row["horizon_hours"] != horizon
+        ):
+            raise ValueError("Signed forecast version, horizon or schema mismatch")
+        origin_ns = _strict_utc_ns(row["origin_hour_utc"], "origin")
+        issue_ns = _strict_utc_ns(row["issued_at_utc"], "issuance")
+        target_hour_ns = _strict_utc_ns(row["target_hour_utc"], "target hour")
+        target_close_ns = _strict_utc_ns(row["target_close_utc"], "target close")
+        if origin_ns != expected_origin_ns:
+            raise ValueError("Signed forecast origin differs from declared source origin")
+        if target_hour_ns != (source_origin + (horizon + 1) * 3600) * SECOND_NS:
+            raise ValueError("Signed forecast target hour does not match H+1 label shift")
+        if target_close_ns != (source_origin + (horizon + 2) * 3600) * SECOND_NS:
+            raise ValueError("Signed forecast target close does not match H+1 label shift")
+        if not (origin_ns + HOUR_NS <= issue_ns <= gen_ns):
+            raise ValueError("Signed forecast issuance outside source-close-to-token window")
+        issues.add(issue_ns)
+    if len(issues) != 1:
+        raise ValueError("Signed forecast bundle contains mixed issuance timestamps")
 
 
 def verify_future_only_rfc3161_seal(
@@ -230,6 +324,9 @@ def verify_future_only_rfc3161_seal(
     if not re.search(policy_re, reply_text, re.MULTILINE):
         raise ValueError("RFC3161 token policy is not predeclared policy")
 
+    # A signed token must authenticate its OWN four-row origin/target calendar.
+    # Caller-provided source_origin cannot promote an older, valid signature.
+    _check_four_signed_forecasts(bundle, source_origin_hour_utc, stamp_ns)
     bar_closed_ns = (source_origin_hour_utc + 3600) * SECOND_NS
     row_info: list[dict[str, object]] = []
     for h in HORIZONS_HOURS:
@@ -262,6 +359,7 @@ def verify_future_only_rfc3161_seal(
         "tsa_policy_oid": expected_policy_oid,
         "tsa_signed_utc_time_ns": stamp_ns,
         "rfc3161_signature_nonce_imprint_and_configured_chain_verified": True,
+        "signed_four_forecast_origin_and_target_calendar_verified": True,
         "forecast_bytes_bound_to_real_committed_git_blob_by_this_function": False,
         "trust_root_independently_preapproved_by_this_function": False,
         "tsa_certificate_revocation_independently_checked": False,

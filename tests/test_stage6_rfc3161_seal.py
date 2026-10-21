@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import shutil
 import subprocess
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -14,7 +15,31 @@ import scripts.stage6_rfc3161_seal as seal_module
 from scripts.stage6_rfc3161_seal import verify_future_only_rfc3161_seal
 
 POLICY = "1.3.6.1.4.1.57615.6.1"
-SYNTHETIC = b'{"synthetic_forecast_bundle": "not_real_market_data"}\n'
+def _mock_future_forecast_bundle(origin_hour: int) -> bytes:
+    source = datetime.fromtimestamp(origin_hour, tz=UTC)
+    issued = (source + timedelta(hours=1)).isoformat()
+    rows = []
+    for horizon in (1, 4, 12, 24):
+        rows.append(
+            {
+                "version": "stage6-hourly-full-elapsed-v1-research-only",
+                "issued_at_utc": issued,
+                "origin_hour_utc": source.isoformat(),
+                "target_hour_utc": (source + timedelta(hours=horizon + 1)).isoformat(),
+                "target_close_utc": (source + timedelta(hours=horizon + 2)).isoformat(),
+                "horizon_hours": horizon,
+                "origin_close_usd": 10.0,
+                "forecast_usd": 11.0,
+                "persistence_usd": 10.0,
+                "observed_volatility_hourly": 0.1,
+                "training_hours": 720,
+                "resolved_training_examples": 500,
+                "holdout_selected_blend": 0.25,
+                "source": "coinbase:exchange:BTC-USD:1h:close",
+                "research_only": True,
+            }
+        )
+    return "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows).encode()
 
 
 def _call(*args: str) -> None:
@@ -92,8 +117,10 @@ def synthetic_tsa(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]
         "-out",
         str(tsa),
     )
+    origin_hour = int(datetime.now(UTC).timestamp()) // 3600 * 3600 - 3600
+    synthetic_bundle = _mock_future_forecast_bundle(origin_hour)
     payload = tmp / "batch.txt"
-    payload.write_bytes(SYNTHETIC)
+    payload.write_bytes(synthetic_bundle)
     query, response = tmp / "query.tsq", tmp / "response.tsr"
     _call(
         "openssl",
@@ -139,8 +166,11 @@ def synthetic_tsa(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]
         capture_output=True,
     ).stdout
     return {
-        "bundle": SYNTHETIC,
-        "sha": hashlib.sha256(SYNTHETIC).hexdigest(),
+        "bundle": synthetic_bundle,
+        "sha": hashlib.sha256(synthetic_bundle).hexdigest(),
+        "origin_hour": origin_hour,
+        "signer_cert_path": tsa,
+        "signer_key_path": tsa_key,
         "query": query.read_bytes(),
         "response": response.read_bytes(),
         "root": root_bytes,
@@ -157,7 +187,7 @@ def synthetic_tsa(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]
 
 def kwargs(source: dict[str, object], *, origin_hour: int | None = None) -> dict[str, object]:
     if origin_hour is None:
-        origin_hour = int(source["signed_hour"]) - 3600
+        origin_hour = int(source["origin_hour"])
     return {
         "forecast_bundle": source["bundle"],
         "expected_bundle_sha256": source["sha"],
@@ -183,12 +213,10 @@ def test_signed_synthetic_rfc3161_verifies_bundle_and_future_targets(synthetic_t
     assert evidence["scientific_authorization"] == "NO_RUN"
 
 
-def test_signed_synthetic_rfc3161_blocks_old_origin_even_when_signature_valid(synthetic_tsa):
-    origin = int(synthetic_tsa["signed_hour"]) - 12 * 3600
-    ev = verify_future_only_rfc3161_seal(**kwargs(synthetic_tsa, origin_hour=origin))
-    assert ev["status"] == "CONFIGURED_TSA_SIGNED_BUT_OUTSIDE_PREDECLARED_WINDOW"
-    assert ev["all_full_elapsed_horizons_eligible_against_signed_time"] is False
-    assert ev["horizons"][0]["signed_minimum_elapsed_eligible"] is False
+def test_signed_token_cannot_relabel_old_origin_as_new(synthetic_tsa):
+    wrong_origin = int(synthetic_tsa["origin_hour"]) - 12 * 3600
+    with pytest.raises(ValueError, match="origin differs"):
+        verify_future_only_rfc3161_seal(**kwargs(synthetic_tsa, origin_hour=wrong_origin))
 
 
 def test_tampered_payload_with_original_declared_sha_rejected(synthetic_tsa):
@@ -331,3 +359,75 @@ def test_certificate_chain_is_checked_at_signed_token_time(synthetic_tsa, monkey
     value = verify_future_only_rfc3161_seal(**kwargs(synthetic_tsa))
     assert value["tsa_signer_cert_validity_checked_at_signed_time"] is True
     assert seen == [int(synthetic_tsa["signed_time_epoch"])] * 2
+
+
+def _resign_mock_bundle(
+    source: dict[str, object], tmp_path: Path, forecast_bundle: bytes
+) -> tuple[bytes, bytes]:
+    path = tmp_path / "signed_forecasts.jsonl"
+    path.write_bytes(forecast_bundle)
+    query = tmp_path / "new_query.tsq"
+    reply = tmp_path / "new_response.tsr"
+    _call(
+        "openssl", "ts", "-query", "-data", str(path), "-sha256",
+        "-cert", "-out", str(query),
+    )
+    _call(
+        "openssl", "ts", "-reply", "-queryfile", str(query),
+        "-signer", str(source["signer_cert_path"]),
+        "-inkey", str(source["signer_key_path"]),
+        "-chain", str(source["root_certificate_path"]),
+        "-tspolicy", POLICY, "-out", str(reply),
+    )
+    return query.read_bytes(), reply.read_bytes()
+
+
+def test_signed_but_truly_old_forecast_origin_is_blocked(synthetic_tsa, tmp_path: Path):
+    past_origin = int(synthetic_tsa["origin_hour"]) - 12 * 3600
+    old_bundle = _mock_future_forecast_bundle(past_origin)
+    query, response = _resign_mock_bundle(synthetic_tsa, tmp_path, old_bundle)
+    params = kwargs(synthetic_tsa, origin_hour=past_origin)
+    params["forecast_bundle"] = old_bundle
+    params["expected_bundle_sha256"] = hashlib.sha256(old_bundle).hexdigest()
+    params["request_der"] = query
+    params["response_der"] = response
+    result = verify_future_only_rfc3161_seal(**params)
+    assert result["status"] == "CONFIGURED_TSA_SIGNED_BUT_OUTSIDE_PREDECLARED_WINDOW"
+    assert result["all_full_elapsed_horizons_eligible_against_signed_time"] is False
+
+
+def test_signed_wrong_target_close_cannot_pass_even_when_root_and_signer_valid(
+    synthetic_tsa, tmp_path: Path
+):
+    source_origin = int(synthetic_tsa["origin_hour"])
+    rows = [
+        json.loads(line)
+        for line in _mock_future_forecast_bundle(source_origin).decode().splitlines()
+    ]
+    rows[0]["target_close_utc"] = rows[1]["target_close_utc"]
+    wrong_bundle = "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows).encode()
+    query, response = _resign_mock_bundle(synthetic_tsa, tmp_path, wrong_bundle)
+    params = kwargs(synthetic_tsa)
+    params["forecast_bundle"] = wrong_bundle
+    params["expected_bundle_sha256"] = hashlib.sha256(wrong_bundle).hexdigest()
+    params["request_der"] = query
+    params["response_der"] = response
+    with pytest.raises(ValueError, match="target close does not match"):
+        verify_future_only_rfc3161_seal(**params)
+
+
+def test_duplicate_signed_origin_metadata_key_rejected(synthetic_tsa, tmp_path: Path):
+    origin = int(synthetic_tsa["origin_hour"])
+    bundle = _mock_future_forecast_bundle(origin)
+    replaced = bundle.replace(
+        b'"origin_hour_utc": ', b'"origin_hour_utc": "forged", "origin_hour_utc": ',
+        1,
+    )
+    query, response = _resign_mock_bundle(synthetic_tsa, tmp_path, replaced)
+    params = kwargs(synthetic_tsa)
+    params["forecast_bundle"] = replaced
+    params["expected_bundle_sha256"] = hashlib.sha256(replaced).hexdigest()
+    params["request_der"] = query
+    params["response_der"] = response
+    with pytest.raises(ValueError, match="Duplicate key"):
+        verify_future_only_rfc3161_seal(**params)

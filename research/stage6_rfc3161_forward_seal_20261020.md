@@ -154,3 +154,27 @@ actually received bytes in real time; the trust-anchor approval, revocation,
 time-service policy and independent public release must still be established.
 `tsa_signer_independently_preapproved_by_this_function=False` and
 `scientific_authorization=NO_RUN` remain unchanged.
+
+### Critical P2 closure — no origin relabeling of correctly signed old forecasts
+
+The independent Codex review of the 217-test version identified that callers
+could supply a **new** source origin when verifying a token issued over
+**older forecast bytes**, making the time arithmetic appear eligible. This
+was a real label-laundering weakness. The verifier now requires the signed
+imprint to cover an exact, canonical four-row JSONL forecast bundle containing
+the **new versioned full-elapsed model**. The verifier independently extracts
+and validates each row's UTC `origin_hour_utc`, H+1 target hour, H+2 target
+close, and shared issuance time; it refuses caller source-origin mismatches,
+mixed generations, extra/missing records, duplicate JSON keys and malformed
+timestamps before assigning any `signed_minimum_elapsed_eligible` flag.
+A token signed now over legitimately old-origin rows **remains ineligible**
+instead of accepting a newer caller-selected origin.
+
+Tests generate synthetic four-row forecast JSONL before signing with an
+ephemeral local CA/TSA. They specifically (1) reject attempts to relabel
+a valid token's old origin, (2) sign *actual old-origin* synthetic forecasts
+now and preserve BLOCKED status, (3) reject signed target-close mismatch
+with a valid signature, and (4) reject duplicate signed origin keys. This
+proves only **internal signed-bundle/calendar consistency**; no real external
+TSA, production model, trusted timestamp deployment, immutable public posting,
+source market vintage or Stage-6 GO is implied.
