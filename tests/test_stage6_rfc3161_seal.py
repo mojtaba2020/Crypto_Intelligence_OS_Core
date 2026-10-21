@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+
+import scripts.stage6_rfc3161_seal as seal_module
 from scripts.stage6_rfc3161_seal import verify_future_only_rfc3161_seal
 
 POLICY = "1.3.6.1.4.1.57615.6.1"
@@ -132,6 +134,11 @@ def synthetic_tsa(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]
     assert match is not None
     signed_time = datetime.strptime(match.group(1), "%b %d %H:%M:%S %Y").replace(tzinfo=UTC)
     root_bytes = root.read_bytes()
+    signer_der = subprocess.run(  # noqa: S603 - test-only OpenSSL certificate.
+        [openssl_path, "x509", "-in", str(tsa), "-outform", "DER"],
+        check=True,
+        capture_output=True,
+    ).stdout
     return {
         "bundle": SYNTHETIC,
         "sha": hashlib.sha256(SYNTHETIC).hexdigest(),
@@ -140,6 +147,11 @@ def synthetic_tsa(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]
         "root": root_bytes,
         "root_sha": hashlib.sha256(root_bytes).hexdigest(),
         "tsa": tsa.read_bytes(),
+        "tsa_cert_sha256": hashlib.sha256(signer_der).hexdigest(),
+        "root_certificate_path": root,
+        "root_private_key_path": root_key,
+        "extensions_path": extensions,
+        "signed_time_epoch": int(signed_time.timestamp()),
         "signed_hour": int(signed_time.timestamp()) // 3600 * 3600,
     }
 
@@ -155,6 +167,7 @@ def kwargs(source: dict[str, object], *, origin_hour: int | None = None) -> dict
         "tsa_trust_root_pem": source["root"],
         "expected_root_pem_sha256": source["root_sha"],
         "tsa_untrusted_chain_pem": source["tsa"],
+        "expected_signer_cert_sha256": source["tsa_cert_sha256"],
         "expected_policy_oid": POLICY,
         "source_origin_hour_utc": origin_hour,
     }
@@ -234,3 +247,58 @@ def test_different_valid_query_nonce_does_not_verify(synthetic_tsa, tmp_path: Pa
     p["request_der"] = alternative_query.read_bytes()
     with pytest.raises(ValueError, match="signature, nonce, content or chain"):
         verify_future_only_rfc3161_seal(**p)
+
+
+def test_wrong_signer_certificate_fingerprint_blocks(synthetic_tsa):
+    params = kwargs(synthetic_tsa)
+    params["expected_signer_cert_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="unpinned TSA certificate"):
+        verify_future_only_rfc3161_seal(**params)
+
+
+def test_different_signer_under_same_root_rejected(synthetic_tsa, tmp_path: Path):
+    other_key = tmp_path / "other.key"
+    other_csr = tmp_path / "other.csr"
+    other_cert = tmp_path / "other.pem"
+    _call(
+        "openssl", "req", "-new", "-newkey", "rsa:2048", "-nodes",
+        "-subj", "/CN=Unapproved Timestamp Leaf", "-keyout", str(other_key),
+        "-out", str(other_csr),
+    )
+    _call(
+        "openssl", "x509", "-req", "-in", str(other_csr),
+        "-CA", str(synthetic_tsa["root_certificate_path"]),
+        "-CAkey", str(synthetic_tsa["root_private_key_path"]),
+        "-CAcreateserial", "-days", "2",
+        "-extfile", str(synthetic_tsa["extensions_path"]),
+        "-out", str(other_cert),
+    )
+    old_query = tmp_path / "same_query.tsq"
+    old_query.write_bytes(synthetic_tsa["query"])
+    alternate = tmp_path / "alternate_response.tsr"
+    _call(
+        "openssl", "ts", "-reply", "-queryfile", str(old_query),
+        "-signer", str(other_cert), "-inkey", str(other_key),
+        "-chain", str(synthetic_tsa["root_certificate_path"]),
+        "-tspolicy", POLICY, "-out", str(alternate),
+    )
+    params = kwargs(synthetic_tsa)
+    params["response_der"] = alternate.read_bytes()
+    with pytest.raises(ValueError, match="unpinned TSA certificate"):
+        verify_future_only_rfc3161_seal(**params)
+
+
+def test_certificate_chain_is_checked_at_signed_token_time(synthetic_tsa, monkeypatch):
+    seen: list[int] = []
+    original = seal_module._openssl
+
+    def observing_openssl(openssl_path: str, *args: str) -> str:
+        if args[:2] == ("ts", "-verify"):
+            idx = args.index("-attime")
+            seen.append(int(args[idx + 1]))
+        return original(openssl_path, *args)
+
+    monkeypatch.setattr(seal_module, "_openssl", observing_openssl)
+    value = verify_future_only_rfc3161_seal(**kwargs(synthetic_tsa))
+    assert value["tsa_signer_cert_validity_checked_at_signed_time"] is True
+    assert seen == [int(synthetic_tsa["signed_time_epoch"])] * 2

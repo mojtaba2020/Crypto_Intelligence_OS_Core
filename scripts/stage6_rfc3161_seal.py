@@ -81,6 +81,7 @@ def verify_future_only_rfc3161_seal(
     tsa_trust_root_pem: bytes,
     expected_root_pem_sha256: str,
     tsa_untrusted_chain_pem: bytes,
+    expected_signer_cert_sha256: str,
     expected_policy_oid: str,
     source_origin_hour_utc: int,
 ) -> dict[str, object]:
@@ -106,6 +107,11 @@ def verify_future_only_rfc3161_seal(
         raise ValueError("A predeclared TSA trust-root SHA256 is required")
     if not hmac.compare_digest(hashlib.sha256(root).hexdigest(), expected_root_pem_sha256):
         raise ValueError("TSA trust-root material differs from the pinned digest")
+    if (
+        type(expected_signer_cert_sha256) is not str
+        or not SHA256_HEX.fullmatch(expected_signer_cert_sha256)
+    ):
+        raise ValueError("A predeclared TSA signing certificate fingerprint is required")
     if type(expected_policy_oid) is not str or not POLICY_OID.fullmatch(expected_policy_oid):
         raise ValueError("An exact predeclared TSA policy OID is required")
     if (
@@ -130,6 +136,37 @@ def verify_future_only_rfc3161_seal(
         }
         for filename, content in files.items():
             (temp / filename).write_bytes(content)
+        reply_text = _openssl(openssl_path, "ts", "-reply", "-in", str(temp / "response"), "-text")
+        # Unverified genTime is used *only* to select verification epoch.
+        stamp_ns = _stamp_ns(reply_text)
+        epoch_floor = stamp_ns // SECOND_NS
+        epoch_ceil = (stamp_ns + SECOND_NS - 1) // SECOND_NS
+        _openssl(
+            openssl_path, "ts", "-reply", "-in", str(temp / "response"),
+            "-token_out", "-out", str(temp / "token.der"),
+        )
+        _openssl(
+            openssl_path, "cms", "-verify", "-inform", "DER",
+            "-in", str(temp / "token.der"), "-noverify", "-binary",
+            "-signer", str(temp / "actual_signer.pem"),
+            "-out", str(temp / "verified_tstinfo.der"),
+        )
+        signer_bytes = (temp / "actual_signer.pem").read_bytes()
+        if signer_bytes.count(b"-----BEGIN CERTIFICATE-----") != 1:
+            raise ValueError("RFC3161 token must contain exactly one CMS signer")
+        fingerprint_line = _openssl(
+            openssl_path, "x509", "-in", str(temp / "actual_signer.pem"),
+            "-noout", "-fingerprint", "-sha256",
+        ).strip()
+        label, separator, fingerprint = fingerprint_line.partition("=")
+        observed = fingerprint.replace(":", "").lower()
+        if (
+            separator != "="
+            or label.lower() != "sha256 fingerprint"
+            or not SHA256_HEX.fullmatch(observed)
+            or not hmac.compare_digest(observed, expected_signer_cert_sha256)
+        ):
+            raise ValueError("RFC3161 token signed by unpinned TSA certificate")
         base_args = (
             "-in",
             str(temp / "response"),
@@ -138,13 +175,19 @@ def verify_future_only_rfc3161_seal(
             "-untrusted",
             str(temp / "untrusted"),
         )
-        # Queryfile verifies the nonce and request's message imprint.
-        _openssl(openssl_path, "ts", "-verify", *base_args, "-queryfile", str(temp / "query"))
-        # Independently insist that the request/token imprint binds to this
-        # exact full forecast bundle (not a detached or unreviewed hash claim).
-        _openssl(openssl_path, "ts", "-verify", *base_args, "-data", str(temp / "payload"))
+        # The signer must validate at the TSA's own signed time, not "now".
+        # Check both adjacent whole seconds for fractional genTime.
+        for epoch in sorted({epoch_floor, epoch_ceil}):
+            timed_args = (*base_args, "-attime", str(epoch))
+            _openssl(
+                openssl_path, "ts", "-verify", *timed_args,
+                "-queryfile", str(temp / "query"),
+            )
+            _openssl(
+                openssl_path, "ts", "-verify", *timed_args,
+                "-data", str(temp / "payload"),
+            )
         request_text = _openssl(openssl_path, "ts", "-query", "-in", str(temp / "query"), "-text")
-        reply_text = _openssl(openssl_path, "ts", "-reply", "-in", str(temp / "response"), "-text")
 
     if len(re.findall(r"^Hash Algorithm: sha256$", request_text, re.MULTILINE)) != 1:
         raise ValueError("RFC3161 timestamp request must use SHA256")
@@ -160,7 +203,6 @@ def verify_future_only_rfc3161_seal(
     if not re.search(policy_re, reply_text, re.MULTILINE):
         raise ValueError("RFC3161 token policy is not predeclared policy")
 
-    stamp_ns = _stamp_ns(reply_text)
     bar_closed_ns = (source_origin_hour_utc + 3600) * SECOND_NS
     row_info: list[dict[str, object]] = []
     for h in HORIZONS_HOURS:
@@ -187,6 +229,9 @@ def verify_future_only_rfc3161_seal(
         ),
         "forecast_bundle_sha256": expected_bundle_sha256,
         "tsa_trust_root_sha256": expected_root_pem_sha256,
+        "tsa_signing_cert_sha256": expected_signer_cert_sha256,
+        "tsa_signer_cert_validity_checked_at_signed_time": True,
+        "tsa_signer_independently_preapproved_by_this_function": False,
         "tsa_policy_oid": expected_policy_oid,
         "tsa_signed_utc_time_ns": stamp_ns,
         "rfc3161_signature_nonce_imprint_and_configured_chain_verified": True,

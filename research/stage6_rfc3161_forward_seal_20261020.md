@@ -135,3 +135,22 @@ Synthetic tests verify both valid versions and reject old-model relabeling,
 unshifted new-version target bars, and mixed-version batches. **This is
 schema-only support**; it does not train this new model, run production
 forecasts, authorize OOS evaluation or independently authenticate publication.
+
+### Adversarial signer identity and signed-epoch checks
+
+After independent Codex P2 findings, the verifier now extracts the **actual**
+CMS signing certificate from the TimeStampToken and compares its SHA-256
+DER certificate fingerprint to `expected_signer_cert_sha256`, a separately
+predeclared fingerprint. A different, valid TSA signing certificate issued
+by the *same* trusted CA is a hard failure, even with the same message
+imprint and query nonce.
+
+The token's as-yet-untrusted `genTime` is used solely to select the OpenSSL
+`ts -verify -attime` certificate-validity epoch. Nonce/query verification
+and exact full-content verification both run at that epoch, with both floor
+and ceil seconds required for fractional token times. This is an offline
+cryptographic test under a synthetic root, not evidence that an external TSA
+actually received bytes in real time; the trust-anchor approval, revocation,
+time-service policy and independent public release must still be established.
+`tsa_signer_independently_preapproved_by_this_function=False` and
+`scientific_authorization=NO_RUN` remain unchanged.
