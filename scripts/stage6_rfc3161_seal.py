@@ -96,9 +96,7 @@ def verify_future_only_rfc3161_seal(
     response = _verified_input(response_der, name="RFC3161 reply", limit=MAX_DER_BYTES)
     root = _verified_input(tsa_trust_root_pem, name="Trust root", limit=MAX_PEM_BYTES)
     signer = _verified_input(tsa_untrusted_chain_pem, name="TSA signer", limit=MAX_PEM_BYTES)
-    if type(expected_bundle_sha256) is not str or not SHA256_HEX.fullmatch(
-        expected_bundle_sha256
-    ):
+    if type(expected_bundle_sha256) is not str or not SHA256_HEX.fullmatch(expected_bundle_sha256):
         raise ValueError("A predeclared SHA256 forecast bundle digest is required")
     if not hmac.compare_digest(hashlib.sha256(bundle).hexdigest(), expected_bundle_sha256):
         raise ValueError("Forecast bundle differs from the predeclared SHA256 digest")
@@ -133,9 +131,12 @@ def verify_future_only_rfc3161_seal(
         for filename, content in files.items():
             (temp / filename).write_bytes(content)
         base_args = (
-            "-in", str(temp / "response"),
-            "-CAfile", str(temp / "root"),
-            "-untrusted", str(temp / "untrusted"),
+            "-in",
+            str(temp / "response"),
+            "-CAfile",
+            str(temp / "root"),
+            "-untrusted",
+            str(temp / "untrusted"),
         )
         # Queryfile verifies the nonce and request's message imprint.
         _openssl(openssl_path, "ts", "-verify", *base_args, "-queryfile", str(temp / "query"))

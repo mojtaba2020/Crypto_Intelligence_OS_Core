@@ -31,16 +31,39 @@ def synthetic_tsa(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]
     root_key, root = tmp / "root.key", tmp / "root.pem"
     tsa_key, tsa_csr, tsa = tmp / "tsa.key", tmp / "tsa.csr", tmp / "tsa.pem"
     _call(
-        "openssl", "req", "-new", "-x509", "-newkey", "rsa:2048", "-nodes",
-        "-days", "2", "-subj", "/CN=Stage6 Temporary Test Root",
-        "-addext", "basicConstraints=critical,CA:TRUE",
-        "-addext", "keyUsage=critical,keyCertSign,cRLSign",
-        "-keyout", str(root_key), "-out", str(root),
+        "openssl",
+        "req",
+        "-new",
+        "-x509",
+        "-newkey",
+        "rsa:2048",
+        "-nodes",
+        "-days",
+        "2",
+        "-subj",
+        "/CN=Stage6 Temporary Test Root",
+        "-addext",
+        "basicConstraints=critical,CA:TRUE",
+        "-addext",
+        "keyUsage=critical,keyCertSign,cRLSign",
+        "-keyout",
+        str(root_key),
+        "-out",
+        str(root),
     )
     _call(
-        "openssl", "req", "-new", "-newkey", "rsa:2048", "-nodes",
-        "-subj", "/CN=Stage6 Temporary Test TSA", "-keyout", str(tsa_key),
-        "-out", str(tsa_csr),
+        "openssl",
+        "req",
+        "-new",
+        "-newkey",
+        "rsa:2048",
+        "-nodes",
+        "-subj",
+        "/CN=Stage6 Temporary Test TSA",
+        "-keyout",
+        str(tsa_key),
+        "-out",
+        str(tsa_csr),
     )
     extensions = tmp / "tsa.ext"
     extensions.write_text(
@@ -51,31 +74,63 @@ def synthetic_tsa(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]
         "authorityKeyIdentifier=keyid,issuer\n"
     )
     _call(
-        "openssl", "x509", "-req", "-in", str(tsa_csr), "-CA", str(root),
-        "-CAkey", str(root_key), "-CAcreateserial", "-days", "2",
-        "-extfile", str(extensions), "-out", str(tsa),
+        "openssl",
+        "x509",
+        "-req",
+        "-in",
+        str(tsa_csr),
+        "-CA",
+        str(root),
+        "-CAkey",
+        str(root_key),
+        "-CAcreateserial",
+        "-days",
+        "2",
+        "-extfile",
+        str(extensions),
+        "-out",
+        str(tsa),
     )
     payload = tmp / "batch.txt"
     payload.write_bytes(SYNTHETIC)
     query, response = tmp / "query.tsq", tmp / "response.tsr"
     _call(
-        "openssl", "ts", "-query", "-data", str(payload), "-sha256",
-        "-cert", "-out", str(query),
+        "openssl",
+        "ts",
+        "-query",
+        "-data",
+        str(payload),
+        "-sha256",
+        "-cert",
+        "-out",
+        str(query),
     )
     _call(
-        "openssl", "ts", "-reply", "-queryfile", str(query),
-        "-signer", str(tsa), "-inkey", str(tsa_key), "-chain", str(root),
-        "-tspolicy", POLICY, "-out", str(response),
+        "openssl",
+        "ts",
+        "-reply",
+        "-queryfile",
+        str(query),
+        "-signer",
+        str(tsa),
+        "-inkey",
+        str(tsa_key),
+        "-chain",
+        str(root),
+        "-tspolicy",
+        POLICY,
+        "-out",
+        str(response),
     )
     display = subprocess.run(  # noqa: S603 - local generated DER only.
         [openssl_path, "ts", "-reply", "-in", str(response), "-text"],
-        text=True, capture_output=True, check=True,
+        text=True,
+        capture_output=True,
+        check=True,
     ).stdout
     match = re.search(r"^Time stamp: (.+) GMT$", display, flags=re.MULTILINE)
     assert match is not None
-    signed_time = datetime.strptime(match.group(1), "%b %d %H:%M:%S %Y").replace(
-        tzinfo=UTC
-    )
+    signed_time = datetime.strptime(match.group(1), "%b %d %H:%M:%S %Y").replace(tzinfo=UTC)
     root_bytes = root.read_bytes()
     return {
         "bundle": SYNTHETIC,
@@ -165,8 +220,15 @@ def test_different_valid_query_nonce_does_not_verify(synthetic_tsa, tmp_path: Pa
     payload.write_bytes(synthetic_tsa["bundle"])
     alternative_query = tmp_path / "different_nonce.tsq"
     _call(
-        "openssl", "ts", "-query", "-data", str(payload), "-sha256", "-cert",
-        "-out", str(alternative_query),
+        "openssl",
+        "ts",
+        "-query",
+        "-data",
+        str(payload),
+        "-sha256",
+        "-cert",
+        "-out",
+        str(alternative_query),
     )
     p = kwargs(synthetic_tsa)
     p["request_der"] = alternative_query.read_bytes()
