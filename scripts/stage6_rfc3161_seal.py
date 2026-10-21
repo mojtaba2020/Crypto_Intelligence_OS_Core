@@ -107,9 +107,8 @@ def verify_future_only_rfc3161_seal(
         raise ValueError("A predeclared TSA trust-root SHA256 is required")
     if not hmac.compare_digest(hashlib.sha256(root).hexdigest(), expected_root_pem_sha256):
         raise ValueError("TSA trust-root material differs from the pinned digest")
-    if (
-        type(expected_signer_cert_sha256) is not str
-        or not SHA256_HEX.fullmatch(expected_signer_cert_sha256)
+    if type(expected_signer_cert_sha256) is not str or not SHA256_HEX.fullmatch(
+        expected_signer_cert_sha256
     ):
         raise ValueError("A predeclared TSA signing certificate fingerprint is required")
     if type(expected_policy_oid) is not str or not POLICY_OID.fullmatch(expected_policy_oid):
@@ -142,21 +141,41 @@ def verify_future_only_rfc3161_seal(
         epoch_floor = stamp_ns // SECOND_NS
         epoch_ceil = (stamp_ns + SECOND_NS - 1) // SECOND_NS
         _openssl(
-            openssl_path, "ts", "-reply", "-in", str(temp / "response"),
-            "-token_out", "-out", str(temp / "token.der"),
+            openssl_path,
+            "ts",
+            "-reply",
+            "-in",
+            str(temp / "response"),
+            "-token_out",
+            "-out",
+            str(temp / "token.der"),
         )
         _openssl(
-            openssl_path, "cms", "-verify", "-inform", "DER",
-            "-in", str(temp / "token.der"), "-noverify", "-binary",
-            "-signer", str(temp / "actual_signer.pem"),
-            "-out", str(temp / "verified_tstinfo.der"),
+            openssl_path,
+            "cms",
+            "-verify",
+            "-inform",
+            "DER",
+            "-in",
+            str(temp / "token.der"),
+            "-noverify",
+            "-binary",
+            "-signer",
+            str(temp / "actual_signer.pem"),
+            "-out",
+            str(temp / "verified_tstinfo.der"),
         )
         signer_bytes = (temp / "actual_signer.pem").read_bytes()
         if signer_bytes.count(b"-----BEGIN CERTIFICATE-----") != 1:
             raise ValueError("RFC3161 token must contain exactly one CMS signer")
         fingerprint_line = _openssl(
-            openssl_path, "x509", "-in", str(temp / "actual_signer.pem"),
-            "-noout", "-fingerprint", "-sha256",
+            openssl_path,
+            "x509",
+            "-in",
+            str(temp / "actual_signer.pem"),
+            "-noout",
+            "-fingerprint",
+            "-sha256",
         ).strip()
         label, separator, fingerprint = fingerprint_line.partition("=")
         observed = fingerprint.replace(":", "").lower()
@@ -180,12 +199,20 @@ def verify_future_only_rfc3161_seal(
         for epoch in sorted({epoch_floor, epoch_ceil}):
             timed_args = (*base_args, "-attime", str(epoch))
             _openssl(
-                openssl_path, "ts", "-verify", *timed_args,
-                "-queryfile", str(temp / "query"),
+                openssl_path,
+                "ts",
+                "-verify",
+                *timed_args,
+                "-queryfile",
+                str(temp / "query"),
             )
             _openssl(
-                openssl_path, "ts", "-verify", *timed_args,
-                "-data", str(temp / "payload"),
+                openssl_path,
+                "ts",
+                "-verify",
+                *timed_args,
+                "-data",
+                str(temp / "payload"),
             )
         request_text = _openssl(openssl_path, "ts", "-query", "-in", str(temp / "query"), "-text")
 

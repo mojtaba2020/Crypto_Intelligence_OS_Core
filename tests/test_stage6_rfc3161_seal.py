@@ -260,26 +260,56 @@ def test_different_signer_under_same_root_rejected(synthetic_tsa, tmp_path: Path
     other_csr = tmp_path / "other.csr"
     other_cert = tmp_path / "other.pem"
     _call(
-        "openssl", "req", "-new", "-newkey", "rsa:2048", "-nodes",
-        "-subj", "/CN=Unapproved Timestamp Leaf", "-keyout", str(other_key),
-        "-out", str(other_csr),
+        "openssl",
+        "req",
+        "-new",
+        "-newkey",
+        "rsa:2048",
+        "-nodes",
+        "-subj",
+        "/CN=Unapproved Timestamp Leaf",
+        "-keyout",
+        str(other_key),
+        "-out",
+        str(other_csr),
     )
     _call(
-        "openssl", "x509", "-req", "-in", str(other_csr),
-        "-CA", str(synthetic_tsa["root_certificate_path"]),
-        "-CAkey", str(synthetic_tsa["root_private_key_path"]),
-        "-CAcreateserial", "-days", "2",
-        "-extfile", str(synthetic_tsa["extensions_path"]),
-        "-out", str(other_cert),
+        "openssl",
+        "x509",
+        "-req",
+        "-in",
+        str(other_csr),
+        "-CA",
+        str(synthetic_tsa["root_certificate_path"]),
+        "-CAkey",
+        str(synthetic_tsa["root_private_key_path"]),
+        "-CAcreateserial",
+        "-days",
+        "2",
+        "-extfile",
+        str(synthetic_tsa["extensions_path"]),
+        "-out",
+        str(other_cert),
     )
     old_query = tmp_path / "same_query.tsq"
     old_query.write_bytes(synthetic_tsa["query"])
     alternate = tmp_path / "alternate_response.tsr"
     _call(
-        "openssl", "ts", "-reply", "-queryfile", str(old_query),
-        "-signer", str(other_cert), "-inkey", str(other_key),
-        "-chain", str(synthetic_tsa["root_certificate_path"]),
-        "-tspolicy", POLICY, "-out", str(alternate),
+        "openssl",
+        "ts",
+        "-reply",
+        "-queryfile",
+        str(old_query),
+        "-signer",
+        str(other_cert),
+        "-inkey",
+        str(other_key),
+        "-chain",
+        str(synthetic_tsa["root_certificate_path"]),
+        "-tspolicy",
+        POLICY,
+        "-out",
+        str(alternate),
     )
     params = kwargs(synthetic_tsa)
     params["response_der"] = alternate.read_bytes()
