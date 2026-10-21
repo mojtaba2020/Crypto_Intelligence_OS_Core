@@ -17,14 +17,15 @@ SYNTHETIC = b'{"synthetic_forecast_bundle": "not_real_market_data"}\n'
 
 
 def _call(*args: str) -> None:
-    subprocess.run(  # noqa: S603,S607 - local synthetic OpenSSL test fixture, no shell.
+    subprocess.run(  # noqa: S603 - local synthetic OpenSSL test fixture, no shell.
         args, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
 
 
 @pytest.fixture(scope="module")
 def synthetic_tsa(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]:
-    if shutil.which("openssl") is None:
+    openssl_path = shutil.which("openssl")
+    if openssl_path is None:
         pytest.fail("OpenSSL is required: never skip time-proof tests in CI")
     tmp: Path = tmp_path_factory.mktemp("mock_tsa")
     root_key, root = tmp / "root.key", tmp / "root.pem"
@@ -66,8 +67,8 @@ def synthetic_tsa(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]
         "-signer", str(tsa), "-inkey", str(tsa_key), "-chain", str(root),
         "-tspolicy", POLICY, "-out", str(response),
     )
-    display = subprocess.run(  # noqa: S603,S607 - local generated DER only.
-        ["openssl", "ts", "-reply", "-in", str(response), "-text"],
+    display = subprocess.run(  # noqa: S603 - local generated DER only.
+        [openssl_path, "ts", "-reply", "-in", str(response), "-text"],
         text=True, capture_output=True, check=True,
     ).stdout
     match = re.search(r"^Time stamp: (.+) GMT$", display, flags=re.MULTILINE)
