@@ -117,3 +117,21 @@ Protocol reference: https://www.rfc-editor.org/rfc/rfc3161
    missed scheduled origins, **not successes by omission**.
 5. Only with the relevant A1–A6 scientific controls certified by a second
    reviewer may any new predictive comparison or Freeze be considered.
+
+### Explicit Git forecast version contract (offline only)
+
+The existing PR #90 append-only price-blind Git-byte audit now accepts two
+mutually exclusive **explicitly named** versions and rejects mixing them in a
+four-forecast batch:
+
+- Legacy `hourly-hybrid-ridge-v2` retains exactly its old target calendar
+  `target_hour = O + H h`, `target_close = O + (H+1)h`.
+- **Proposed and UNTRAINED** `stage6-hourly-full-elapsed-v1-research-only`
+  requires `target_hour = O + (H+1)h`, `target_close = O + (H+2)h`;
+  the corresponding training-label shift is `H+1` bars. Every one of the
+  four appended rows must declare this version consistently.
+
+Synthetic tests verify both valid versions and reject old-model relabeling,
+unshifted new-version target bars, and mixed-version batches. **This is
+schema-only support**; it does not train this new model, run production
+forecasts, authorize OOS evaluation or independently authenticate publication.

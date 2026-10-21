@@ -404,6 +404,10 @@ def reconcile_github_push_bundle(
 
 
 _GIT_LEDGER_MAX_BYTES = 8_000_000
+_FORECAST_BAR_OFFSET_BY_VERSION = {
+    "hourly-hybrid-ridge-v2": 0,
+    "stage6-hourly-full-elapsed-v1-research-only": 1,
+}
 _DEPLOYED_FORECAST_KEYS = frozenset(
     {
         "version",
@@ -506,7 +510,7 @@ def bind_supplied_git_ledger_append(
             or set(row) != _DEPLOYED_FORECAST_KEYS
             or row.get("research_only") is not True
             or row.get("source") != "coinbase:exchange:BTC-USD:1h:close"
-            or row.get("version") != "hourly-hybrid-ridge-v2"
+            or row.get("version") not in _FORECAST_BAR_OFFSET_BY_VERSION
             or type(row.get("horizon_hours")) is not int
         ):
             raise ValueError("Unexpected deployed forecast row schema")
@@ -517,7 +521,8 @@ def bind_supplied_git_ledger_append(
         target_close = _parse_utc(row["target_close_utc"], "Target close")
         if origin != origin.replace(minute=0, second=0, microsecond=0):
             raise ValueError("Forecast origin must be UTC hour-aligned")
-        if target_hour != origin + timedelta(hours=horizon):
+        shifted_horizon = horizon + _FORECAST_BAR_OFFSET_BY_VERSION[row["version"]]
+        if target_hour != origin + timedelta(hours=shifted_horizon):
             raise ValueError("Target hour inconsistent with origin and horizon")
         if target_close != target_hour + timedelta(hours=1):
             raise ValueError("Target close inconsistent with target hour")
@@ -536,6 +541,8 @@ def bind_supplied_git_ledger_append(
         raise ValueError("Append contains mismatched forecast origins")
     if len({row["issued_at_utc"] for row in bound_projection}) != 1:
         raise ValueError("Append contains mismatched issuance timestamps")
+    if len({row["version"] for row in bound_projection}) != 1:
+        raise ValueError("Append mixes incompatible forecast target version semantics")
 
     return {
         "status": "SUPPLIED_GIT_FORECAST_APPEND_BYTES_MATCH_UNAUTHENTICATED",

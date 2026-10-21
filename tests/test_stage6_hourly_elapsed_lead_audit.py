@@ -929,3 +929,96 @@ def test_git_tree_binder_rejects_unreported_leafless_directory_structure(directo
         )
     with pytest.raises(ValueError, match="Leafless Git tree directory"):
         bind_supplied_git_commit_tree_chain(*args)
+
+
+def _synthetic_full_elapsed_git_fixture():
+    parent, child, parent_sha, _, _ = _synthetic_git_append_fixture()
+    source_rows = [json.loads(line) for line in child[len(parent) :].splitlines()]
+    for row in source_rows:
+        row["version"] = "stage6-hourly-full-elapsed-v1-research-only"
+        row["target_hour_utc"] = (
+            datetime.fromisoformat(row["target_hour_utc"]) + timedelta(hours=1)
+        ).isoformat()
+        row["target_close_utc"] = (
+            datetime.fromisoformat(row["target_close_utc"]) + timedelta(hours=1)
+        ).isoformat()
+    child_new = parent + "".join(
+        json.dumps(row, sort_keys=True) + "\n" for row in source_rows
+    ).encode("utf-8")
+    child_sha = hashlib.sha1(
+        b"blob " + str(len(child_new)).encode() + b"\0" + child_new,
+        usedforsecurity=False,
+    ).hexdigest()
+    projection_keys = (
+        "origin_hour_utc",
+        "issued_at_utc",
+        "target_close_utc",
+        "horizon_hours",
+        "version",
+    )
+    projection = [{key: row[key] for key in projection_keys} for row in source_rows]
+    return parent, child_new, parent_sha, child_sha, projection
+
+
+def test_full_elapsed_v1_git_blob_accepts_only_new_shifted_target_labels():
+    original, child, old_sha, new_sha, projections = _synthetic_full_elapsed_git_fixture()
+    result = bind_supplied_git_ledger_append(original, child, old_sha, new_sha, projections)
+    assert result["appended_forecast_count"] == 4
+    assert result["scientific_authorization"] == "NO_RUN"
+    assert result["independent_first_publication_attested"] is False
+    assert {r["version"] for r in result["projected_metadata"]} == {
+        "stage6-hourly-full-elapsed-v1-research-only"
+    }
+
+
+def test_old_version_cannot_relabel_future_target_as_existing_forecast():
+    old, child, old_sha, _, projections = _synthetic_full_elapsed_git_fixture()
+    rows = [json.loads(line) for line in child[len(old) :].splitlines()]
+    for i, row in enumerate(rows):
+        row["version"] = "hourly-hybrid-ridge-v2"
+        projections[i]["version"] = "hourly-hybrid-ridge-v2"
+    changed = old + "".join(
+        json.dumps(row, sort_keys=True) + "\n" for row in rows
+    ).encode()
+    child_sha = hashlib.sha1(
+        b"blob " + str(len(changed)).encode() + b"\0" + changed,
+        usedforsecurity=False,
+    ).hexdigest()
+    with pytest.raises(ValueError, match="Target hour inconsistent"):
+        bind_supplied_git_ledger_append(old, changed, old_sha, child_sha, projections)
+
+
+def test_full_elapsed_version_cannot_use_old_shortened_target_calendar():
+    old, child, old_sha, _, projections = _synthetic_git_append_fixture()
+    rows = [json.loads(line) for line in child[len(old) :].splitlines()]
+    for i, row in enumerate(rows):
+        row["version"] = "stage6-hourly-full-elapsed-v1-research-only"
+        projections[i]["version"] = "stage6-hourly-full-elapsed-v1-research-only"
+    changed = old + "".join(
+        json.dumps(row, sort_keys=True) + "\n" for row in rows
+    ).encode()
+    child_sha = hashlib.sha1(
+        b"blob " + str(len(changed)).encode() + b"\0" + changed,
+        usedforsecurity=False,
+    ).hexdigest()
+    with pytest.raises(ValueError, match="Target hour inconsistent"):
+        bind_supplied_git_ledger_append(old, changed, old_sha, child_sha, projections)
+
+
+def test_mixed_version_targets_cannot_pass_as_single_hourly_forecast_batch():
+    old, child, old_sha, _, projections = _synthetic_full_elapsed_git_fixture()
+    rows = [json.loads(line) for line in child[len(old) :].splitlines()]
+    rows[0]["version"] = "hourly-hybrid-ridge-v2"
+    rows[0]["target_hour_utc"] = "2026-10-18T14:00:00+00:00"
+    rows[0]["target_close_utc"] = "2026-10-18T15:00:00+00:00"
+    projections[0]["version"] = rows[0]["version"]
+    projections[0]["target_close_utc"] = rows[0]["target_close_utc"]
+    changed = old + "".join(
+        json.dumps(row, sort_keys=True) + "\n" for row in rows
+    ).encode()
+    child_sha = hashlib.sha1(
+        b"blob " + str(len(changed)).encode() + b"\0" + changed,
+        usedforsecurity=False,
+    ).hexdigest()
+    with pytest.raises(ValueError, match="mixes incompatible"):
+        bind_supplied_git_ledger_append(old, changed, old_sha, child_sha, projections)
