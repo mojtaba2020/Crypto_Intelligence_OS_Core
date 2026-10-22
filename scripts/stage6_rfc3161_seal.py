@@ -122,7 +122,6 @@ def _strict_utc_ns(value: object, field: str) -> int:
 
 
 
-
 def _signed_accuracy_ns(text: str) -> int:
     """Parse RFC3161 token accuracy; never assume a zero absent-policy error."""
     matches = re.findall(r"^Accuracy: (.+)$", text, flags=re.MULTILINE)
@@ -171,11 +170,7 @@ def _validate_signed_forecast_numeric_fields(row: dict[str, object]) -> None:
         if type(value) not in (int, float) or not math.isfinite(value) or value <= 0:
             raise ValueError("Signed forecast prices must be finite positive numbers")
     volatility = row["observed_volatility_hourly"]
-    if (
-        type(volatility) not in (int, float)
-        or not math.isfinite(volatility)
-        or volatility < 0
-    ):
+    if type(volatility) not in (int, float) or not math.isfinite(volatility) or volatility < 0:
         raise ValueError("Signed observed volatility must be finite and nonnegative")
     weight = row["holdout_selected_blend"]
     if type(weight) not in (int, float) or not math.isfinite(weight) or not 0 <= weight <= 1:
