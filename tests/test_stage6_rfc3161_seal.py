@@ -19,7 +19,7 @@ POLICY = "1.3.6.1.4.1.57615.6.1"
 
 def _mock_future_forecast_bundle(origin_hour: int) -> bytes:
     source = datetime.fromtimestamp(origin_hour, tz=UTC)
-    issued = (source + timedelta(hours=1)).isoformat()
+    issued = (source + timedelta(hours=1, microseconds=1)).isoformat()
     rows = []
     for horizon in (1, 4, 12, 24):
         rows.append(
@@ -450,4 +450,124 @@ def test_duplicate_signed_origin_metadata_key_rejected(synthetic_tsa, tmp_path: 
     params["request_der"] = query
     params["response_der"] = response
     with pytest.raises(ValueError, match="Duplicate key"):
+        verify_future_only_rfc3161_seal(**params)
+
+
+def test_rfc3161_accuracy_upper_bound_blocks_near_deadline():
+    from scripts.stage6_rfc3161_seal import (
+        _is_minimum_elapsed_eligible,
+        _signed_accuracy_ns,
+    )
+
+    # OpenSSL prints this exact hex-based accuracy format.
+    text = "Accuracy: 0x01 seconds, 0x01F4 millis, 0x64 micros"
+    error_ns = _signed_accuracy_ns(text)
+    assert error_ns == 1_500_100_000
+    close = 1_000_000_000_000
+    deadline = close + 2 * 3600 * 1_000_000_000
+    nominal = deadline - 3600 * 1_000_000_000 - 500_000_000
+    assert not _is_minimum_elapsed_eligible(
+        source_close_ns=close,
+        target_close_ns=deadline,
+        horizon_hours=1,
+        signed_time_lower_ns=nominal - error_ns,
+        signed_time_upper_ns=nominal + error_ns,
+    )
+    assert _is_minimum_elapsed_eligible(
+        source_close_ns=close,
+        target_close_ns=deadline,
+        horizon_hours=1,
+        signed_time_lower_ns=nominal - 1,
+        signed_time_upper_ns=nominal,
+    ) is True
+
+
+@pytest.mark.parametrize(
+    "accuracy_text",
+    ["Accuracy: unspecified", "", "Accuracy: 0x0A micros, 0x01 micros"],
+)
+def test_unestablished_or_malformed_accuracy_is_not_accepted(accuracy_text):
+    from scripts.stage6_rfc3161_seal import _signed_accuracy_ns
+
+    with pytest.raises(ValueError, match="accuracy"):
+        _signed_accuracy_ns(accuracy_text)
+
+
+def test_real_synthetic_signed_token_accuracy_is_applied(synthetic_tsa):
+    evidence = verify_future_only_rfc3161_seal(**kwargs(synthetic_tsa))
+    assert evidence["tsa_signed_accuracy_ns"] > 0
+    assert evidence["tsa_signed_utc_time_upper_ns"] == (
+        evidence["tsa_signed_utc_time_ns"] + evidence["tsa_signed_accuracy_ns"]
+    )
+    first = evidence["horizons"][0]
+    assert first["conservative_signed_elapsed_lead_ns"] == (
+        first["target_close_utc"] * 1_000_000_000 - evidence["tsa_signed_utc_time_upper_ns"]
+    )
+
+
+@pytest.mark.parametrize(
+    ("bad_field", "bad_value"),
+    [
+        ("forecast_usd", None),
+        ("forecast_usd", False),
+        ("origin_close_usd", -1),
+        ("persistence_usd", "10"),
+        ("observed_volatility_hourly", -1),
+        ("training_hours", False),
+        ("resolved_training_examples", 0),
+        ("holdout_selected_blend", 2),
+    ],
+)
+def test_correctly_signed_invalid_numeric_forecast_is_rejected(
+    synthetic_tsa, tmp_path: Path, bad_field, bad_value
+):
+    bundle = _mock_future_forecast_bundle(int(synthetic_tsa["origin_hour"]))
+    rows = [json.loads(line) for line in bundle.decode().splitlines()]
+    rows[0][bad_field] = bad_value
+    changed = "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows).encode()
+    query, response = _resign_mock_bundle(synthetic_tsa, tmp_path, changed)
+    params = kwargs(synthetic_tsa)
+    params.update(
+        forecast_bundle=changed,
+        expected_bundle_sha256=hashlib.sha256(changed).hexdigest(),
+        request_der=query,
+        response_der=response,
+    )
+    with pytest.raises(ValueError, match="Signed"):
+        verify_future_only_rfc3161_seal(**params)
+
+
+def test_overflowing_json_exponent_in_signed_forecast_rejected(synthetic_tsa, tmp_path):
+    original = _mock_future_forecast_bundle(int(synthetic_tsa["origin_hour"]))
+    changed = original.replace(b'"forecast_usd": 11.0', b'"forecast_usd": 1e400', 1)
+    assert changed != original
+    query, response = _resign_mock_bundle(synthetic_tsa, tmp_path, changed)
+    params = kwargs(synthetic_tsa)
+    params.update(
+        forecast_bundle=changed,
+        expected_bundle_sha256=hashlib.sha256(changed).hexdigest(),
+        request_der=query,
+        response_der=response,
+    )
+    with pytest.raises(ValueError, match="finite positive"):
+        verify_future_only_rfc3161_seal(**params)
+
+
+def test_issuance_equal_to_source_candle_close_rejected(synthetic_tsa, tmp_path):
+    origin = int(synthetic_tsa["origin_hour"])
+    bundle = _mock_future_forecast_bundle(origin)
+    rows = [json.loads(line) for line in bundle.decode().splitlines()]
+    exact_close = datetime.fromtimestamp(origin + 3600, tz=UTC).isoformat()
+    for row in rows:
+        row["issued_at_utc"] = exact_close
+    changed = "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows).encode()
+    query, response = _resign_mock_bundle(synthetic_tsa, tmp_path, changed)
+    params = kwargs(synthetic_tsa)
+    params.update(
+        forecast_bundle=changed,
+        expected_bundle_sha256=hashlib.sha256(changed).hexdigest(),
+        request_der=query,
+        response_der=response,
+    )
+    with pytest.raises(ValueError, match="outside source-close-to-token"):
         verify_future_only_rfc3161_seal(**params)

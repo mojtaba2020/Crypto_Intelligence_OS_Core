@@ -178,3 +178,22 @@ with a valid signature, and (4) reject duplicate signed origin keys. This
 proves only **internal signed-bundle/calendar consistency**; no real external
 TSA, production model, trusted timestamp deployment, immutable public posting,
 source market vintage or Stage-6 GO is implied.
+
+### Additional Codex P2 closure: conservative accuracy and signed numeric schema
+
+RFC3161 `TSTInfo.accuracy` is a symmetric uncertainty about the signed
+`genTime`. Time-eligibility now uses **genTime + accuracy** as the latest
+permitted time and requires **genTime - accuracy strictly after the source
+candle closed**; an accuracy field that is absent or undecodable is rejected
+until independently established under a pinned TSA policy. The embedded
+token accuracy is parsed in signed integer seconds, milliseconds and
+microseconds, including OpenSSL's hexadecimal output. Using nominal
+`genTime` alone was a P2 timing gate bypass.
+
+The signed JSONL contract now rejects nulls, booleans and non-finite
+numeric values (including exponential overflow like `1e400`), negative
+prices/volatility, nonpositive training counts and blend weights outside
+[0,1]. Four-row `issued_at_utc` is required to be strictly later than
+the source-bar close. Synthetic adversarial cases re-sign malformed rows
+under the local disposable test TSA and require validation to fail; this
+does not certify any real-market prediction.

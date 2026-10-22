@@ -11,6 +11,7 @@ import calendar
 import hashlib
 import hmac
 import json
+import math
 import os
 import re
 import shutil
@@ -27,6 +28,7 @@ SECOND_NS = 1_000_000_000
 HOUR_NS = 3600 * SECOND_NS
 POLICY_OID = re.compile(r"^[0-2](?:\.(?:0|[1-9]\d*)){2,18}$")
 SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
+_ACCURACY_ENTRY = re.compile(r"(?P<hex>0x[0-9A-Fa-f]+) (?P<unit>seconds|millis|micros)")
 BUNDLE_TIMESTAMP_RE = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,6})?(?:Z|\+00:00)$")
 SIGNED_FORECAST_VERSION = "stage6-hourly-full-elapsed-v1-research-only"
 SIGNED_ROW_FIELDS = frozenset(
@@ -119,6 +121,70 @@ def _strict_utc_ns(value: object, field: str) -> int:
     return calendar.timegm(stamp.timetuple()) * SECOND_NS + stamp.microsecond * 1000
 
 
+
+
+def _signed_accuracy_ns(text: str) -> int:
+    """Parse RFC3161 token accuracy; never assume a zero absent-policy error."""
+    matches = re.findall(r"^Accuracy: (.+)$", text, flags=re.MULTILINE)
+    if len(matches) != 1:
+        raise ValueError("Signed timestamp accuracy is missing or ambiguous")
+    components = matches[0].split(", ")
+    if not 1 <= len(components) <= 3:
+        raise ValueError("Signed timestamp accuracy syntax invalid")
+    scales = {"seconds": SECOND_NS, "millis": 1_000_000, "micros": 1_000}
+    observed: set[str] = set()
+    total = 0
+    for component in components:
+        parsed = _ACCURACY_ENTRY.fullmatch(component)
+        if parsed is None:
+            raise ValueError("Signed timestamp accuracy syntax invalid")
+        unit = parsed.group("unit")
+        value = int(parsed.group("hex"), 16)
+        if unit in observed or (unit in {"millis", "micros"} and not 1 <= value <= 999):
+            raise ValueError("Signed timestamp accuracy unit invalid")
+        if unit == "seconds" and value > 86_400:
+            raise ValueError("Signed timestamp accuracy exceeds allowed bound")
+        observed.add(unit)
+        total += value * scales[unit]
+    return total
+
+
+def _is_minimum_elapsed_eligible(
+    *,
+    source_close_ns: int,
+    target_close_ns: int,
+    horizon_hours: int,
+    signed_time_lower_ns: int,
+    signed_time_upper_ns: int,
+) -> bool:
+    """Only a timestamp wholly after source close AND before horizon deadline qualifies."""
+    return (
+        signed_time_lower_ns > source_close_ns
+        and target_close_ns - signed_time_upper_ns >= horizon_hours * HOUR_NS
+    )
+
+
+def _validate_signed_forecast_numeric_fields(row: dict[str, object]) -> None:
+    """Reject boolean, null, NaN, overflow-to-infinity, or mis-typed signed fields."""
+    for key in ("origin_close_usd", "forecast_usd", "persistence_usd"):
+        value = row[key]
+        if type(value) not in (int, float) or not math.isfinite(value) or value <= 0:
+            raise ValueError("Signed forecast prices must be finite positive numbers")
+    volatility = row["observed_volatility_hourly"]
+    if (
+        type(volatility) not in (int, float)
+        or not math.isfinite(volatility)
+        or volatility < 0
+    ):
+        raise ValueError("Signed observed volatility must be finite and nonnegative")
+    weight = row["holdout_selected_blend"]
+    if type(weight) not in (int, float) or not math.isfinite(weight) or not 0 <= weight <= 1:
+        raise ValueError("Signed blend weight must be finite and within [0,1]")
+    for key in ("training_hours", "resolved_training_examples"):
+        value = row[key]
+        if type(value) is not int or value <= 0:
+            raise ValueError("Signed training counts must be positive integers")
+
 def _check_four_signed_forecasts(bundle: bytes, source_origin: int, gen_ns: int) -> None:
     """Derive the origin and H+1 targets from signed bytes, never caller metadata."""
     if b"\r" in bundle or not bundle.endswith(b"\n"):
@@ -147,6 +213,7 @@ def _check_four_signed_forecasts(bundle: bytes, source_origin: int, gen_ns: int)
             or row["horizon_hours"] != horizon
         ):
             raise ValueError("Signed forecast version, horizon or schema mismatch")
+        _validate_signed_forecast_numeric_fields(row)
         origin_ns = _strict_utc_ns(row["origin_hour_utc"], "origin")
         issue_ns = _strict_utc_ns(row["issued_at_utc"], "issuance")
         target_hour_ns = _strict_utc_ns(row["target_hour_utc"], "target hour")
@@ -157,7 +224,7 @@ def _check_four_signed_forecasts(bundle: bytes, source_origin: int, gen_ns: int)
             raise ValueError("Signed forecast target hour does not match H+1 label shift")
         if target_close_ns != (source_origin + (horizon + 2) * 3600) * SECOND_NS:
             raise ValueError("Signed forecast target close does not match H+1 label shift")
-        if not (origin_ns + HOUR_NS <= issue_ns <= gen_ns):
+        if not (origin_ns + HOUR_NS < issue_ns <= gen_ns):
             raise ValueError("Signed forecast issuance outside source-close-to-token window")
         issues.add(issue_ns)
     if len(issues) != 1:
@@ -325,20 +392,30 @@ def verify_future_only_rfc3161_seal(
     # A signed token must authenticate its OWN four-row origin/target calendar.
     # Caller-provided source_origin cannot promote an older, valid signature.
     _check_four_signed_forecasts(bundle, source_origin_hour_utc, stamp_ns)
+    accuracy_ns = _signed_accuracy_ns(reply_text)
+    signed_time_lower_ns = stamp_ns - accuracy_ns
+    signed_time_upper_ns = stamp_ns + accuracy_ns
     bar_closed_ns = (source_origin_hour_utc + 3600) * SECOND_NS
     row_info: list[dict[str, object]] = []
     for h in HORIZONS_HOURS:
         target_hour = source_origin_hour_utc + (h + 1) * 3600
         target_close = source_origin_hour_utc + (h + 2) * 3600
-        lead_ns = target_close * SECOND_NS - stamp_ns
-        eligible = stamp_ns >= bar_closed_ns and lead_ns >= h * HOUR_NS
+        target_close_ns = target_close * SECOND_NS
+        lead_ns = target_close_ns - signed_time_upper_ns
+        eligible = _is_minimum_elapsed_eligible(
+            source_close_ns=bar_closed_ns,
+            target_close_ns=target_close_ns,
+            horizon_hours=h,
+            signed_time_lower_ns=signed_time_lower_ns,
+            signed_time_upper_ns=signed_time_upper_ns,
+        )
         row_info.append(
             {
                 "horizon_hours": h,
                 "training_target_row_shift": h + 1,
                 "target_hour_utc": target_hour,
                 "target_close_utc": target_close,
-                "signed_elapsed_lead_ns": lead_ns,
+                "conservative_signed_elapsed_lead_ns": lead_ns,
                 "signed_minimum_elapsed_eligible": eligible,
             }
         )
@@ -356,6 +433,10 @@ def verify_future_only_rfc3161_seal(
         "tsa_signer_independently_preapproved_by_this_function": False,
         "tsa_policy_oid": expected_policy_oid,
         "tsa_signed_utc_time_ns": stamp_ns,
+        "tsa_signed_accuracy_ns": accuracy_ns,
+        "tsa_signed_utc_time_lower_ns": signed_time_lower_ns,
+        "tsa_signed_utc_time_upper_ns": signed_time_upper_ns,
+        "accuracy_source": "token_embedded_accuracy",
         "rfc3161_signature_nonce_imprint_and_configured_chain_verified": True,
         "signed_four_forecast_origin_and_target_calendar_verified": True,
         "forecast_bytes_bound_to_real_committed_git_blob_by_this_function": False,
