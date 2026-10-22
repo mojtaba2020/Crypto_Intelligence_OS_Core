@@ -19,6 +19,8 @@ on:
       - "tests/test_btc_volume_ablation.py"
       - "tests/test_btc_phase4_simple.py"
       - "tests/test_btc_phase5_prospective.py"
+      - "scripts/evaluate_btc_model_tournament.py"
+      - "tests/test_btc_model_tournament.py"
       - ".github/workflows/btc_long_history_ai.yml"
 
 permissions:
@@ -170,6 +172,9 @@ jobs:
             --database .research/btc_full_history.sqlite \
             --report .research/multihorizon_benchmark.json
 
+      - name: Chronological locked-test model tournament
+        run: python -m scripts.evaluate_btc_model_tournament --database .research/btc_full_history.sqlite --report .research/model_tournament.json
+
       - name: Show reports
         run: |
           cat .research/import_report.json
@@ -191,6 +196,7 @@ jobs:
           cat .research/phase4_simple_7d.json
           cat .research/phase4_simple_30d.json
           cat .research/multihorizon_benchmark.json
+          cat .research/model_tournament.json
 
       - name: Preserve research results
         if: always()
@@ -217,4 +223,5 @@ jobs:
             .research/phase4_simple_7d.json
             .research/phase4_simple_30d.json
             .research/multihorizon_benchmark.json
+            .research/model_tournament.json
           retention-days: 30

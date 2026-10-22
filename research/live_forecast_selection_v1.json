@@ -1,0 +1,68 @@
+{
+  "status": "MODEL_TOURNAMENT_RESEARCH_ONLY",
+  "source_pr": 55,
+  "source_run": 35942861573,
+  "warning": "Two-day horizon is an explicitly unvalidated persistence baseline, not a tournament winner. Other historical model names are pinned; benchmark metrics omitted pending verification. No prospective accuracy established.",
+  "results": [
+    {
+      "horizon_days": 1,
+      "selected_on_validation": "persistence",
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
+    },
+    {
+      "horizon_days": 2,
+      "selected_on_validation": "persistence",
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
+    },
+    {
+      "horizon_days": 3,
+      "selected_on_validation": "momentum_90d_quarter",
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
+    },
+    {
+      "horizon_days": 7,
+      "selected_on_validation": "persistence",
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
+    },
+    {
+      "horizon_days": 14,
+      "selected_on_validation": "persistence",
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
+    },
+    {
+      "horizon_days": 21,
+      "selected_on_validation": "momentum_30d_quarter",
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
+    },
+    {
+      "horizon_days": 30,
+      "selected_on_validation": "momentum_90d_quarter",
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
+    },
+    {
+      "horizon_days": 90,
+      "selected_on_validation": "persistence",
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
+    },
+    {
+      "horizon_days": 180,
+      "selected_on_validation": "persistence",
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
+    },
+    {
+      "horizon_days": 365,
+      "selected_on_validation": "momentum_30d_quarter",
+      "locked_test_examples": null,
+      "selected_test_improvement_vs_persistence_pct": null
+    }
+  ]
+}

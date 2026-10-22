@@ -1,0 +1,107 @@
+name: BTC Long-History Research
+
+on:
+  pull_request:
+    paths:
+      - "scripts/backfill_bitstamp_hourly.py"
+      - "scripts/evaluate_bitstamp_hourly_features_v2.py"
+      - "scripts/confirm_hourly_regime_hypothesis.py"
+      - "scripts/hourly_regime_v1.py"
+      - "tests/test_confirm_hourly_regime_hypothesis.py"
+      - "tests/test_backfill_bitstamp_hourly.py"
+      - "tests/test_hourly_regime_gate_v1.py"
+      - "research/prereg_range_mean_6h_down_low_vol_12h_v1.json"
+      - "scripts/hourly_features_v2.py"
+      - "scripts/attribute_hourly_candle_features_v2.py"
+      - "scripts/ablate_hourly_features_v2.py"
+      - "src/crypto_intelligence_os/adapters/market_data/bitstamp.py"
+      - "src/crypto_intelligence_os/adapters/market_data/historical_archive.py"
+      - ".github/workflows/btc-long-history-research.yml"
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "UTC ISO start"
+        required: true
+        default: "2023-01-01T00:00:00+00:00"
+      end:
+        description: "UTC ISO end"
+        required: true
+        default: "2024-01-01T00:00:00+00:00"
+
+permissions:
+  contents: read
+
+jobs:
+  bitstamp-hourly-backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install project
+        run: python -m pip install -e .
+
+      - name: Backfill and validate Bitstamp hourly history
+        env:
+          START: ${{ github.event_name == 'workflow_dispatch' && inputs.start || '2023-01-01T00:00:00+00:00' }}
+          END: ${{ github.event_name == 'workflow_dispatch' && inputs.end || '2024-01-01T00:00:00+00:00' }}
+        run: |
+          mkdir -p artifacts/long-history
+          python scripts/backfill_bitstamp_hourly.py \
+            --start "$START" \
+            --end "$END" \
+            --database artifacts/long-history/bitstamp-btcusd-1h.sqlite \
+            --report artifacts/long-history/bitstamp-btcusd-1h-report.json
+
+      - name: Enforce locked primary confirmation period
+        env:
+          START: ${{ github.event_name == 'workflow_dispatch' && inputs.start || '2023-01-01T00:00:00+00:00' }}
+          END: ${{ github.event_name == 'workflow_dispatch' && inputs.end || '2024-01-01T00:00:00+00:00' }}
+        run: |
+          test "$START" = "2023-01-01T00:00:00+00:00"
+          test "$END" = "2024-01-01T00:00:00+00:00"
+
+      - name: Run locked 2023 preregistered confirmation
+        run: |
+          python scripts/confirm_hourly_regime_hypothesis.py \
+            --database artifacts/long-history/bitstamp-btcusd-1h.sqlite \
+            --preregistration research/prereg_range_mean_6h_down_low_vol_12h_v1.json \
+            --ingestion-report artifacts/long-history/bitstamp-btcusd-1h-report.json \
+            --runner-git-sha "${{ github.sha }}" \
+            --output artifacts/long-history/range-mean-6h-2023-confirmation.json
+
+      - name: Upload locked 2023 confirmation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-locked-2023-confirmation
+          path: |
+            artifacts/long-history/range-mean-6h-2023-confirmation.json
+            artifacts/long-history/bitstamp-btcusd-1h-report.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Evaluate Feature V2 on validated Bitstamp history
+        if: success()
+        run: |
+          python scripts/evaluate_bitstamp_hourly_features_v2.py \
+            --database artifacts/long-history/bitstamp-btcusd-1h.sqlite \
+            --output artifacts/long-history/bitstamp-feature-v2-report.json \
+            --train-min 720 \
+            --step 24
+
+      - name: Upload validated research artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-long-history-bitstamp
+          path: artifacts/long-history/
+          if-no-files-found: error
+          retention-days: 14
+# Smoke trigger: validate PR-based Bitstamp hourly ingestion.

@@ -1,0 +1,51 @@
+name: BTC Live Numeric Forecast Prototype
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/forecast_btc_live.py
+      - research/live_forecast_selection_v1.json
+      - .github/workflows/btc-live-numeric-forecast.yml
+  push:
+    branches:
+      - feature/live-numeric-btc-forecast-v1
+    paths:
+      - scripts/forecast_btc_live.py
+      - research/live_forecast_selection_v1.json
+      - .github/workflows/btc-live-numeric-forecast.yml
+
+permissions:
+  contents: read
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Produce timestamped numerical BTC forecasts from live Coinbase data
+        run: |
+          python scripts/forecast_btc_live.py --selection-report research/live_forecast_selection_v1.json --output .research/live_btc_forecast.json
+      - name: Validate output structure and evidence labels
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          result = json.loads(Path(".research/live_btc_forecast.json").read_text())
+          assert result["status"] == "LIVE_NUMERIC_RESEARCH_FORECAST_NOT_TRADING_ADVICE"
+          assert len(result["forecasts"]) == 15
+          assert len({r["timeframe"] for r in result["forecasts"]}) == 15
+          assert all(r["predicted_price_usd"] > 0 and r["target_utc"] for r in result["forecasts"])
+          assert all(r["evidence"] for r in result["forecasts"])
+          print("Validated 15 timestamped numerical forecasts")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: btc-live-numeric-forecast
+          path: .research/live_btc_forecast.json
+          if-no-files-found: warn
