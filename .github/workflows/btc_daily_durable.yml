@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Checkout private research code
+      - name: Checkout repository research code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -34,7 +34,7 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Restore previous private database
+      - name: Restore previously committed database
         run: |
           set -euo pipefail
           mkdir -p data
@@ -42,7 +42,7 @@ jobs:
           if git ls-remote --exit-code --heads origin "refs/heads/$DATA_BRANCH" >/dev/null; then
             git fetch origin "refs/heads/$DATA_BRANCH:refs/remotes/origin/$DATA_BRANCH"
             git show "origin/$DATA_BRANCH:data/btc_usd_daily.sqlite" > data/btc_usd_daily.sqlite
-            echo "Restored previous private SQLite archive from $DATA_BRANCH"
+            echo "Restored previous repository SQLite archive from $DATA_BRANCH"
           else
             echo "Initial archive: $DATA_BRANCH does not yet exist"
           fi
@@ -77,7 +77,7 @@ jobs:
           print(f"Pre-commit verification PASS: {count} daily candles")
           PY
 
-      - name: Commit archive to dedicated private data branch
+      - name: Commit archive to dedicated repository data branch
         run: |
           set -euo pipefail
           DATA_BRANCH="data/btc-usd-daily"
@@ -100,7 +100,7 @@ jobs:
           git add data/btc_usd_daily.sqlite data/btc_ingestion_report.json
           git commit -m "Persist validated public BTC/USD daily research archive (run $GITHUB_RUN_ID)"
           git push origin "HEAD:refs/heads/$DATA_BRANCH"
-          echo "Data saved to private Git branch: $DATA_BRANCH" >> "$GITHUB_STEP_SUMMARY"
+          echo "Data saved to Git branch (repository visibility applies): $DATA_BRANCH" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Attach CEO run snapshot (temporary convenience copy)
         uses: actions/upload-artifact@v4
@@ -112,5 +112,5 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish verified mobile CEO mission board to private GitHub run summary
+      - name: Publish verified mobile CEO mission board to GitHub run summary
         run: python "$RUNNER_TEMP/render_ceo_mission_board.py"

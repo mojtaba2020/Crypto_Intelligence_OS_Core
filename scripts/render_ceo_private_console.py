@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # ruff: noqa: E501
-"""Offline, private CEO mobile console generated from one verified completed mission.
+"""Offline, locally saved CEO mobile console generated from one verified completed mission.
 
-Never publish this HTML to public Pages: download the artifact from the private run.
+Never publish this HTML to public Pages: verify access permissions on the GitHub run before sharing any artifact.
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ def render_console(facts: dict[str, str | int], run_id: str) -> str:
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
-<title>Crypto Intelligence OS | CEO Private Console</title>
+<title>Crypto Intelligence OS | CEO Snapshot Console</title>
 <style>
 :root{{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif}}
 *{{box-sizing:border-box}}body{{background:#080e1b;color:#edf3ff;margin:0}}
@@ -64,7 +64,7 @@ a.action:focus-visible{{outline:3px solid #a3f1c8}}
 .note{{border-left:3px solid #f2c76f;padding-left:12px}}
 code{{overflow-wrap:anywhere;font-size:12px}}
 </style></head><body><main>
-<header><span class="brand">CRYPTO INTELLIGENCE OS</span><span class="badge">PRIVATE · CEO</span></header>
+<header><span class="brand">CRYPTO INTELLIGENCE OS</span><span class="badge">LOCAL SNAPSHOT · CEO</span></header>
 <h1>Mission Control</h1>
 <p>Verified historical snapshot of one completed GitHub Actions mission. This downloaded
 file does not refresh automatically or control active jobs.</p>
@@ -82,11 +82,11 @@ file does not refresh automatically or control active jobs.</p>
 <dt>SQLite SHA-256</dt><dd><code>{safe("sqlite_sha256")}</code></dd>
 </dl></section>
 <section class="panel"><h2>CEO actions · authenticated GitHub</h2>
-<p>These links open the actual private GitHub control plane; this static file never
+<p>These links open the actual GitHub repository (verify visibility before sharing); this static file never
 pretends that a click has started or cancelled a job.</p>
 <a class="action" href="{run_url}" rel="noreferrer">View real job state, logs and cancel active run ↗</a>
 <a class="action" href="{mission_url}" rel="noreferrer">Start a new approved read-only mission ↗</a>
-<a class="action" href="{data_url}" rel="noreferrer">Inspect persistent private BTC/USD archive ↗</a>
+<a class="action" href="{data_url}" rel="noreferrer">Inspect repository BTC/USD archive (check visibility) ↗</a>
 </section>
 <p class="note">No live agent activity, exchange credentials, trades, withdrawals, or
 unverified predictions. Open GitHub for current run status. Keep this downloaded
@@ -100,7 +100,7 @@ def main() -> int:
     )
     run_id = os.environ.get("GITHUB_RUN_ID", "")
     OUTPUT.write_text(render_console(facts, run_id), encoding="utf-8")
-    print(f"CEO PRIVATE CONSOLE GENERATED: {OUTPUT} from verified run {run_id}")
+    print(f"CEO SNAPSHOT CONSOLE GENERATED: {OUTPUT} from verified run {run_id}")
     return 0
 
 
