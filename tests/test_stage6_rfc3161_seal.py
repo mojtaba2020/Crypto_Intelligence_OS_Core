@@ -712,9 +712,7 @@ def test_stale_but_signed_git_append_remains_ineligible(synthetic_tsa, tmp_path)
         (3599.999, 5.251),
     ],
 )
-def test_mock_tsa_hour_edge_selection_is_bounded_and_deterministic(
-    second_offset, expected_wait
-):
+def test_mock_tsa_hour_edge_selection_is_bounded_and_deterministic(second_offset, expected_wait):
     delay = _fixture_time_boundary_delay(second_offset)
     assert delay == pytest.approx(expected_wait, abs=1e-5)
     safe_offset = (second_offset + delay) % 3600
