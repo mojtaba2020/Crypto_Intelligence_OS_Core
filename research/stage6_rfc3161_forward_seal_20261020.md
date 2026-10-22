@@ -197,3 +197,23 @@ prices/volatility, nonpositive training counts and blend weights outside
 the source-bar close. Synthetic adversarial cases re-sign malformed rows
 under the local disposable test TSA and require validation to fail; this
 does not certify any real-market prediction.
+
+### October 22 — exact signed-message ↔ Git append byte bridge (offline)
+
+New `scripts/stage6_rfc3161_git_crosscheck.py` combines *existing* RFC3161
+signed-forecast checks with the append-only Git commit/tree/forecast blob
+validator. It explicitly requires the SHA-256/CMS-authenticated four-row
+`forecast_bundle` to be **byte-for-byte equal** to the newly appended
+suffix `child_forecast_blob[len(parent_forecast_blob):]`.
+The Git check derives its price-free projected metadata from the verified
+signed bytes rather than trusting a separate unbound projection. A correctly
+signed but later modified Git forecast file is rejected; a correctly signed
+old origin still remains ineligible for the minimum elapsed horizon.
+
+This is only an **internal consistency check over caller-supplied
+Git commit/tree/byte objects**. It does NOT authenticate GitHub API identity
+or real public byte visibility, independent TSA certificate approval, CA
+revocation state, market-data first receipt, predictive performance or a
+commercially usable deployment. All outputs state `NO_RUN` explicitly.
+No live workflows, paid services, actual market forecasts or locked OOS
+are accessed by this offline module.

@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 import scripts.stage6_rfc3161_seal as seal_module
+from scripts.stage6_rfc3161_git_crosscheck import crosscheck_signed_forecast_git_append
 from scripts.stage6_rfc3161_seal import verify_future_only_rfc3161_seal
 
 POLICY = "1.3.6.1.4.1.57615.6.1"
@@ -571,3 +572,104 @@ def test_issuance_equal_to_source_candle_close_rejected(synthetic_tsa, tmp_path)
     )
     with pytest.raises(ValueError, match="outside source-close-to-token"):
         verify_future_only_rfc3161_seal(**params)
+
+
+def _mock_git_chain_for_signed_bundle(synthetic_tsa):
+    parent = b'{"older_forecasts":"opaque"}\n'
+    child = parent + synthetic_tsa["bundle"]
+
+    def git_sha(data):
+        return hashlib.sha1(
+            b"blob " + str(len(data)).encode() + b"\0" + data,
+            usedforsecurity=False,
+        ).hexdigest()
+
+    parent_commit_sha, child_commit_sha = "a" * 40, "b" * 40
+    parent_tree_sha, child_tree_sha = "c" * 40, "d" * 40
+    return {
+        **kwargs(synthetic_tsa),
+        "parent_forecast_blob": parent,
+        "child_forecast_blob": child,
+        "parent_commit": {"sha": parent_commit_sha, "tree_sha": parent_tree_sha},
+        "child_commit": {
+            "sha": child_commit_sha,
+            "tree_sha": child_tree_sha,
+            "parents": [parent_commit_sha],
+            "changed_paths": ["research/hourly_forecasts.jsonl"],
+        },
+        "parent_tree": {
+            "sha": parent_tree_sha,
+            "truncated": False,
+            "entries": [
+                {
+                    "path": "research/hourly_forecasts.jsonl",
+                    "type": "blob",
+                    "mode": "100644",
+                    "sha": git_sha(parent),
+                }
+            ],
+        },
+        "child_tree": {
+            "sha": child_tree_sha,
+            "truncated": False,
+            "entries": [
+                {
+                    "path": "research/hourly_forecasts.jsonl",
+                    "type": "blob",
+                    "mode": "100644",
+                    "sha": git_sha(child),
+                }
+            ],
+        },
+    }
+
+
+def test_signed_tsa_bytes_must_match_exact_git_append(synthetic_tsa):
+    verified = crosscheck_signed_forecast_git_append(
+        **_mock_git_chain_for_signed_bundle(synthetic_tsa)
+    )
+    assert verified["exact_signed_forecast_bytes_match_supplied_git_append"] is True
+    assert verified["four_horizon_rows_matched"] is True
+    assert verified["signed_elapsed_window_eligible"] is True
+    assert verified["github_data_independently_authenticated_by_this_function"] is False
+    assert verified["independent_public_forecast_delivery_attested"] is False
+    assert verified["scientific_authorization"] == "NO_RUN"
+
+
+def test_same_valid_tsa_token_cannot_attest_different_committed_forecast(synthetic_tsa):
+    kwargs_git = _mock_git_chain_for_signed_bundle(synthetic_tsa)
+    kwargs_git["child_forecast_blob"] = kwargs_git["child_forecast_blob"].replace(
+        b'"forecast_usd": 11.0', b'"forecast_usd": 11.7',
+    )
+    with pytest.raises(ValueError, match="signed bundle differs"):
+        crosscheck_signed_forecast_git_append(**kwargs_git)
+
+
+def test_signed_forecast_does_not_accept_false_git_tree_blob_id(synthetic_tsa):
+    kwargs_git = _mock_git_chain_for_signed_bundle(synthetic_tsa)
+    kwargs_git["child_tree"]["entries"][0]["sha"] = "f" * 40
+    with pytest.raises(ValueError, match="Child Git blob SHA"):
+        crosscheck_signed_forecast_git_append(**kwargs_git)
+
+
+def test_stale_but_signed_git_append_remains_ineligible(synthetic_tsa, tmp_path):
+    old_origin = int(synthetic_tsa["origin_hour"]) - 12 * 3600
+    old_bundle = _mock_future_forecast_bundle(old_origin)
+    query, response = _resign_mock_bundle(synthetic_tsa, tmp_path, old_bundle)
+    args = _mock_git_chain_for_signed_bundle(synthetic_tsa)
+    parent = args["parent_forecast_blob"]
+    child = parent + old_bundle
+    args["forecast_bundle"] = old_bundle
+    args["child_forecast_blob"] = child
+    args["source_origin_hour_utc"] = old_origin
+    args["expected_bundle_sha256"] = hashlib.sha256(old_bundle).hexdigest()
+    args["request_der"] = query
+    args["response_der"] = response
+    args["child_tree"]["entries"][0]["sha"] = hashlib.sha1(
+        b"blob " + str(len(child)).encode() + b"\0" + child,
+        usedforsecurity=False,
+    ).hexdigest()
+    verified = crosscheck_signed_forecast_git_append(**args)
+    assert verified["exact_signed_forecast_bytes_match_supplied_git_append"] is True
+    assert verified["signed_elapsed_window_eligible"] is False
+    assert verified["scientific_authorization"] == "NO_RUN"
