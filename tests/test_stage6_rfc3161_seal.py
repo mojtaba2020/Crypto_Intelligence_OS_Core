@@ -639,7 +639,8 @@ def test_signed_tsa_bytes_must_match_exact_git_append(synthetic_tsa):
 def test_same_valid_tsa_token_cannot_attest_different_committed_forecast(synthetic_tsa):
     kwargs_git = _mock_git_chain_for_signed_bundle(synthetic_tsa)
     kwargs_git["child_forecast_blob"] = kwargs_git["child_forecast_blob"].replace(
-        b'"forecast_usd": 11.0', b'"forecast_usd": 11.7',
+        b'"forecast_usd": 11.0',
+        b'"forecast_usd": 11.7',
     )
     with pytest.raises(ValueError, match="signed bundle differs"):
         crosscheck_signed_forecast_git_append(**kwargs_git)
