@@ -745,9 +745,11 @@ def test_mock_tsa_hour_edge_selection_is_bounded_and_deterministic(second_offset
         ("Oct 20 11:00:00 2026", "0x01 seconds", False),
     ],
 )
-def test_mock_signed_window_uses_post_sign_token_time_and_accuracy(stamp, accuracy, expected):
+def test_mock_signed_window_uses_post_sign_token_time_and_accuracy(
+    stamp: str, accuracy: str, expected: bool
+) -> None:
     origin = int(datetime(2026, 10, 20, 10, tzinfo=UTC).timestamp())
-    token_text = f"Time stamp: {stamp} GMT\\nAccuracy: {accuracy}\\n"
+    token_text = f"Time stamp: {stamp} GMT\nAccuracy: {accuracy}\n"
     assert _mock_token_within_full_elapsed_window(origin, token_text) is expected
 
 
