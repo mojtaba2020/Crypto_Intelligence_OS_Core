@@ -48,3 +48,28 @@ for each claimed forecast, records expected scheduled slots including
 misses and outages, and studies both GitHub schedule delivery reliability
 and effective dependence-aware forecast sample size. Do not treat
 successful CI as a substitute for these independent approvals.
+
+## 2026-10-22 — Prevent falsely reconstructed hourly forecast batches
+
+Review of the original price-free coverage helper found that four separate GitHub
+runs (or four different claimed issuance times) could be stitched into one
+`CLAIMED_COMPLETE_UNVERIFIED` hourly origin. The research-only Draft branch now
+rejects those contradictions explicitly:
+
+- Each origin's four horizons must carry **one identical GitHub run ID**
+  and **one identical claimed issuance time**.
+- One GitHub run ID cannot be recycled across unrelated scheduled origins.
+- Claimed issuance must be **strictly after** the completed source bar's
+  close, not equal to that close.
+- The origin denominator remains fixed and incomplete/missed origins stay
+  visible. Passing internal checks still produces `UNVERIFIED_COVERAGE_ONLY`,
+  **not independently witnessed publication, full elapsed H-hour lead, market
+  predictive performance, or Stage-6 approval**.
+
+Five synthetic regressions exercise both mixed-run/time cases, reused run
+identity, source-close equality and a complete but still-unverified packet.
+This audit retains the **legacy bar-aligned** target definition; it cannot
+certify the proposed full-elapsed label/calendar of PR #90. No network
+requests, real candles, scoring, protected OOS, production runner/workflow,
+merges or paid actions were performed. External custody and A1–A6 remain
+separate mandatory evidence; `NO_RUN / NO_FREEZE`.
