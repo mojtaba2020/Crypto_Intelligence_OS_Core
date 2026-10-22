@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import shutil
 import subprocess
 import time
@@ -38,6 +37,19 @@ def _safe_mock_origin() -> int:
         if delay == 0:
             return int(now) // 3600 * 3600 - 3600
         time.sleep(delay)
+
+
+def _mock_token_within_full_elapsed_window(origin_hour: int, reply_text: str) -> bool:
+    """Use the actual signed genTime and its embedded accuracy after signing."""
+    stamp_ns = seal_module._stamp_ns(reply_text)
+    accuracy_ns = seal_module._signed_accuracy_ns(reply_text)
+    return seal_module._is_minimum_elapsed_eligible(
+        source_close_ns=(origin_hour + 3600) * 1_000_000_000,
+        target_close_ns=(origin_hour + 3 * 3600) * 1_000_000_000,
+        horizon_hours=1,
+        signed_time_lower_ns=stamp_ns - accuracy_ns,
+        signed_time_upper_ns=stamp_ns + accuracy_ns,
+    )
 
 
 def _mock_future_forecast_bundle(origin_hour: int) -> bytes:
@@ -142,49 +154,53 @@ def synthetic_tsa(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]
         "-out",
         str(tsa),
     )
-    # Ensures token genTime with second precision is strictly AFTER signed issuance.
-    origin_hour = _safe_mock_origin()
-    synthetic_bundle = _mock_future_forecast_bundle(origin_hour)
+    # Pre-sign clock checks cannot prevent process stalls or clock jumps.
+    # Retry only when the *signed* token's conservative elapsed window failed.
     payload = tmp / "batch.txt"
-    payload.write_bytes(synthetic_bundle)
     query, response = tmp / "query.tsq", tmp / "response.tsr"
-    _call(
-        "openssl",
-        "ts",
-        "-query",
-        "-data",
-        str(payload),
-        "-sha256",
-        "-cert",
-        "-out",
-        str(query),
-    )
-    _call(
-        "openssl",
-        "ts",
-        "-reply",
-        "-queryfile",
-        str(query),
-        "-signer",
-        str(tsa),
-        "-inkey",
-        str(tsa_key),
-        "-chain",
-        str(root),
-        "-tspolicy",
-        POLICY,
-        "-out",
-        str(response),
-    )
-    display = subprocess.run(  # noqa: S603 - local generated DER only.
-        [openssl_path, "ts", "-reply", "-in", str(response), "-text"],
-        text=True,
-        capture_output=True,
-        check=True,
-    ).stdout
-    match = re.search(r"^Time stamp: (.+) GMT$", display, flags=re.MULTILINE)
-    assert match is not None
-    signed_time = datetime.strptime(match.group(1), "%b %d %H:%M:%S %Y").replace(tzinfo=UTC)
+    for _attempt in range(3):
+        origin_hour = _safe_mock_origin()
+        synthetic_bundle = _mock_future_forecast_bundle(origin_hour)
+        payload.write_bytes(synthetic_bundle)
+        _call(
+            "openssl",
+            "ts",
+            "-query",
+            "-data",
+            str(payload),
+            "-sha256",
+            "-cert",
+            "-out",
+            str(query),
+        )
+        _call(
+            "openssl",
+            "ts",
+            "-reply",
+            "-queryfile",
+            str(query),
+            "-signer",
+            str(tsa),
+            "-inkey",
+            str(tsa_key),
+            "-chain",
+            str(root),
+            "-tspolicy",
+            POLICY,
+            "-out",
+            str(response),
+        )
+        display = subprocess.run(  # noqa: S603 - local generated DER only.
+            [openssl_path, "ts", "-reply", "-in", str(response), "-text"],
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout
+        if _mock_token_within_full_elapsed_window(origin_hour, display):
+            signed_time_epoch = seal_module._stamp_ns(display) // 1_000_000_000
+            break
+    else:
+        pytest.fail("Synthetic TSA signed-time window expired after three attempts")
     root_bytes = root.read_bytes()
     signer_der = subprocess.run(  # noqa: S603 - test-only OpenSSL certificate.
         [openssl_path, "x509", "-in", str(tsa), "-outform", "DER"],
@@ -206,8 +222,8 @@ def synthetic_tsa(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]
         "root_certificate_path": root,
         "root_private_key_path": root_key,
         "extensions_path": extensions,
-        "signed_time_epoch": int(signed_time.timestamp()),
-        "signed_hour": int(signed_time.timestamp()) // 3600 * 3600,
+        "signed_time_epoch": signed_time_epoch,
+        "signed_hour": signed_time_epoch // 3600 * 3600,
     }
 
 
@@ -717,6 +733,22 @@ def test_mock_tsa_hour_edge_selection_is_bounded_and_deterministic(second_offset
     assert delay == pytest.approx(expected_wait, abs=1e-5)
     safe_offset = (second_offset + delay) % 3600
     assert 5 <= safe_offset < 3590
+
+
+@pytest.mark.parametrize(
+    ("stamp", "accuracy", "expected"),
+    [
+        ("Oct 20 11:00:02 2026", "0x01 millis", True),
+        ("Oct 20 11:59:58 2026", "0x01 seconds", True),
+        ("Oct 20 11:59:59 2026", "0x02 seconds", False),
+        ("Oct 20 12:00:01 2026", "0x01 millis", False),
+        ("Oct 20 11:00:00 2026", "0x01 seconds", False),
+    ],
+)
+def test_mock_signed_window_uses_post_sign_token_time_and_accuracy(stamp, accuracy, expected):
+    origin = int(datetime(2026, 10, 20, 10, tzinfo=UTC).timestamp())
+    token_text = f"Time stamp: {stamp} GMT\\nAccuracy: {accuracy}\\n"
+    assert _mock_token_within_full_elapsed_window(origin, token_text) is expected
 
 
 def test_real_mock_issue_precedes_token_gen_time_in_full_hour_safe_window(synthetic_tsa):
