@@ -121,7 +121,6 @@ def _strict_utc_ns(value: object, field: str) -> int:
     return calendar.timegm(stamp.timetuple()) * SECOND_NS + stamp.microsecond * 1000
 
 
-
 def _signed_accuracy_ns(text: str) -> int:
     """Parse RFC3161 token accuracy; never assume a zero absent-policy error."""
     matches = re.findall(r"^Accuracy: (.+)$", text, flags=re.MULTILINE)
@@ -179,6 +178,7 @@ def _validate_signed_forecast_numeric_fields(row: dict[str, object]) -> None:
         value = row[key]
         if type(value) is not int or value <= 0:
             raise ValueError("Signed training counts must be positive integers")
+
 
 def _check_four_signed_forecasts(bundle: bytes, source_origin: int, gen_ns: int) -> None:
     """Derive the origin and H+1 targets from signed bytes, never caller metadata."""
