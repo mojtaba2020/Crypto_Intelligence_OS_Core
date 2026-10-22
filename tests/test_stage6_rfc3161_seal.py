@@ -7,6 +7,7 @@ import json
 import re
 import shutil
 import subprocess
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -16,6 +17,27 @@ from scripts.stage6_rfc3161_git_crosscheck import crosscheck_signed_forecast_git
 from scripts.stage6_rfc3161_seal import verify_future_only_rfc3161_seal
 
 POLICY = "1.3.6.1.4.1.57615.6.1"
+
+
+def _fixture_time_boundary_delay(seconds_into_hour: float) -> float:
+    """Avoid midnight/hour-edge races in second-resolution mock TSA genTime."""
+    if not 0 <= seconds_into_hour < 3600:
+        raise ValueError("Seconds into hour must be in the canonical range")
+    if seconds_into_hour < 5:
+        return 5.25 - seconds_into_hour
+    if seconds_into_hour >= 3590:
+        return 3605.25 - seconds_into_hour
+    return 0.0
+
+
+def _safe_mock_origin() -> int:
+    """Choose a completed candle only inside the current hour's safe window."""
+    while True:
+        now = datetime.now(UTC).timestamp()
+        delay = _fixture_time_boundary_delay(now % 3600)
+        if delay == 0:
+            return int(now) // 3600 * 3600 - 3600
+        time.sleep(delay)
 
 
 def _mock_future_forecast_bundle(origin_hour: int) -> bytes:
@@ -120,7 +142,8 @@ def synthetic_tsa(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]
         "-out",
         str(tsa),
     )
-    origin_hour = int(datetime.now(UTC).timestamp()) // 3600 * 3600 - 3600
+    # Ensures token genTime with second precision is strictly AFTER signed issuance.
+    origin_hour = _safe_mock_origin()
     synthetic_bundle = _mock_future_forecast_bundle(origin_hour)
     payload = tmp / "batch.txt"
     payload.write_bytes(synthetic_bundle)
@@ -674,3 +697,32 @@ def test_stale_but_signed_git_append_remains_ineligible(synthetic_tsa, tmp_path)
     assert verified["exact_signed_forecast_bytes_match_supplied_git_append"] is True
     assert verified["signed_elapsed_window_eligible"] is False
     assert verified["scientific_authorization"] == "NO_RUN"
+
+
+@pytest.mark.parametrize(
+    ("second_offset", "expected_wait"),
+    [
+        (0.0, 5.25),
+        (0.000001, 5.249999),
+        (4.999, 0.251),
+        (5.0, 0.0),
+        (120.0, 0.0),
+        (3589.999, 0.0),
+        (3590.0, 15.25),
+        (3599.999, 5.251),
+    ],
+)
+def test_mock_tsa_hour_edge_selection_is_bounded_and_deterministic(
+    second_offset, expected_wait
+):
+    delay = _fixture_time_boundary_delay(second_offset)
+    assert delay == pytest.approx(expected_wait, abs=1e-5)
+    safe_offset = (second_offset + delay) % 3600
+    assert 5 <= safe_offset < 3590
+
+
+def test_real_mock_issue_precedes_token_gen_time_in_full_hour_safe_window(synthetic_tsa):
+    rows = [json.loads(line) for line in synthetic_tsa["bundle"].decode().splitlines()]
+    issued_at = datetime.fromisoformat(rows[0]["issued_at_utc"]).timestamp()
+    assert issued_at > int(synthetic_tsa["origin_hour"]) + 3600
+    assert issued_at < float(synthetic_tsa["signed_time_epoch"])
