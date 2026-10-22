@@ -93,3 +93,42 @@ def test_unapproved_horizon_subset_or_order_rejected(invalid) -> None:
 def test_oversized_schedule_fails_closed() -> None:
     with pytest.raises(ValueError, match="bounded"):
         audit_hourly_schedule_coverage(plan(169), [])
+
+
+def test_origin_cannot_be_reassembled_from_two_different_runs() -> None:
+    rows = four(0)
+    rows[-1]["github_run_id"] = 999
+    with pytest.raises(ValueError, match="same GitHub run"):
+        audit_hourly_schedule_coverage(plan(1), rows)
+
+
+def test_one_run_must_use_one_consistent_batch_issuance() -> None:
+    rows = four(0)
+    rows[-1]["claimed_issued_at_utc"] += 1
+    with pytest.raises(ValueError, match="issuance time"):
+        audit_hourly_schedule_coverage(plan(1), rows)
+
+
+def test_same_run_cannot_be_reused_for_distinct_origins() -> None:
+    rows = four(0) + four(1)
+    for row in rows[4:]:
+        row["github_run_id"] = rows[0]["github_run_id"]
+    with pytest.raises(ValueError, match="distinct scheduled origins"):
+        audit_hourly_schedule_coverage(plan(2), rows)
+
+
+def test_claimed_issuance_at_source_close_is_too_early() -> None:
+    rows = four(0)
+    for row in rows:
+        row["claimed_issued_at_utc"] = START + HOUR
+    with pytest.raises(ValueError, match="prospectively timed"):
+        audit_hourly_schedule_coverage(plan(1), rows)
+
+
+def test_valid_distinct_runs_and_shared_batch_time_remain_unverified() -> None:
+    rows = four(0) + four(1)
+    result = audit_hourly_schedule_coverage(plan(2), rows)
+    assert result["claimed_complete_origin_count"] == 2
+    assert result["status"] == "UNVERIFIED_COVERAGE_ONLY"
+    assert result["independent_github_log_provenance_verified"] is False
+    assert result["scientific_authorization"] == "NO_RUN"
