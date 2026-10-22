@@ -479,7 +479,7 @@ def test_rfc3161_accuracy_upper_bound_blocks_near_deadline():
         horizon_hours=1,
         signed_time_lower_ns=nominal - 1,
         signed_time_upper_ns=nominal,
-    ) is True
+    )
 
 
 @pytest.mark.parametrize(
