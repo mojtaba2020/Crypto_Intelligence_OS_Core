@@ -57,11 +57,15 @@ def audit_hourly_schedule_coverage(
         raise ValueError("Invalid or oversized metadata sequence")
 
     by_origin: dict[int, set[int]] = {}
+    # A scheduled four-horizon batch is atomic: never stitch together
+    # horizons issued by different jobs or at different claimed times.
+    origin_batch: dict[int, tuple[int, int]] = {}
+    run_origin: dict[int, int] = {}
     seen: set[tuple[int, int]] = set()
     for record in records:
         if not isinstance(record, Mapping) or set(record) != RECORD_FIELDS:
             raise ValueError("Only exact non-outcome forecast metadata allowed")
-        _second(record["github_run_id"], "GitHub run ID")
+        run_id = _second(record["github_run_id"], "GitHub run ID")
         origin = _second(record["origin_hour_utc"], "forecast origin")
         horizon = record["horizon_hours"]
         if type(horizon) is not int or horizon not in HORIZONS:
@@ -79,8 +83,14 @@ def audit_hourly_schedule_coverage(
         expected_close = origin + (horizon + 1) * SECONDS_PER_HOUR
         if target_close != expected_close:
             raise ValueError("Forecast target does not match fixed hourly horizon")
-        if not origin + SECONDS_PER_HOUR <= issue <= logged < target_close:
+        if not origin + SECONDS_PER_HOUR < issue <= logged < target_close:
             raise ValueError("Forecast log not prospectively timed after completed origin")
+        batch = origin_batch.setdefault(origin, (run_id, issue))
+        if batch != (run_id, issue):
+            raise ValueError("One hourly batch must share the same GitHub run and issuance time")
+        owner = run_origin.setdefault(run_id, origin)
+        if owner != origin:
+            raise ValueError("One GitHub run cannot be reused for distinct scheduled origins")
         by_origin.setdefault(origin, set()).add(horizon)
 
     origin_rows: list[dict[str, object]] = []
