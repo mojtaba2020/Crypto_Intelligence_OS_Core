@@ -120,8 +120,7 @@ def fit_candidate_and_controls(
     # ridge penalty relief caused by adding a redundant correlated column.
     # When either m or v is constant, it equals m*v on every row.
     placebo = [
-        ((m, v, m * mean_v + mean_m * v - mean_m * mean_v), y)
-        for (m, v, _interaction), y in full
+        ((m, v, m * mean_v + mean_m * v - mean_m * mean_v), y) for (m, v, _interaction), y in full
     ]
     return FittedComparison(
         candidate_fit=_fit(full, ridge=ridge),
@@ -151,9 +150,7 @@ def predict_log_returns(
         + volatility * model_pair.training_mean_momentum
         - model_pair.training_mean_momentum * model_pair.training_mean_volatility
     )
-    placebo = _estimate(
-        *model_pair.linearized_placebo_fit, (momentum, volatility, placebo_feature)
-    )
+    placebo = _estimate(*model_pair.linearized_placebo_fit, (momentum, volatility, placebo_feature))
     if not all(math.isfinite(v) for v in (candidate, ablation, placebo)):
         raise ValueError("Nonfinite model output")
     return candidate, ablation, placebo, 0.0
