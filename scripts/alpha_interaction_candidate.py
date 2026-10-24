@@ -89,7 +89,6 @@ def interaction_features(
     return momentum, volatility, interaction
 
 
-
 def _independent_interaction_projection(
     rows: Sequence[tuple[tuple[float, float, float], float]],
 ) -> tuple[tuple[float, float, float], bool]:
@@ -114,8 +113,7 @@ def _independent_interaction_projection(
                 weight = math.fsum(a * b for a, b in zip(work, unit, strict=True))
                 work = [a - weight * b for a, b in zip(work, unit, strict=True)]
                 representation = [
-                    a - weight * b
-                    for a, b in zip(representation, linear_coeffs, strict=True)
+                    a - weight * b for a, b in zip(representation, linear_coeffs, strict=True)
                 ]
         norm = math.sqrt(math.fsum(value * value for value in work))
         source_norm = math.sqrt(math.fsum(value * value for value in column))
@@ -135,10 +133,7 @@ def _independent_interaction_projection(
         for unit, linear_coeffs in basis:
             weight = math.fsum(a * b for a, b in zip(residual, unit, strict=True))
             residual = [a - weight * b for a, b in zip(residual, unit, strict=True)]
-            projection = [
-                a + weight * b
-                for a, b in zip(projection, linear_coeffs, strict=True)
-            ]
+            projection = [a + weight * b for a, b in zip(projection, linear_coeffs, strict=True)]
 
     remaining_norm = math.sqrt(math.fsum(value * value for value in residual))
     original_norm = math.sqrt(math.fsum(value * value for value in interaction))
@@ -189,9 +184,7 @@ def fit_candidate_and_controls(
             (
                 m,
                 v,
-                z - (projection[0] + projection[1] * m + projection[2] * v)
-                if enabled
-                else 0.0,
+                z - (projection[0] + projection[1] * m + projection[2] * v) if enabled else 0.0,
             ),
             y,
         )
