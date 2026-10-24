@@ -134,6 +134,15 @@ exact FLAT separate), conditional accuracy, absolute USD/percentage error,
 stability by calendar segment/volatility, and coverage are **secondary**
 and cannot substitute for primary superiority.
 
+At each scheduled origin persist whether the interaction was truly
+applied and the exact reason whenever an ill-conditioned or out-of-support
+candidate fell back to the additive ablation. Numerical fallbacks are
+**not interaction-specific successes**, even when the resulting price error
+is small; count them in the all-slots denominator and report
+interaction-active vs fallback coverage separately. The implementation's
+`predict_with_diagnostics` makes this reason inspectable but does **not**
+itself create an attested immutable public origin ledger.
+
 At every S retain `scheduled / issued / late / missing / source-unavailable /
 abstained / matured / verified / unverified`, and publish BOTH a
 conditional-verified sample statistic and the all-scheduled denominator.
