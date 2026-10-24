@@ -124,9 +124,7 @@ def _independent_interaction_projection(
             # linear function of momentum. Raw projection coefficients
             # become enormous and can amplify small extrapolation errors.
             centered_v = statistics.mean(column)
-            variation = math.sqrt(
-                math.fsum((value - centered_v) ** 2 for value in column)
-            )
+            variation = math.sqrt(math.fsum((value - centered_v) ** 2 for value in column))
             if variation <= 1e-14 or norm / variation < 0.02:
                 additive_span_well_conditioned = False
         if norm <= 1e-10 * max(source_norm, 1e-20):
@@ -238,9 +236,7 @@ def fit_candidate_and_controls(
         training_mean_volatility=mean_v,
         additive_projection=projection,
         independent_interaction=enabled,
-        max_training_interaction_residual=max(
-            abs(features[2]) for features, _ in candidate_rows
-        ),
+        max_training_interaction_residual=max(abs(features[2]) for features, _ in candidate_rows),
         training_rows=len(full),
     )
 
