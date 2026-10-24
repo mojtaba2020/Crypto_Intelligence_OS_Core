@@ -35,6 +35,8 @@ class FittedComparison:
     linearized_placebo_fit: tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...]]
     training_mean_momentum: float
     training_mean_volatility: float
+    additive_projection: tuple[float, float, float]
+    independent_interaction: bool
     training_rows: int
 
 
@@ -87,6 +89,65 @@ def interaction_features(
     return momentum, volatility, interaction
 
 
+
+def _independent_interaction_projection(
+    rows: Sequence[tuple[tuple[float, float, float], float]],
+) -> tuple[tuple[float, float, float], bool]:
+    """Training-only orthogonal projection onto intercept, momentum, volatility.
+
+    Modified Gram-Schmidt with a second pass accommodates redundant base
+    columns. Along with the data-space orthonormal basis, track each basis
+    vector's exact representation as a linear combination of base features.
+    """
+    n = len(rows)
+    columns = [
+        [1.0] * n,
+        [features[0] for features, _ in rows],
+        [features[1] for features, _ in rows],
+    ]
+    basis: list[tuple[list[float], list[float]]] = []
+    for index, column in enumerate(columns):
+        work = column.copy()
+        representation = [float(index == k) for k in range(3)]
+        for _ in range(2):
+            for unit, linear_coeffs in basis:
+                weight = math.fsum(a * b for a, b in zip(work, unit, strict=True))
+                work = [a - weight * b for a, b in zip(work, unit, strict=True)]
+                representation = [
+                    a - weight * b
+                    for a, b in zip(representation, linear_coeffs, strict=True)
+                ]
+        norm = math.sqrt(math.fsum(value * value for value in work))
+        source_norm = math.sqrt(math.fsum(value * value for value in column))
+        if norm <= 1e-10 * max(source_norm, 1e-20):
+            continue
+        basis.append(
+            (
+                [value / norm for value in work],
+                [value / norm for value in representation],
+            )
+        )
+
+    interaction = [features[2] for features, _ in rows]
+    residual = interaction.copy()
+    projection = [0.0, 0.0, 0.0]
+    for _ in range(2):
+        for unit, linear_coeffs in basis:
+            weight = math.fsum(a * b for a, b in zip(residual, unit, strict=True))
+            residual = [a - weight * b for a, b in zip(residual, unit, strict=True)]
+            projection = [
+                a + weight * b
+                for a, b in zip(projection, linear_coeffs, strict=True)
+            ]
+
+    remaining_norm = math.sqrt(math.fsum(value * value for value in residual))
+    original_norm = math.sqrt(math.fsum(value * value for value in interaction))
+    has_incremental_dimension = remaining_norm > 1e-9 * max(original_norm, 1e-12)
+    if not all(math.isfinite(x) for x in projection):
+        raise ValueError("Nonfinite additive interaction projection")
+    return (projection[0], projection[1], projection[2]), has_incremental_dimension
+
+
 def fit_candidate_and_controls(
     approved_training_rows: Sequence[tuple[tuple[float, float, float], float]],
     *,
@@ -122,12 +183,28 @@ def fit_candidate_and_controls(
     placebo = [
         ((m, v, m * mean_v + mean_m * v - mean_m * mean_v), y) for (m, v, _interaction), y in full
     ]
+    projection, enabled = _independent_interaction_projection(full)
+    candidate_rows = [
+        (
+            (
+                m,
+                v,
+                z - (projection[0] + projection[1] * m + projection[2] * v)
+                if enabled
+                else 0.0,
+            ),
+            y,
+        )
+        for (m, v, z), y in full
+    ]
     return FittedComparison(
-        candidate_fit=_fit(full, ridge=ridge),
+        candidate_fit=_fit(candidate_rows, ridge=ridge),
         ablation_fit=_fit(nested, ridge=ridge),
         linearized_placebo_fit=_fit(placebo, ridge=ridge),
         training_mean_momentum=mean_m,
         training_mean_volatility=mean_v,
+        additive_projection=projection,
+        independent_interaction=enabled,
         training_rows=len(full),
     )
 
@@ -143,7 +220,13 @@ def predict_log_returns(
         interaction, momentum * volatility, rel_tol=1e-9, abs_tol=1e-12
     ):
         raise ValueError("Invalid interaction feature")
-    candidate = _estimate(*model_pair.candidate_fit, features)
+    offset, slope_m, slope_v = model_pair.additive_projection
+    residual = (
+        interaction - (offset + slope_m * momentum + slope_v * volatility)
+        if model_pair.independent_interaction
+        else 0.0
+    )
+    candidate = _estimate(*model_pair.candidate_fit, (momentum, volatility, residual))
     ablation = _estimate(*model_pair.ablation_fit, (momentum, volatility))
     placebo_feature = (
         momentum * model_pair.training_mean_volatility
