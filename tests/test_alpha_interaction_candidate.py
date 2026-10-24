@@ -140,6 +140,24 @@ class AlphaInteractionCandidateTests(unittest.TestCase):
             self.assertAlmostEqual(candidate, ablation, places=11)
             self.assertEqual(persistence, 0.0)
 
+    def test_near_collinear_codex_projection_attack_falls_back(self):
+        # Codex P2: a nearly collinear volatility function made raw
+        # reconstructed residual almost perfectly correlated with momentum
+        # and produced a nonsensical multibillion log-return prediction.
+        rows = []
+        for _ in range(20):
+            for m in (-0.1, -0.03, 0.04, 0.1):
+                v = 0.02 + 0.05 * m + 1e-9 * m * m
+                rows.append(((m, v, m * v), m))
+        pair = fit_candidate_and_controls(rows, ridge=10.0)
+        self.assertFalse(pair.independent_interaction)
+        m, v = 0.05, 0.02
+        candidate, ablation, _placebo, _baseline = predict_log_returns(
+            pair, (m, v, m * v)
+        )
+        self.assertAlmostEqual(candidate, ablation, places=11)
+        self.assertLess(abs(candidate), 1.0)
+
     def test_bad_training_rows_fail_closed(self):
         example = ((0.02, 0.004, 0.00008), 0.0003)
         with self.assertRaisesRegex(ValueError, "At least 30"):
