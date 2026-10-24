@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 from scripts.alpha_interaction_candidate import (
     HourlyClose,
-    fit_candidate_and_ablation,
+    fit_candidate_and_controls,
     interaction_features,
     predict_log_returns,
 )
@@ -90,29 +90,54 @@ class AlphaInteractionCandidateTests(unittest.TestCase):
             # Invented labels test software, not actual BTC forecasting skill.
             y = 0.3 * m + 14.0 * interaction
             rows.append(((m, v, interaction), y))
-        pair = fit_candidate_and_ablation(rows, ridge=1.0)
+        pair = fit_candidate_and_controls(rows, ridge=1.0)
         self.assertEqual(pair.training_rows, 80)
         self.assertEqual(len(pair.candidate_fit[0]), 4)
         self.assertEqual(len(pair.ablation_fit[0]), 3)
+        self.assertEqual(len(pair.linearized_placebo_fit[0]), 4)
         result = predict_log_returns(pair, (0.04, 0.01, 0.0004))
-        self.assertEqual(len(result), 3)
+        self.assertEqual(len(result), 4)
         self.assertTrue(all(math.isfinite(v) for v in result))
         self.assertEqual(result[-1], 0)
         self.assertNotAlmostEqual(result[0], result[1], places=9)
 
+    def test_constant_volatility_cannot_win_on_duplicate_ridge_relief(self):
+        # When volatility is constant, m*v is only a rescaled momentum.
+        # Candidate and Taylor-linearized placebo must be indistinguishable,
+        # even if both beat the unaugmented ridge ablation numerically.
+        rows = []
+        for i in range(80):
+            m = ((i % 23) - 11) * 0.01
+            v = 0.005
+            rows.append(((m, v, m * v), 0.45 * m))
+        pair = fit_candidate_and_controls(rows, ridge=10.0)
+        predicted = predict_log_returns(pair, (0.07, 0.005, 0.07 * 0.005))
+        self.assertAlmostEqual(predicted[0], predicted[2], places=11)
+
+    def test_constant_momentum_cannot_win_on_duplicate_ridge_relief(self):
+        # Equivalently, constant momentum makes m*v a duplicate of volatility.
+        rows = []
+        for i in range(80):
+            m = 0.02
+            v = 0.001 + (i % 21) * 0.001
+            rows.append(((m, v, m * v), 1.2 * v))
+        pair = fit_candidate_and_controls(rows, ridge=10.0)
+        predicted = predict_log_returns(pair, (0.02, 0.008, 0.02 * 0.008))
+        self.assertAlmostEqual(predicted[0], predicted[2], places=11)
+
     def test_bad_training_rows_fail_closed(self):
         example = ((0.02, 0.004, 0.00008), 0.0003)
         with self.assertRaisesRegex(ValueError, "At least 30"):
-            fit_candidate_and_ablation([example] * 29, ridge=1.0)
+            fit_candidate_and_controls([example] * 29, ridge=1.0)
         with self.assertRaisesRegex(ValueError, "strictly positive"):
-            fit_candidate_and_ablation([example] * 30, ridge=0)
+            fit_candidate_and_controls([example] * 30, ridge=0)
         malformed = ((0.02, 0.004, 0.002), 0.001)
         with self.assertRaisesRegex(ValueError, "Malformed"):
-            fit_candidate_and_ablation([malformed] * 30, ridge=1.0)
+            fit_candidate_and_controls([malformed] * 30, ridge=1.0)
 
     def test_invalid_features_are_not_predictions(self):
         rows = [((0.02, 0.004, 0.00008), 0.0003)] * 30
-        pair = fit_candidate_and_ablation(rows, ridge=1.0)
+        pair = fit_candidate_and_controls(rows, ridge=1.0)
         with self.assertRaisesRegex(ValueError, "Invalid interaction"):
             predict_log_returns(pair, (0.02, 0.004, 0.5))
         with self.assertRaisesRegex(ValueError, "Invalid feature"):
