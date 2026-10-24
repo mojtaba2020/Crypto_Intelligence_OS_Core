@@ -112,7 +112,8 @@ class AlphaInteractionCandidateTests(unittest.TestCase):
             rows.append(((m, v, m * v), 0.45 * m))
         pair = fit_candidate_and_controls(rows, ridge=10.0)
         predicted = predict_log_returns(pair, (0.07, 0.005, 0.07 * 0.005))
-        self.assertAlmostEqual(predicted[0], predicted[2], places=11)
+        self.assertFalse(pair.independent_interaction)
+        self.assertAlmostEqual(predicted[0], predicted[1], places=11)
 
     def test_constant_momentum_cannot_win_on_duplicate_ridge_relief(self):
         # Equivalently, constant momentum makes m*v a duplicate of volatility.
@@ -123,7 +124,25 @@ class AlphaInteractionCandidateTests(unittest.TestCase):
             rows.append(((m, v, m * v), 1.2 * v))
         pair = fit_candidate_and_controls(rows, ridge=10.0)
         predicted = predict_log_returns(pair, (0.02, 0.008, 0.02 * 0.008))
-        self.assertAlmostEqual(predicted[0], predicted[2], places=11)
+        self.assertFalse(pair.independent_interaction)
+        self.assertAlmostEqual(predicted[0], predicted[1], places=11)
+
+    def test_three_support_points_cannot_fake_an_interaction(self):
+        # Real Codex P2 challenge: m*v is EXACTLY in the additive span
+        # at these three unique support points; ridge must not get a
+        # spurious advantage by duplicating the additive direction.
+        support = [(-0.1, 0.01), (0.1, 0.01), (0.1, 0.03)]
+        rows = [
+            ((m, v, m * v), v) for _ in range(20) for m, v in support
+        ]
+        pair = fit_candidate_and_controls(rows, ridge=10.0)
+        self.assertFalse(pair.independent_interaction)
+        for m, v in support:
+            candidate, ablation, _placebo, persistence = predict_log_returns(
+                pair, (m, v, m * v)
+            )
+            self.assertAlmostEqual(candidate, ablation, places=11)
+            self.assertEqual(persistence, 0.0)
 
     def test_bad_training_rows_fail_closed(self):
         example = ((0.02, 0.004, 0.00008), 0.0003)
