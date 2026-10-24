@@ -156,6 +156,34 @@ class AlphaInteractionCandidateTests(unittest.TestCase):
         self.assertAlmostEqual(candidate, ablation, places=11)
         self.assertLess(abs(candidate), 1.0)
 
+    def test_codex_fourth_near_collinear_amplification_is_disabled(self):
+        # Exact later Codex P2: the old correlation cutoff accepted this
+        # additive-only sample yet predicted an absurd -44 log return.
+        rows = []
+        for _ in range(20):
+            for m in (-0.1, -0.03, 0.04, 0.1):
+                v = 0.02 + 0.05 * m + 8e-6 * m * m
+                rows.append(((m, v, m * v), m))
+        pair = fit_candidate_and_controls(rows, ridge=10.0)
+        self.assertFalse(pair.independent_interaction)
+        result = predict_log_returns(pair, (0.05, 0.02, 0.001))
+        self.assertAlmostEqual(result[0], result[1], places=11)
+        self.assertLess(abs(result[0]), 1.0)
+
+    def test_out_of_support_interaction_uses_additive_fallback(self):
+        rows = []
+        for i in range(100):
+            m = ((i % 17) - 8) * 0.01
+            v = 0.003 + ((i * 7) % 13) * 0.001
+            rows.append(((m, v, m * v), m * v * 20.0 + 0.2 * m))
+        pair = fit_candidate_and_controls(rows, ridge=10.0)
+        self.assertTrue(pair.independent_interaction)
+        # A physically valid input can still be wildly outside the
+        # training-only interaction range. Do not extrapolate that term.
+        m, v = 0.5, 0.3
+        result = predict_log_returns(pair, (m, v, m * v))
+        self.assertAlmostEqual(result[0], result[1], places=11)
+
     def test_bad_training_rows_fail_closed(self):
         example = ((0.02, 0.004, 0.00008), 0.0003)
         with self.assertRaisesRegex(ValueError, "At least 30"):
