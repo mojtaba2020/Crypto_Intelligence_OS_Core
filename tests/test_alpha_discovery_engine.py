@@ -7,9 +7,7 @@ from pathlib import Path
 
 from scripts.alpha_discovery_engine import evaluate
 
-MANIFEST = (
-    Path(__file__).resolve().parents[1] / "research" / "alpha_discovery_pilot_20261024.json"
-)
+MANIFEST = Path(__file__).resolve().parents[1] / "research" / "alpha_discovery_pilot_20261024.json"
 
 
 class AlphaDiscoveryTests(unittest.TestCase):
