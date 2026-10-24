@@ -9,6 +9,7 @@ from scripts.alpha_interaction_candidate import (
     fit_candidate_and_controls,
     interaction_features,
     predict_log_returns,
+    predict_with_diagnostics,
 )
 
 
@@ -183,6 +184,46 @@ class AlphaInteractionCandidateTests(unittest.TestCase):
         m, v = 0.5, 0.3
         result = predict_log_returns(pair, (m, v, m * v))
         self.assertAlmostEqual(result[0], result[1], places=11)
+
+    def test_fallback_is_explicit_for_near_collinear_model(self):
+        rows = []
+        for _ in range(20):
+            for m in (-0.1, -0.03, 0.04, 0.1):
+                v = 0.02 + 0.05 * m + 8e-6 * m * m
+                rows.append(((m, v, m * v), m))
+        pair = fit_candidate_and_controls(rows, ridge=10.0)
+        prediction = predict_with_diagnostics(pair, (0.05, 0.02, 0.001))
+        self.assertFalse(prediction.interaction_applied)
+        self.assertEqual(prediction.fallback_reason, "UNSTABLE_OR_REDUNDANT_INTERACTION")
+        self.assertAlmostEqual(
+            prediction.candidate_log_return, prediction.ablation_log_return, places=11
+        )
+
+    def test_out_of_support_fallback_is_explicit(self):
+        rows = []
+        for i in range(100):
+            m = ((i % 17) - 8) * 0.01
+            v = 0.003 + ((i * 7) % 13) * 0.001
+            rows.append(((m, v, m * v), 0.2 * m + m * v * 20.0))
+        pair = fit_candidate_and_controls(rows, ridge=10.0)
+        prediction = predict_with_diagnostics(pair, (0.5, 0.3, 0.15))
+        self.assertFalse(prediction.interaction_applied)
+        self.assertEqual(prediction.fallback_reason, "OUTSIDE_TRAINING_INTERACTION_SUPPORT")
+        self.assertEqual(prediction.candidate_log_return, prediction.ablation_log_return)
+        self.assertEqual(prediction.returns(), predict_log_returns(pair, (0.5, 0.3, 0.15)))
+
+    def test_active_interaction_reports_no_fallback(self):
+        rows = []
+        for i in range(100):
+            m = ((i % 17) - 8) * 0.01
+            v = 0.003 + ((i * 7) % 13) * 0.001
+            rows.append(((m, v, m * v), 0.2 * m + m * v * 20.0))
+        pair = fit_candidate_and_controls(rows, ridge=10.0)
+        self.assertTrue(pair.independent_interaction)
+        m, v = 0.02, 0.009
+        prediction = predict_with_diagnostics(pair, (m, v, m * v))
+        self.assertTrue(prediction.interaction_applied)
+        self.assertIsNone(prediction.fallback_reason)
 
     def test_bad_training_rows_fail_closed(self):
         example = ((0.02, 0.004, 0.00008), 0.0003)
