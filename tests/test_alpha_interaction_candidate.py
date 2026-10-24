@@ -152,9 +152,7 @@ class AlphaInteractionCandidateTests(unittest.TestCase):
         pair = fit_candidate_and_controls(rows, ridge=10.0)
         self.assertFalse(pair.independent_interaction)
         m, v = 0.05, 0.02
-        candidate, ablation, _placebo, _baseline = predict_log_returns(
-            pair, (m, v, m * v)
-        )
+        candidate, ablation, _placebo, _baseline = predict_log_returns(pair, (m, v, m * v))
         self.assertAlmostEqual(candidate, ablation, places=11)
         self.assertLess(abs(candidate), 1.0)
 
