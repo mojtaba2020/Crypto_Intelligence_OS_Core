@@ -144,8 +144,7 @@ def _independent_interaction_projection(
     # Numerically unstable, nearly collinear data can destroy the
     # orthogonality achieved in data space when reconstructing r.
     reconstructed = [
-        z - (projection[0] + projection[1] * m + projection[2] * v)
-        for (m, v, z), _ in rows
+        z - (projection[0] + projection[1] * m + projection[2] * v) for (m, v, z), _ in rows
     ]
     reconstruction_error = math.sqrt(
         math.fsum((a - b) ** 2 for a, b in zip(reconstructed, residual, strict=True))
@@ -160,9 +159,10 @@ def _independent_interaction_projection(
         # Reject a residual that numerically reintroduces any additive
         # feature direction. Returning False forces exact nested ablation.
         for unit, _coefficients in basis:
-            correlation = abs(
-                math.fsum(a * b for a, b in zip(reconstructed, unit, strict=True))
-            ) / reconstructed_norm
+            correlation = (
+                abs(math.fsum(a * b for a, b in zip(reconstructed, unit, strict=True)))
+                / reconstructed_norm
+            )
             if correlation > 1e-5:
                 has_incremental_dimension = False
                 break
