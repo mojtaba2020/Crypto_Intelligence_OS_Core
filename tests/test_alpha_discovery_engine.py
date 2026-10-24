@@ -36,7 +36,9 @@ class AlphaDiscoveryTests(unittest.TestCase):
         self.assertEqual(result["external_cost_usd"], 0)
 
     def test_three_claimed_clear_reviews_still_do_not_authorize_run(self):
-        self.packet["reviews"] = [self.review(role) for role in ("mechanism", "adversary", "statistics")]
+        self.packet["reviews"] = [
+            self.review(role) for role in ("mechanism", "adversary", "statistics")
+        ]
         result = evaluate(self.packet)
         self.assertEqual(result["hypotheses"][0]["status"], "DESIGN_REVIEWED_ONLY")
         self.assertEqual(
