@@ -35,16 +35,21 @@ log(P_t/P_{t-24}), volatility v = population standard deviation of
 release. Fixed model family: ridge with an intercept and the three
 features (m, v, m*v). Frozen tuning and fit schedule are TBD; this
 manifest does NOT itself provide a preregistered forecasting model.
-The first negative control removes the interaction while retaining m and v.
-An adversarial Codex P2 finding exposed **ridge-penalty relief** when m*v
-merely duplicates momentum or volatility. A second, equal-dimensional,
-training-only Taylor-linearized negative control substitutes
-z = m*mean_training(v) + v*mean_training(m) - mean_training(m)*mean_training(v)
-for m*v. **All three ridge fits use the same labels and penalty**; the
-interaction must beat both controls AND persistence under an independently
-signed-off statistical hierarchy. Passing any numerical comparison alone
-cannot substitute for independently authenticated publication, sample power
-or multiplicity control.
+A Codex P2 critique identified a **fake ridge advantage**: even when
+m*v is merely an additive combination of m and v on the empirical support,
+a redundant feature can alter the ridge shrinkage of additive coefficients.
+A simple Taylor-matched placebo fixes some but NOT all such cases.
+Therefore the candidate fits only the **training-orthogonalized residual**
+r = m*v - projection_training(m*v | 1, m, v). The projection is learned
+exclusively on input features from permitted training rows. If this residual
+has effectively zero training variation, it is **exactly zeroed** and the
+candidate cannot differ from the additive ablation due to this feature.
+A nested 2-feature ablation and a Taylor-linearized 3-feature placebo
+remain independent negative controls. All three ridge fits use the same
+training labels and penalty; the residual candidate must beat both controls
+AND persistence under an independently approved statistical hierarchy.
+No purely numerical comparison authenticates point-in-time market data,
+public release, sample power or multiplicity corrections.
 Price error is primary; direction and coverage remain secondary.
 This is a *hypothesis*, not an empirical finding.
 
