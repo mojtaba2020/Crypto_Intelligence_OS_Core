@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import math
 import statistics
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from itertools import pairwise
-from typing import Sequence
 
 from crypto_intelligence_os.hybrid_forecasting import _estimate, _fit
 
