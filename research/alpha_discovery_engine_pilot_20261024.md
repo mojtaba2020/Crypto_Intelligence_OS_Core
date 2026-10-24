@@ -26,13 +26,21 @@ identifiers are refused; distinct names are NOT authenticated identities.
 
 ## Concrete first hypothesis
 
-The sole design in research/alpha_discovery_pilot_20261024.json is the
-**past-only trend × realized-volatility interaction**. Hypothesis: that
-interaction may contain incremental BTC log-price information in
-prespecified market regimes. Falsification requires the same new future
-full-elapsed target schedule and an identically complex placebo assembled
-using only legitimate past training data, with persistence as baseline.
-Price error is primary; direction/coverage secondary.
+The sole design in research/alpha_discovery_pilot_20261024.json is ONE
+**past-only 24-hour trend × realized-volatility interaction** hypothesis,
+not an open-ended search for "winning regimes". Define momentum m =
+log(P_t/P_{t-24}), volatility v = population standard deviation of
+24 hourly log returns, and exactly one interaction m*v. Require
+25 complete, independently first-observed hourly closes prior to forecast
+release. Fixed model family: ridge with an intercept and the three
+features (m, v, m*v). Frozen tuning and fit schedule are TBD; this
+manifest does NOT itself provide a preregistered forecasting model.
+The negative ablation removes the interaction while retaining m and v,
+under an identical approved future schedule, alongside persistence.
+This smaller nested ablation tests whether the INTERACTION adds value;
+it is not an equal-dimensional random placebo and cannot substitute for
+independent publication or multiplicity control.
+Price error is primary; direction and coverage remain secondary.
 This is a *hypothesis*, not an empirical finding.
 
 Prior V3/hourly V2 outcomes have been seen; the design explicitly declares
