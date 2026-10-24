@@ -41,6 +41,26 @@ class FittedComparison:
     training_rows: int
 
 
+@dataclass(frozen=True)
+class PredictionDiagnostics:
+    """Price-blind per-origin account of whether interaction was really used."""
+
+    candidate_log_return: float
+    ablation_log_return: float
+    placebo_log_return: float
+    persistence_log_return: float
+    interaction_applied: bool
+    fallback_reason: str | None
+
+    def returns(self) -> tuple[float, float, float, float]:
+        return (
+            self.candidate_log_return,
+            self.ablation_log_return,
+            self.placebo_log_return,
+            self.persistence_log_return,
+        )
+
+
 def interaction_features(
     bars: Sequence[HourlyClose], *, issue_at_utc: datetime
 ) -> tuple[float, float, float]:
@@ -241,10 +261,10 @@ def fit_candidate_and_controls(
     )
 
 
-def predict_log_returns(
+def predict_with_diagnostics(
     model_pair: FittedComparison, features: tuple[float, float, float]
-) -> tuple[float, float, float, float]:
-    """Return candidate, ablation, linearized placebo and persistence returns."""
+) -> PredictionDiagnostics:
+    """Predict without hiding whether the candidate used its interaction."""
     if len(features) != 3 or not all(math.isfinite(v) for v in features):
         raise ValueError("Invalid feature vector")
     momentum, volatility, interaction = features
@@ -259,16 +279,22 @@ def predict_log_returns(
         else 0.0
     )
     ablation = _estimate(*model_pair.ablation_fit, (momentum, volatility))
-    # Never evaluate a learned interaction far outside the residual range
-    # seen at training time. A no-signal fallback must be disclosed in an
-    # eventual scheduled-origin record; it cannot count as a model victory.
-    extrapolated = (
+    # A large or untrusted residual must not be promoted as evidence of
+    # interaction skill. Record a fallback in every future origin ledger.
+    out_of_support = (
         model_pair.independent_interaction
         and abs(residual) > 4.0 * model_pair.max_training_interaction_residual
     )
+    reason = (
+        "UNSTABLE_OR_REDUNDANT_INTERACTION"
+        if not model_pair.independent_interaction
+        else "OUTSIDE_TRAINING_INTERACTION_SUPPORT"
+        if out_of_support
+        else None
+    )
     candidate = (
         ablation
-        if extrapolated
+        if reason is not None
         else _estimate(*model_pair.candidate_fit, (momentum, volatility, residual))
     )
     placebo_feature = (
@@ -279,7 +305,21 @@ def predict_log_returns(
     placebo = _estimate(*model_pair.linearized_placebo_fit, (momentum, volatility, placebo_feature))
     if not all(math.isfinite(v) for v in (candidate, ablation, placebo)):
         raise ValueError("Nonfinite model output")
-    return candidate, ablation, placebo, 0.0
+    return PredictionDiagnostics(
+        candidate_log_return=candidate,
+        ablation_log_return=ablation,
+        placebo_log_return=placebo,
+        persistence_log_return=0.0,
+        interaction_applied=reason is None,
+        fallback_reason=reason,
+    )
+
+
+def predict_log_returns(
+    model_pair: FittedComparison, features: tuple[float, float, float]
+) -> tuple[float, float, float, float]:
+    """Legacy numeric API; callers needing honest coverage use diagnostics."""
+    return predict_with_diagnostics(model_pair, features).returns()
 
 
 if __name__ == "__main__":
