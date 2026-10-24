@@ -137,9 +137,36 @@ def _independent_interaction_projection(
 
     remaining_norm = math.sqrt(math.fsum(value * value for value in residual))
     original_norm = math.sqrt(math.fsum(value * value for value in interaction))
-    has_incremental_dimension = remaining_norm > 1e-9 * max(original_norm, 1e-12)
     if not all(math.isfinite(x) for x in projection):
         raise ValueError("Nonfinite additive interaction projection")
+
+    # The model applies raw projection coefficients at inference time.
+    # Numerically unstable, nearly collinear data can destroy the
+    # orthogonality achieved in data space when reconstructing r.
+    reconstructed = [
+        z - (projection[0] + projection[1] * m + projection[2] * v)
+        for (m, v, z), _ in rows
+    ]
+    reconstruction_error = math.sqrt(
+        math.fsum((a - b) ** 2 for a, b in zip(reconstructed, residual, strict=True))
+    )
+    reconstructed_norm = math.sqrt(math.fsum(value * value for value in reconstructed))
+    has_incremental_dimension = (
+        remaining_norm > 1e-6 * max(original_norm, 1e-12)
+        and reconstruction_error <= 1e-3 * remaining_norm
+        and reconstructed_norm <= 1.001 * remaining_norm
+    )
+    if has_incremental_dimension:
+        # Reject a residual that numerically reintroduces any additive
+        # feature direction. Returning False forces exact nested ablation.
+        for unit, _coefficients in basis:
+            correlation = abs(
+                math.fsum(a * b for a, b in zip(reconstructed, unit, strict=True))
+            ) / reconstructed_norm
+            if correlation > 1e-5:
+                has_incremental_dimension = False
+                break
+
     return (projection[0], projection[1], projection[2]), has_incremental_dimension
 
 
