@@ -12,14 +12,25 @@ Never portray internal code review or this document as those approvals.
 
 The candidate has exactly four regression terms: an intercept, **m** (24-hour
 log-price momentum), **v** (population SD of the same 24 completed one-hour
-log returns), and **m × v**. Its ablation retains intercept, m and v, and
-removes only m × v. Persistence predicts the origin reference price. Thus:
+log returns), and **m × v**. Its ablation retains intercept, m and v, and removes m × v. **Codex found
+a P2 scientific confound:** with constant volatility or momentum, m × v
+duplicates a base feature and gives the 3-feature ridge more coefficient
+channels to share its penalty, creating a fake win over the 2-feature ablation.
+Therefore the protocol now also includes **one predeclared linearized
+regularization-matched negative control**: construct a third feature
+`z_placebo = m × mean_training(v) + v × mean_training(m) − mean_training(m) × mean_training(v)`
+and fit the *same* three-feature ridge on the same rows with this
+training-only placebo replacing m × v. For constant m or constant v the
+candidate and placebo inputs are identical, so an apparent ridge shrinkage
+advantage cannot be credited to incremental market information. Persistence
+predicts the origin reference price. Thus:
 
 - Candidate hypothesis: m × v supplies **incremental** information on a
   future log-price return after accounting for m and v.
 - Null/negative finding: no incremental gain vs the nested ablation and/or
-  no gain vs persistence; reject the *interaction-specific* thesis even if
-  one unrelated momentum specification is promising.
+  no gain vs persistence, the no-interaction ablation, OR the
+  linearized penalty-matched placebo; reject the *interaction-specific*
+  thesis even if a momentum specification is promising.
 - The old V2 4h, 12h and 24h outcomes and retrospective volatility medians
   have all been examined; they cannot serve as fresh untouched confirmation.
   **No post-hoc high-volatility gate and no second candidate family**.
@@ -63,10 +74,13 @@ new cron until operator/reviewer approval and cost/isolation attestation.
 
 ## 3. Candidate fitting contract requiring final signoff
 
-For each S, the two linear/ridge models must be trained separately, but
-against the **same** earlier, fully resolved labels, source vintages,
+For each S, the three linear/ridge research fits (interaction candidate,
+nested ablation and penalty-matched placebo) must use the **same**
+earlier, fully resolved labels, source vintages,
 training timestamps, target convention and rolling history. Candidate:
-`x=(m, v, m*v)`; ablation: `x=(m, v)`. Fit independent standardizers
+`x=(m, v, m*v)`; ablation: `x=(m, v)`; regularization placebo:
+`x=(m, v, z_placebo)`, using training-only m/v means.
+Fit independent standardizers
 from TRAINING inputs only; never normalize on an OOS/test window. Predict
 log return; convert to positive USD forecast from P_S. Ridge penalty,
 window duration, refit cadence, numerical caps, feature normalization,
@@ -83,14 +97,17 @@ have not passed.
 ## 4. Single primary outcome and honest secondary diagnostics
 
 For each scheduled S with a matured, independent observed target,
-record the three models' log-price absolute errors:
+record the four forecasters' log-price absolute errors:
 `L_c=|ln(P_candidate/P_T)|`,
 `L_a=|ln(P_ablation/P_T)|`,
+`L_r=|ln(P_regularization_placebo/P_T)|`, and
 `L_p=|ln(P_S/P_T)|`.
 Paired gain relative to persistence is `D_p=L_p−L_c`; paired
-incremental interaction gain is `D_a=L_a−L_c`.
-Report both mean effects, with the **primary scientific hypothesis
-requiring superiority to persistence AND incrementality beyond ablation**;
+interaction gain against the nested ablation is `D_a=L_a−L_c`, and
+against the shrinkage-matched placebo is `D_r=L_r−L_c`.
+Report all three mean effects. **Scientific success requires genuine
+superiority to persistence AND to BOTH controls**, rather than only winning
+because a redundant ridge column relaxed a penalty;
 the significance family and order must be fixed by an independent
 statistics reviewer, not chosen after observing D. Direction (UP/DOWN,
 exact FLAT separate), conditional accuracy, absolute USD/percentage error,
@@ -108,7 +125,7 @@ slots is a feasibility requirement, not evidence of alpha.
 
 - **Independent statistics reviewer:** predeclare minimum economically
   meaningful relative log-error improvement, desired power >=80%,
-  confidence level, the hierarchy/multiplicity of D_p and D_a, and
+  confidence level, the hierarchy/multiplicity of D_p, D_a and D_r, and
   dependence-aware resampling/HAC method (including block size or lags)
   for six daily origins with overlapping 24h features. Report effective
   sample size; do not equate six slots/day with six independent samples.
@@ -141,8 +158,8 @@ pre-registered target number of effective observations, score exactly once
 at that frozen endpoint; no stopping early for wins or extending for
 losses. Data/source failure or failed custody halts issuance with
 `NO_RUN/BLOCKED`, preserving all lost slots. Success additionally requires
-verified price lift vs persistence, incremental lift vs the non-interaction
-ablation, positive effect size of at least the signed-off threshold,
+verified price lift vs persistence, incremental lift vs the non-interaction ablation **and the
+regularization-matched placebo**, positive effect size of at least the signed-off threshold,
 appropriate multiple-test/dependence-adjusted uncertainty, honest
 denominators, and signoff. **Inconclusive** is distinct from model failure
 and from success. A limited-power study MUST remain inconclusive and
