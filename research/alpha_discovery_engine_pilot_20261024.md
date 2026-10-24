@@ -35,11 +35,16 @@ log(P_t/P_{t-24}), volatility v = population standard deviation of
 release. Fixed model family: ridge with an intercept and the three
 features (m, v, m*v). Frozen tuning and fit schedule are TBD; this
 manifest does NOT itself provide a preregistered forecasting model.
-The negative ablation removes the interaction while retaining m and v,
-under an identical approved future schedule, alongside persistence.
-This smaller nested ablation tests whether the INTERACTION adds value;
-it is not an equal-dimensional random placebo and cannot substitute for
-independent publication or multiplicity control.
+The first negative control removes the interaction while retaining m and v.
+An adversarial Codex P2 finding exposed **ridge-penalty relief** when m*v
+merely duplicates momentum or volatility. A second, equal-dimensional,
+training-only Taylor-linearized negative control substitutes
+z = m*mean_training(v) + v*mean_training(m) - mean_training(m)*mean_training(v)
+for m*v. **All three ridge fits use the same labels and penalty**; the
+interaction must beat both controls AND persistence under an independently
+signed-off statistical hierarchy. Passing any numerical comparison alone
+cannot substitute for independently authenticated publication, sample power
+or multiplicity control.
 Price error is primary; direction and coverage remain secondary.
 This is a *hypothesis*, not an empirical finding.
 
