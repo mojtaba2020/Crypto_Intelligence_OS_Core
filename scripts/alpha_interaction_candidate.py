@@ -32,6 +32,9 @@ class FittedComparison:
 
     candidate_fit: tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...]]
     ablation_fit: tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...]]
+    linearized_placebo_fit: tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...]]
+    training_mean_momentum: float
+    training_mean_volatility: float
     training_rows: int
 
 
@@ -84,12 +87,12 @@ def interaction_features(
     return momentum, volatility, interaction
 
 
-def fit_candidate_and_ablation(
+def fit_candidate_and_controls(
     approved_training_rows: Sequence[tuple[tuple[float, float, float], float]],
     *,
     ridge: float,
 ) -> FittedComparison:
-    """Fit two nested ridge designs to the exact same caller-approved labels.
+    """Fit interaction, no-interaction, and shrinkage-matched placebo designs.
 
     CRITICAL: the caller must independently prove training eligibility and
     target maturity. Passing this numeric function grants NO_RUN only; do not
@@ -111,17 +114,29 @@ def fit_candidate_and_ablation(
             raise ValueError("Malformed interaction feature")
         full.append((features, label))
         nested.append(((momentum, volatility), label))
+    mean_m = statistics.mean(features[0] for features, _ in full)
+    mean_v = statistics.mean(features[1] for features, _ in full)
+    # This Taylor-linearized feature is a predeclared negative control for
+    # ridge penalty relief caused by adding a redundant correlated column.
+    # When either m or v is constant, it equals m*v on every row.
+    placebo = [
+        ((m, v, m * mean_v + mean_m * v - mean_m * mean_v), y)
+        for (m, v, _interaction), y in full
+    ]
     return FittedComparison(
         candidate_fit=_fit(full, ridge=ridge),
         ablation_fit=_fit(nested, ridge=ridge),
+        linearized_placebo_fit=_fit(placebo, ridge=ridge),
+        training_mean_momentum=mean_m,
+        training_mean_volatility=mean_v,
         training_rows=len(full),
     )
 
 
 def predict_log_returns(
     model_pair: FittedComparison, features: tuple[float, float, float]
-) -> tuple[float, float, float]:
-    """Return candidate, noninteraction ablation and persistence log returns."""
+) -> tuple[float, float, float, float]:
+    """Return candidate, ablation, linearized placebo and persistence returns."""
     if len(features) != 3 or not all(math.isfinite(v) for v in features):
         raise ValueError("Invalid feature vector")
     momentum, volatility, interaction = features
@@ -131,9 +146,17 @@ def predict_log_returns(
         raise ValueError("Invalid interaction feature")
     candidate = _estimate(*model_pair.candidate_fit, features)
     ablation = _estimate(*model_pair.ablation_fit, (momentum, volatility))
-    if not math.isfinite(candidate) or not math.isfinite(ablation):
+    placebo_feature = (
+        momentum * model_pair.training_mean_volatility
+        + volatility * model_pair.training_mean_momentum
+        - model_pair.training_mean_momentum * model_pair.training_mean_volatility
+    )
+    placebo = _estimate(
+        *model_pair.linearized_placebo_fit, (momentum, volatility, placebo_feature)
+    )
+    if not all(math.isfinite(v) for v in (candidate, ablation, placebo)):
         raise ValueError("Nonfinite model output")
-    return candidate, ablation, 0.0
+    return candidate, ablation, placebo, 0.0
 
 
 if __name__ == "__main__":
