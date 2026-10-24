@@ -37,6 +37,7 @@ class FittedComparison:
     training_mean_volatility: float
     additive_projection: tuple[float, float, float]
     independent_interaction: bool
+    max_training_interaction_residual: float
     training_rows: int
 
 
@@ -105,6 +106,7 @@ def _independent_interaction_projection(
         [features[1] for features, _ in rows],
     ]
     basis: list[tuple[list[float], list[float]]] = []
+    additive_span_well_conditioned = True
     for index, column in enumerate(columns):
         work = column.copy()
         representation = [float(index == k) for k in range(3)]
@@ -117,6 +119,16 @@ def _independent_interaction_projection(
                 ]
         norm = math.sqrt(math.fsum(value * value for value in work))
         source_norm = math.sqrt(math.fsum(value * value for value in column))
+        if index == 2:
+            # Reject an ill-conditioned additive design: v is nearly a
+            # linear function of momentum. Raw projection coefficients
+            # become enormous and can amplify small extrapolation errors.
+            centered_v = statistics.mean(column)
+            variation = math.sqrt(
+                math.fsum((value - centered_v) ** 2 for value in column)
+            )
+            if variation <= 1e-14 or norm / variation < 0.02:
+                additive_span_well_conditioned = False
         if norm <= 1e-10 * max(source_norm, 1e-20):
             continue
         basis.append(
@@ -151,7 +163,8 @@ def _independent_interaction_projection(
     )
     reconstructed_norm = math.sqrt(math.fsum(value * value for value in reconstructed))
     has_incremental_dimension = (
-        remaining_norm > 1e-6 * max(original_norm, 1e-12)
+        additive_span_well_conditioned
+        and remaining_norm > 1e-6 * max(original_norm, 1e-12)
         and reconstruction_error <= 1e-3 * remaining_norm
         and reconstructed_norm <= 1.001 * remaining_norm
     )
@@ -225,6 +238,9 @@ def fit_candidate_and_controls(
         training_mean_volatility=mean_v,
         additive_projection=projection,
         independent_interaction=enabled,
+        max_training_interaction_residual=max(
+            abs(features[2]) for features, _ in candidate_rows
+        ),
         training_rows=len(full),
     )
 
@@ -246,8 +262,19 @@ def predict_log_returns(
         if model_pair.independent_interaction
         else 0.0
     )
-    candidate = _estimate(*model_pair.candidate_fit, (momentum, volatility, residual))
     ablation = _estimate(*model_pair.ablation_fit, (momentum, volatility))
+    # Never evaluate a learned interaction far outside the residual range
+    # seen at training time. A no-signal fallback must be disclosed in an
+    # eventual scheduled-origin record; it cannot count as a model victory.
+    extrapolated = (
+        model_pair.independent_interaction
+        and abs(residual) > 4.0 * model_pair.max_training_interaction_residual
+    )
+    candidate = (
+        ablation
+        if extrapolated
+        else _estimate(*model_pair.candidate_fit, (momentum, volatility, residual))
+    )
     placebo_feature = (
         momentum * model_pair.training_mean_volatility
         + volatility * model_pair.training_mean_momentum
