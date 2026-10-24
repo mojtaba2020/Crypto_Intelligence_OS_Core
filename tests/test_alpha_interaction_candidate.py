@@ -132,15 +132,11 @@ class AlphaInteractionCandidateTests(unittest.TestCase):
         # at these three unique support points; ridge must not get a
         # spurious advantage by duplicating the additive direction.
         support = [(-0.1, 0.01), (0.1, 0.01), (0.1, 0.03)]
-        rows = [
-            ((m, v, m * v), v) for _ in range(20) for m, v in support
-        ]
+        rows = [((m, v, m * v), v) for _ in range(20) for m, v in support]
         pair = fit_candidate_and_controls(rows, ridge=10.0)
         self.assertFalse(pair.independent_interaction)
         for m, v in support:
-            candidate, ablation, _placebo, persistence = predict_log_returns(
-                pair, (m, v, m * v)
-            )
+            candidate, ablation, _placebo, persistence = predict_log_returns(pair, (m, v, m * v))
             self.assertAlmostEqual(candidate, ablation, places=11)
             self.assertEqual(persistence, 0.0)
 
