@@ -16,8 +16,22 @@ log returns), and **m × v**. Its ablation retains intercept, m and v, and remov
 a P2 scientific confound:** with constant volatility or momentum, m × v
 duplicates a base feature and gives the 3-feature ridge more coefficient
 channels to share its penalty, creating a fake win over the 2-feature ablation.
-Therefore the protocol now also includes **one predeclared linearized
-regularization-matched negative control**: construct a third feature
+Codex's second review found an additional exact **three-point additive
+support** where the Taylor control was not enough: m*v was an additive
+combination of m and v on the actual empirical support but the two ridge
+penalties still differed. To rule out *all* empirically redundant additive
+interactions in this numerical pilot, the candidate now uses a
+**training-only orthogonalized interaction residual**
+`r = m*v - projection_training(m*v | 1, m, v)`, computed by a rank-aware
+re-orthogonalized basis. If the training residual has negligible norm,
+it is pinned **exactly to zero**; the fitted candidate must then equal
+the additive ablation numerically and **cannot win by redundant shrinkage**.
+Projection coefficients and the zero-residual decision are frozen at
+each approved refit and reused without looking at the future target.
+
+The pilot also keeps one predeclared linearized
+regularization-matched negative control as an additional stress test:
+construct a third feature
 `z_placebo = m × mean_training(v) + v × mean_training(m) − mean_training(m) × mean_training(v)`
 and fit the *same* three-feature ridge on the same rows with this
 training-only placebo replacing m × v. For constant m or constant v the
@@ -25,8 +39,10 @@ candidate and placebo inputs are identical, so an apparent ridge shrinkage
 advantage cannot be credited to incremental market information. Persistence
 predicts the origin reference price. Thus:
 
-- Candidate hypothesis: m × v supplies **incremental** information on a
-  future log-price return after accounting for m and v.
+- Candidate hypothesis: the **training-residualized** portion of m × v
+  supplies incremental information on a future log-price return *beyond*
+  the full additive span of m and v; a zero residual is an immediate
+  negative result for that fit, not a deployment success.
 - Null/negative finding: no incremental gain vs the nested ablation and/or
   no gain vs persistence, the no-interaction ablation, OR the
   linearized penalty-matched placebo; reject the *interaction-specific*
@@ -78,8 +94,12 @@ For each S, the three linear/ridge research fits (interaction candidate,
 nested ablation and penalty-matched placebo) must use the **same**
 earlier, fully resolved labels, source vintages,
 training timestamps, target convention and rolling history. Candidate:
-`x=(m, v, m*v)`; ablation: `x=(m, v)`; regularization placebo:
+`x=(m, v, r)` where r is the training-orthogonalized residual of m*v
+after projection onto (1,m,v); ablation: `x=(m, v)`; regularization placebo:
 `x=(m, v, z_placebo)`, using training-only m/v means.
+The residual projection must be fit on **training inputs only**, never on
+a future/test/OOS window. The numerical code currently implements this
+as an internal fit of its own; real source/label eligibility remains unverified.
 Fit independent standardizers
 from TRAINING inputs only; never normalize on an OOS/test window. Predict
 log return; convert to positive USD forecast from P_S. Ridge penalty,
