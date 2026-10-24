@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "mode": "design_only",
+  "max_external_cost_usd": 0,
+  "hypotheses": [
+    {
+      "id": "regime_conditioned_signal",
+      "mechanism": "Past-only trend times realized-volatility interaction may predict incremental BTC log-price change in selected regimes",
+      "pre_origin_features": "Strictly completed, independently timestamped returns and realized volatility; do not infer availability from candle close alone",
+      "falsification_rule": "Reject if an approved prospective paired loss test does not beat persistence after dependence-aware inference and full-slot accounting; also reject if placebo is indistinguishable",
+      "negative_control": "Identical candidate complexity using prespecified lagged or training-only shuffled features, evaluated on the same future target schedule",
+      "baseline": "PERSISTENCE",
+      "primary_metric": "PAIRED_ABSOLUTE_LOG_PRICE_ERROR",
+      "horizon": "UNDECIDED",
+      "historical_outcome_exposure": "ALREADY_EXPOSED"
+    }
+  ],
+  "reviews": []
+}
