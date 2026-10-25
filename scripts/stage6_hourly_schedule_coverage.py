@@ -173,9 +173,7 @@ def audit_github_schedule_arrivals(
     ):
         raise ValueError("Incomplete, oversized or malformed GitHub API snapshot")
 
-    windows: dict[int, int] = {
-        instant: 0 for instant in range(start, stop, FOUR_HOURS)
-    }
+    windows: dict[int, int] = {instant: 0 for instant in range(start, stop, FOUR_HOURS)}
     day_creations = {day: 0 for day in range(start, stop, SECONDS_PER_DAY)}
     day_successes = {day: 0 for day in range(start, stop, SECONDS_PER_DAY)}
     seen_ids: set[int] = set()
@@ -193,8 +191,14 @@ def audit_github_schedule_arrivals(
         if not isinstance(row["workflow_name"], str) or not row["workflow_name"]:
             raise ValueError("Workflow name must be nonempty text")
         if row["conclusion"] not in {
-            "success", "failure", "cancelled", "skipped",
-            "timed_out", "neutral", "action_required", None,
+            "success",
+            "failure",
+            "cancelled",
+            "skipped",
+            "timed_out",
+            "neutral",
+            "action_required",
+            None,
         }:
             raise ValueError("Unrecognized workflow-run conclusion")
 
@@ -215,9 +219,7 @@ def audit_github_schedule_arrivals(
         "status": "GITHUB_RUN_METADATA_ONLY_NO_FORECAST_ATTESTATION",
         "expected_hourly_trigger_opportunities": expected,
         "observed_schedule_run_creations": total_observed,
-        "workflow_creation_count_shortfall_not_slot_attribution": max(
-            0, expected - total_observed
-        ),
+        "workflow_creation_count_shortfall_not_slot_attribution": max(0, expected - total_observed),
         "successful_workflow_conclusions_not_valid_issuances": total_success,
         "four_hour_windows": len(windows),
         "four_hour_windows_with_any_run_creation": nonempty,
