@@ -1,3 +1,61 @@
+## 2026-10-25 decision revision — REMOVE PingPane from scientific critical path
+
+**New verification from PingPane's own official manual** makes the initial
+zero-cost monitoring suggestion non-actionable as an independent scientific
+proof *on currently advertised capabilities*:
+
+- https://www.pingpane.com/manual/status-pages explicitly says the **public**
+  status page omits individual checks and even the exact monitored URL
+  (only uptime barcode and incidents are public).
+- https://www.pingpane.com/manual/monitors says individual checks are in
+  the operator dashboard, private check history can be exported to CSV, and
+  monitors are one URL with 5-minute Free interval. This is **not** a
+  cryptographically signed publicly verifiable per-check body-hash-and-time
+  receipt. The monitor API reference link currently returns a 404.
+- https://www.pingpane.com/ promotes per-check body hashing, but the
+  existence of a body hash *within a private dashboard* is not a trusted
+  public first-publication certificate. An owner-controlled CSV is not a
+  separate independently witnessed record by itself.
+
+**Efficiency decision:** DO NOT open a PingPane account, request
+credential access, buy its Pro tier, or schedule checks solely to satisfy
+the prospective Alpha scientific gate. It is eliminated as our **default
+standalone witness**. It could still be considered as *supplementary
+uptime instrumentation* if a genuinely independent custodian can export
+and sign verifiable per-check raw GET byte hashes, source-observation
+intervals, and a bound tied to an immutable forecast URI. Such operator
+attestation is NOT available now, so do not spend cycles simulating it.
+
+**One remaining real-world dependency, not more code:** a separately
+authorized independent custodian (or service) must agree, *in writing
+before the pilot*, to perform fresh GET on each immutable public forecast
+URI and attest all exact bytes + signed UTC latest-possible availability
+bound, external identity, retention and third-party re-verification.
+In parallel, one independent BTC data source custodian must attest
+source first receipt/vintage. All-slots schedule, power and A1–A6
+approval are still required. Until those named independent parties
+exist, mark **`EXTERNAL_OPERATOR_UNASSIGNED / PILOT_BLOCKED / NO_RUN`**.
+
+**Stop-rule to save time:** do not keep shopping API timestamp vendors,
+generating more synthetic timestamps, increasing agents, retesting
+the rejected 24-family, or spending on uptime dashboards. Resume
+engineering only after receiving a real independently verifiable
+candidate **GET receipt schema/signature/cert/time policy** or a
+positive authenticated source-operator commitment. If the candidate
+proposes solely RFC3161/hash presence without observed public GET,
+reject without coding an adapter.
+
+**Current synthetic canary remains valid:** immutable SHA-256
+`2ddb60f2003011b89502534c7fd20dbc0ccb28a2d1918da520001d048560eaaf`,
+367 UTF-8 bytes, Git blob
+`51294b5f9894a02cd93f5b3fef6a491d9a2a8141`.
+Both digests are independently recomputed locally against the exact
+line committed in GitHub. Its first public availability has
+**not** been externally witnessed. No live forecast was issued,
+no third-party service was started, and no costs were incurred.
+
+---
+
 # Alpha Discovery: independent evidence operator decision — 2026-10-25
 
 **Decision:** use a **two-witness** path, not timestamping alone. An exact-byte
