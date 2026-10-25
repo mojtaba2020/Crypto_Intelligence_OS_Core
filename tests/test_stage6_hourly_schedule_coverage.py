@@ -132,3 +132,139 @@ def test_valid_distinct_runs_and_shared_batch_time_remain_unverified() -> None:
     assert result["status"] == "UNVERIFIED_COVERAGE_ONLY"
     assert result["independent_github_log_provenance_verified"] is False
     assert result["scientific_authorization"] == "NO_RUN"
+
+
+from scripts.stage6_hourly_schedule_coverage import audit_github_schedule_arrivals
+
+
+def _synthetic_actions_rows() -> list[dict[str, object]]:
+    # Synthetic metadata representing the separately observed day-by-day
+    # *run-creation counts*. These are NOT actual market forecasts.
+    utc_hours = (
+        (0, 5, 10, 14, 18, 20, 23),
+        (1, 6, 14, 20),
+        (0, 5, 11, 16, 20, 23),
+        (4, 10, 15, 20, 23),
+        (4, 10, 15, 20, 23),
+        (4, 9, 14, 19, 22),
+        (0, 5, 10, 14, 18, 20, 23),
+    )
+    rows: list[dict[str, object]] = []
+    first = int(datetime(2026, 10, 18, tzinfo=UTC).timestamp())
+    for day, hours in enumerate(utc_hours):
+        for hour in hours:
+            rows.append(
+                {
+                    "github_run_id": 1000 + len(rows),
+                    "created_at_utc": first + day * 24 * HOUR + hour * HOUR + 15 * 60,
+                    "workflow_name": "BTC Hourly Prospective Forecasts",
+                    "event": "schedule",
+                    "conclusion": "success",
+                }
+            )
+    for index in range(15):
+        rows.append(
+            {
+                "github_run_id": 2000 + index,
+                "created_at_utc": first + (index % 7) * 24 * HOUR + 2 * HOUR,
+                "workflow_name": "Other scheduled workflow",
+                "event": "schedule",
+                "conclusion": "success",
+            }
+        )
+    return rows
+
+
+def _week_start_and_stop() -> tuple[int, int]:
+    first = int(datetime(2026, 10, 18, tzinfo=UTC).timestamp())
+    return first, first + 7 * 24 * HOUR
+
+
+def test_github_metadata_hourly_vs_four_hour_windows() -> None:
+    rows = _synthetic_actions_rows()
+    start, stop = _week_start_and_stop()
+    result = audit_github_schedule_arrivals(
+        start, stop, rows, api_total_count=len(rows)
+    )
+    assert result["expected_hourly_trigger_opportunities"] == 168
+    assert result["observed_schedule_run_creations"] == 39
+    assert result["workflow_creation_count_shortfall_not_slot_attribution"] == 129
+    assert result["successful_workflow_conclusions_not_valid_issuances"] == 39
+    assert result["four_hour_windows"] == 42
+    assert result["four_hour_windows_with_any_run_creation"] == 34
+    assert result["four_hour_windows_without_run_creation"] == 8
+    assert result["four_hour_windows_with_multiple_run_creations"] == 5
+    assert result["other_scheduled_workflow_runs"] == 15
+    assert [row["observed_hourly_workflow_runs"] for row in result["by_day"]] == [
+        7, 4, 6, 5, 5, 5, 7
+    ]
+    assert result["exact_scheduled_slot_assignment_known"] is False
+    assert result["independent_publication_time_verified"] is False
+    assert result["valid_forecast_count"] == "UNKNOWN"
+    assert result["scientific_authorization"] == "NO_RUN"
+
+
+def test_github_metadata_incomplete_api_page_rejected() -> None:
+    rows = _synthetic_actions_rows()
+    start, stop = _week_start_and_stop()
+    with pytest.raises(ValueError, match="Incomplete"):
+        audit_github_schedule_arrivals(start, stop, rows, api_total_count=len(rows) + 1)
+
+
+def test_github_metadata_duplicate_run_cannot_inflate_coverage() -> None:
+    rows = _synthetic_actions_rows()
+    start, stop = _week_start_and_stop()
+    with pytest.raises(ValueError, match="Duplicate"):
+        audit_github_schedule_arrivals(
+            start, stop, [rows[0], rows[0]], api_total_count=2
+        )
+
+
+def test_github_metadata_no_price_or_future_outcome_fields() -> None:
+    rows = _synthetic_actions_rows()
+    start, stop = _week_start_and_stop()
+    rows[0]["actual_close_usd"] = 999999
+    with pytest.raises(ValueError, match="price-blind"):
+        audit_github_schedule_arrivals(
+            start, stop, rows, api_total_count=len(rows)
+        )
+
+
+def test_github_metadata_manual_dispatch_not_counted_as_schedule() -> None:
+    rows = _synthetic_actions_rows()
+    start, stop = _week_start_and_stop()
+    rows[0]["event"] = "workflow_dispatch"
+    with pytest.raises(ValueError, match="schedule-event"):
+        audit_github_schedule_arrivals(
+            start, stop, rows, api_total_count=len(rows)
+        )
+
+
+def test_github_metadata_half_day_or_eight_days_not_allowed() -> None:
+    start, stop = _week_start_and_stop()
+    with pytest.raises(ValueError, match="whole-day"):
+        audit_github_schedule_arrivals(start + 3600, stop, [], api_total_count=0)
+    with pytest.raises(ValueError, match="whole-day"):
+        audit_github_schedule_arrivals(start, stop + 24 * HOUR, [], api_total_count=0)
+
+
+def test_github_metadata_created_outside_period_fails_closed() -> None:
+    rows = _synthetic_actions_rows()
+    start, stop = _week_start_and_stop()
+    rows[0]["created_at_utc"] = stop
+    with pytest.raises(ValueError, match="out-of-interval"):
+        audit_github_schedule_arrivals(
+            start, stop, rows, api_total_count=len(rows)
+        )
+
+
+def test_github_metadata_failed_run_still_counts_creation_not_success() -> None:
+    rows = _synthetic_actions_rows()
+    start, stop = _week_start_and_stop()
+    rows[0]["conclusion"] = "failure"
+    result = audit_github_schedule_arrivals(
+        start, stop, rows, api_total_count=len(rows)
+    )
+    assert result["observed_schedule_run_creations"] == 39
+    assert result["successful_workflow_conclusions_not_valid_issuances"] == 38
+    assert result["valid_forecast_count"] == "UNKNOWN"
