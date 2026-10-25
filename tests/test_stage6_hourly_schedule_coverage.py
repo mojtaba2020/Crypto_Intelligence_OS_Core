@@ -137,7 +137,6 @@ def test_valid_distinct_runs_and_shared_batch_time_remain_unverified() -> None:
     assert result["scientific_authorization"] == "NO_RUN"
 
 
-
 def _synthetic_actions_rows() -> list[dict[str, object]]:
     # Synthetic metadata representing the separately observed day-by-day
     # *run-creation counts*. These are NOT actual market forecasts.
@@ -184,9 +183,7 @@ def _week_start_and_stop() -> tuple[int, int]:
 def test_github_metadata_hourly_vs_four_hour_windows() -> None:
     rows = _synthetic_actions_rows()
     start, stop = _week_start_and_stop()
-    result = audit_github_schedule_arrivals(
-        start, stop, rows, api_total_count=len(rows)
-    )
+    result = audit_github_schedule_arrivals(start, stop, rows, api_total_count=len(rows))
     assert result["expected_hourly_trigger_opportunities"] == 168
     assert result["observed_schedule_run_creations"] == 39
     assert result["workflow_creation_count_shortfall_not_slot_attribution"] == 129
@@ -197,7 +194,13 @@ def test_github_metadata_hourly_vs_four_hour_windows() -> None:
     assert result["four_hour_windows_with_multiple_run_creations"] == 5
     assert result["other_scheduled_workflow_runs"] == 15
     assert [row["observed_hourly_workflow_runs"] for row in result["by_day"]] == [
-        7, 4, 6, 5, 5, 5, 7
+        7,
+        4,
+        6,
+        5,
+        5,
+        5,
+        7,
     ]
     assert result["exact_scheduled_slot_assignment_known"] is False
     assert result["independent_publication_time_verified"] is False
@@ -216,9 +219,7 @@ def test_github_metadata_duplicate_run_cannot_inflate_coverage() -> None:
     rows = _synthetic_actions_rows()
     start, stop = _week_start_and_stop()
     with pytest.raises(ValueError, match="Duplicate"):
-        audit_github_schedule_arrivals(
-            start, stop, [rows[0], rows[0]], api_total_count=2
-        )
+        audit_github_schedule_arrivals(start, stop, [rows[0], rows[0]], api_total_count=2)
 
 
 def test_github_metadata_no_price_or_future_outcome_fields() -> None:
@@ -226,9 +227,7 @@ def test_github_metadata_no_price_or_future_outcome_fields() -> None:
     start, stop = _week_start_and_stop()
     rows[0]["actual_close_usd"] = 999999
     with pytest.raises(ValueError, match="price-blind"):
-        audit_github_schedule_arrivals(
-            start, stop, rows, api_total_count=len(rows)
-        )
+        audit_github_schedule_arrivals(start, stop, rows, api_total_count=len(rows))
 
 
 def test_github_metadata_manual_dispatch_not_counted_as_schedule() -> None:
@@ -236,9 +235,7 @@ def test_github_metadata_manual_dispatch_not_counted_as_schedule() -> None:
     start, stop = _week_start_and_stop()
     rows[0]["event"] = "workflow_dispatch"
     with pytest.raises(ValueError, match="schedule-event"):
-        audit_github_schedule_arrivals(
-            start, stop, rows, api_total_count=len(rows)
-        )
+        audit_github_schedule_arrivals(start, stop, rows, api_total_count=len(rows))
 
 
 def test_github_metadata_half_day_or_eight_days_not_allowed() -> None:
@@ -254,18 +251,14 @@ def test_github_metadata_created_outside_period_fails_closed() -> None:
     start, stop = _week_start_and_stop()
     rows[0]["created_at_utc"] = stop
     with pytest.raises(ValueError, match="out-of-interval"):
-        audit_github_schedule_arrivals(
-            start, stop, rows, api_total_count=len(rows)
-        )
+        audit_github_schedule_arrivals(start, stop, rows, api_total_count=len(rows))
 
 
 def test_github_metadata_failed_run_still_counts_creation_not_success() -> None:
     rows = _synthetic_actions_rows()
     start, stop = _week_start_and_stop()
     rows[0]["conclusion"] = "failure"
-    result = audit_github_schedule_arrivals(
-        start, stop, rows, api_total_count=len(rows)
-    )
+    result = audit_github_schedule_arrivals(start, stop, rows, api_total_count=len(rows))
     assert result["observed_schedule_run_creations"] == 39
     assert result["successful_workflow_conclusions_not_valid_issuances"] == 38
     assert result["valid_forecast_count"] == "UNKNOWN"
