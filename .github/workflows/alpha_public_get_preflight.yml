@@ -88,6 +88,19 @@ jobs:
         with:
           subject-path: get-receipt.json
 
+      # Preserve the signed subjects, not merely the attestations, so an
+      # outside reviewer can independently verify their exact bytes later.
+      # Public synthetic only; never upload credentials or real market inputs.
+      - name: Preserve exact signed subjects for external verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-get-evidence-${{ github.run_id }}
+          path: |
+            canary.raw
+            get-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Verify signed attestation against this repository and exact bytes
         env:
           GH_TOKEN: ${{ github.token }}
