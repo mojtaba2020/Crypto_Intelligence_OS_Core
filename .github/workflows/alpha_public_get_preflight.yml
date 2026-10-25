@@ -52,3 +52,14 @@ jobs:
         uses: actions/attest@v4
         with:
           subject-path: canary.raw
+
+      - name: Verify signed attestation against this repository and exact bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh attestation verify canary.raw --repo "$GITHUB_REPOSITORY" --format json > verified-attestation.json
+          test -s verified-attestation.json
+          echo "GITHUB_ATTESTATION_VERIFIED_TECHNICAL_ONLY"
+          echo "WORKFLOW_OWNER_NOT_INDEPENDENT; MARKET_PILOT_STILL_BLOCKED"
