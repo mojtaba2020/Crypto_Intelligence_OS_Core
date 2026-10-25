@@ -128,3 +128,114 @@ def audit_hourly_schedule_coverage(
         "effective_independent_n": "UNKNOWN",
         "origins": origin_rows,
     }
+
+
+# A separate, price-blind view of GitHub scheduled-run metadata. Workflow-run
+# creation is NOT forecast issuance and GitHub's creation time is not a signed
+# first-publication timestamp. This helper never recovers missed forecasts.
+GITHUB_RUN_FIELDS = frozenset(
+    {"github_run_id", "created_at_utc", "workflow_name", "event", "conclusion"}
+)
+HOURLY_WORKFLOW_NAME = "BTC Hourly Prospective Forecasts"
+FOUR_HOURS = 4 * SECONDS_PER_HOUR
+SECONDS_PER_DAY = 24 * SECONDS_PER_HOUR
+
+
+def audit_github_schedule_arrivals(
+    start_utc: int,
+    stop_utc: int,
+    scheduled_runs: Sequence[Mapping[str, object]],
+    *,
+    api_total_count: int,
+) -> dict[str, object]:
+    """Bound a COMPLETE API snapshot and count hourly vs 4-hour run arrivals.
+
+    A 4-hour window containing some run is only a *coverage opportunity*.
+    It must never be scored as a timely 4-hour forecast publication.
+    """
+    from datetime import UTC, datetime
+
+    start = _second(start_utc, "first UTC day")
+    stop = _second(stop_utc, "exclusive last UTC day")
+    if (
+        start % SECONDS_PER_DAY
+        or stop % SECONDS_PER_DAY
+        or stop <= start
+        or stop - start > MAX_HOURS * SECONDS_PER_HOUR
+    ):
+        raise ValueError("Require a bounded whole-day UTC interval")
+    if (
+        not isinstance(scheduled_runs, Sequence)
+        or isinstance(scheduled_runs, (str, bytes))
+        or type(api_total_count) is not int
+        or api_total_count != len(scheduled_runs)
+        or len(scheduled_runs) > 2000
+    ):
+        raise ValueError("Incomplete, oversized or malformed GitHub API snapshot")
+
+    windows: dict[int, int] = {
+        instant: 0 for instant in range(start, stop, FOUR_HOURS)
+    }
+    by_day: dict[int, dict[str, int | str]] = {
+        instant: {
+            "utc_date": datetime.fromtimestamp(instant, UTC).date().isoformat(),
+            "expected_hourly_runs": 24,
+            "observed_hourly_workflow_runs": 0,
+            "successful_workflow_conclusions": 0,
+        }
+        for instant in range(start, stop, SECONDS_PER_DAY)
+    }
+    seen_ids: set[int] = set()
+    total_observed = total_success = 0
+    for row in scheduled_runs:
+        if not isinstance(row, Mapping) or set(row) != GITHUB_RUN_FIELDS:
+            raise ValueError("Exact, price-blind GitHub run metadata required")
+        run_id = _second(row["github_run_id"], "GitHub run id")
+        created = _second(row["created_at_utc"], "created time")
+        if run_id in seen_ids or not start <= created < stop:
+            raise ValueError("Duplicate or out-of-interval run")
+        seen_ids.add(run_id)
+        if row["event"] != "schedule":
+            raise ValueError("Only schedule-event API runs are admissible")
+        if not isinstance(row["workflow_name"], str) or not row["workflow_name"]:
+            raise ValueError("Workflow name must be nonempty text")
+        if row["conclusion"] not in {
+            "success", "failure", "cancelled", "skipped",
+            "timed_out", "neutral", "action_required", None,
+        }:
+            raise ValueError("Unrecognized workflow-run conclusion")
+
+        if row["workflow_name"] != HOURLY_WORKFLOW_NAME:
+            continue
+        total_observed += 1
+        day = created - (created % SECONDS_PER_DAY)
+        window = created - (created % FOUR_HOURS)
+        windows[window] += 1
+        by_day[day]["observed_hourly_workflow_runs"] += 1
+        if row["conclusion"] == "success":
+            total_success += 1
+            by_day[day]["successful_workflow_conclusions"] += 1
+
+    expected = (stop - start) // SECONDS_PER_HOUR
+    nonempty = sum(count > 0 for count in windows.values())
+    return {
+        "status": "GITHUB_RUN_METADATA_ONLY_NO_FORECAST_ATTESTATION",
+        "expected_hourly_trigger_opportunities": expected,
+        "observed_schedule_run_creations": total_observed,
+        "workflow_creation_count_shortfall_not_slot_attribution": max(
+            0, expected - total_observed
+        ),
+        "successful_workflow_conclusions_not_valid_issuances": total_success,
+        "four_hour_windows": len(windows),
+        "four_hour_windows_with_any_run_creation": nonempty,
+        "four_hour_windows_without_run_creation": len(windows) - nonempty,
+        "four_hour_windows_with_multiple_run_creations": sum(
+            count > 1 for count in windows.values()
+        ),
+        "other_scheduled_workflow_runs": len(scheduled_runs) - total_observed,
+        "by_day": list(by_day.values()),
+        "exact_scheduled_slot_assignment_known": False,
+        "independent_publication_time_verified": False,
+        "valid_forecast_count": "UNKNOWN",
+        "scientific_authorization": "NO_RUN",
+    }
