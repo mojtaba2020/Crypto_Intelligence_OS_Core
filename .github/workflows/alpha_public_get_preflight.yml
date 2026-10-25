@@ -1,0 +1,43 @@
+# ONE-SHOT RESEARCH PREFLIGHT. This is NOT independent forecast-publication
+# evidence: the forecast developer controls this repository and workflow.
+# This job only checks that a public GitHub-hosted runner can download the
+# exact, immutable synthetic raw JSONL response bytes by unauthenticated GET.
+name: Alpha synthetic external GET preflight
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/alpha_public_get_preflight.yml
+
+permissions:
+  contents: read
+
+jobs:
+  public-get-canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check unauthenticated public HTTP bytes
+        env:
+          CANARY_URL: https://raw.githubusercontent.com/mojtaba2020/Crypto_Intelligence_OS_Core/f5c180aa1842b0680dde4dd7442a30d890c13583/research/alpha_public_get_canary_20261025.jsonl
+          EXPECTED_SHA256: 2ddb60f2003011b89502534c7fd20dbc0ccb28a2d1918da520001d048560eaaf
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --location --max-time 25 --retry 0 --output canary.raw --write-out '%{http_code}' "$CANARY_URL")"
+          test "$status" = "200"
+          echo "$EXPECTED_SHA256  canary.raw" | sha256sum --check --status
+          test "$(wc -c < canary.raw)" -eq 367
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          b = Path("canary.raw").read_bytes()
+          assert b.endswith(b"\n") and b.count(b"\n") == 1
+          row = json.loads(b)
+          assert row["experimental_status"] == "SYNTHETIC_ONLY_NO_RUN"
+          assert row["source_data"] == "NONE"
+          assert row["model_predictions"] == "NONE"
+          print("TECHNICAL_ONLY_EXTERNAL_GET_MATCH; 367 exact raw bytes; SHA-256 checked")
+          print("NOT_INDEPENDENT_CUSTODY; NOT_PROOF_OF_FIRST_PUBLIC_AVAILABILITY")
+          PY
