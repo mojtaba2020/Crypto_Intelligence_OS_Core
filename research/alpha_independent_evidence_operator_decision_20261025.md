@@ -10,6 +10,16 @@ or authorized trial**. Status: **OPERATOR_UNASSIGNED / NO_RUN / NO_FREEZE**.
 
 ## Why the existing proofs cannot be promoted
 
+**Critical schema mismatch:** Draft PR #90's RFC3161 verifier expects a
+signed bundle of **four different horizons (1h,4h,12h,24h)** using the old
+hourly versioned calendar. The new Alpha pilot instead requires **one
+approved 4h horizon with four named forecast variants** (candidate, nested
+ablation, linearized placebo, persistence). Reusing that code/schema
+unchanged could certify the WRONG experimental message and wrong clock
+bound. It is therefore **not an approved drop-in sealer** for the Alpha
+pilot. Do not combine the old four-horizon rows with this new experiment
+or retrofit them as supposedly fresh predictions.
+
 Our legacy V2 hourly ledger and GitHub run/push timestamps do not show a
 third-party first-public retrieval of the exact prediction bytes. Existing
 draft PR #90 verifies *caller-supplied* Git append objects and synthetic
