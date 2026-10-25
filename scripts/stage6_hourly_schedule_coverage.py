@@ -176,15 +176,8 @@ def audit_github_schedule_arrivals(
     windows: dict[int, int] = {
         instant: 0 for instant in range(start, stop, FOUR_HOURS)
     }
-    by_day: dict[int, dict[str, int | str]] = {
-        instant: {
-            "utc_date": datetime.fromtimestamp(instant, UTC).date().isoformat(),
-            "expected_hourly_runs": 24,
-            "observed_hourly_workflow_runs": 0,
-            "successful_workflow_conclusions": 0,
-        }
-        for instant in range(start, stop, SECONDS_PER_DAY)
-    }
+    day_creations = {day: 0 for day in range(start, stop, SECONDS_PER_DAY)}
+    day_successes = {day: 0 for day in range(start, stop, SECONDS_PER_DAY)}
     seen_ids: set[int] = set()
     total_observed = total_success = 0
     for row in scheduled_runs:
@@ -211,10 +204,10 @@ def audit_github_schedule_arrivals(
         day = created - (created % SECONDS_PER_DAY)
         window = created - (created % FOUR_HOURS)
         windows[window] += 1
-        by_day[day]["observed_hourly_workflow_runs"] += 1
+        day_creations[day] += 1
         if row["conclusion"] == "success":
             total_success += 1
-            by_day[day]["successful_workflow_conclusions"] += 1
+            day_successes[day] += 1
 
     expected = (stop - start) // SECONDS_PER_HOUR
     nonempty = sum(count > 0 for count in windows.values())
@@ -233,7 +226,15 @@ def audit_github_schedule_arrivals(
             count > 1 for count in windows.values()
         ),
         "other_scheduled_workflow_runs": len(scheduled_runs) - total_observed,
-        "by_day": list(by_day.values()),
+        "by_day": [
+            {
+                "utc_date": datetime.fromtimestamp(day, UTC).date().isoformat(),
+                "expected_hourly_runs": 24,
+                "observed_hourly_workflow_runs": day_creations[day],
+                "successful_workflow_conclusions": day_successes[day],
+            }
+            for day in day_creations
+        ],
         "exact_scheduled_slot_assignment_known": False,
         "independent_publication_time_verified": False,
         "valid_forecast_count": "UNKNOWN",
