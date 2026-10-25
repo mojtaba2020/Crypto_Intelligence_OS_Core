@@ -106,3 +106,61 @@ not fabricated signatures or JSON "CLEAR" reviewer names.
 
 Cost budget this round: **$0 in tool/provider calls; no paid third-party
 request, no new training, no live trial, no remote agents.**
+
+
+## 2026-10-25 narrowing: zero-cost *technical* external-GET feasibility
+
+**Leading $0 preflight candidate, not an approved independent scientific
+witness:** PingPane (https://www.pingpane.com/ and
+https://www.pingpane.com/manual/getting-started). Its published free
+plan has three monitors with a 5-minute check interval, no credit card,
+HTTP status/response time/body hash per check, and a public status page.
+The private monitor view advertises the latest 1,000 checks. This could
+provide a genuine **external-network GET** after we publish a fixed,
+nonfinancial synthetic test resource and authorize a separate real
+operator/account.
+
+**Verification still missing:** it is NOT established that PingPane
+exposes the *full per-check exact SHA-256 and externally credible UTC
+observation bound* in a third-party-readable, exportable, tamper-evident
+receipt; a public uptime status indicator is insufficient. It is also
+unverified whether a static immutable file can be monitored separately
+for each new forecast resource without manual creation, whether checks
+are reliably scheduled before S+15m, and whether an independent
+custodian (not the developer) can control the account. A 5-minute poll
+does not itself certify the collector's clock, original publisher or
+market candle first-arrival. **Do not enable a live model on the basis
+of signup or an uptime-green badge.**
+
+**Actionable, no-cost preflight gate:** an authorized operator, using
+their own separate account and ONLY innocuous synthetic content:
+(1) point one $0 monitor at one permanently public immutable URL
+(2) retrieve a genuine check record after a fresh external HTTP GET
+(3) establish that its **exact body SHA-256** equals an independently
+known local file hash
+(4) independently validate UTC observation time **upper bound** (not
+only local UI-rendered time), retention, signature/receipt integrity and
+public availability of the evidence to a separate reviewer
+(5) document missed/unavailable checks; do not count them as successes.
+
+If 3–4 cannot be demonstrated, PingPane is **not an accepted custody
+solution**. Stop that vendor and compare alternatives rather than
+spending on an untested $19 one-shot archive or paid blockchain calls.
+The technical preflight itself cannot grant `PILOT_EVIDENCE=APPROVED`.
+
+**Paid fallback discovery, NOT chosen for purchase:** FreshProof's
+public MCP description advertises a *fresh public-network fetch*
+(`max_age=0`) with HTTP response body SHA-256 and a verifiable stored
+Proof Receipt; however its observe/verify_url tools **cost money
+in USDC on Base**, and operational/signer/time attestation have not
+been accepted by an independent custodian. Never invoke paid
+tools, sign up, or spend project funds without explicit
+permission. References:
+- https://glama.ai/mcp/connectors/io.github.ricksporto/freshproof/tools/verify_url
+- https://verifymcp.io/servers/ricksporto-freshproof/freshproof
+
+**Decision:** select only a *free synthetic PingPane feasibility check*
+as the first external onboarding path. No account connection or
+synthetic GET was performed here because no separately controlled,
+authorized PingPane account or external witness is connected. This
+remains `WITNESS_OPERATOR_UNASSIGNED / NO_RUN`.
