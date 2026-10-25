@@ -164,3 +164,45 @@ as the first external onboarding path. No account connection or
 synthetic GET was performed here because no separately controlled,
 authorized PingPane account or external witness is connected. This
 remains `WITNESS_OPERATOR_UNASSIGNED / NO_RUN`.
+
+
+## October 25 exact-byte canary — PUBLISHED / EXTERNAL GET NOT YET PROVEN
+
+A deliberately **non-financial, non-model** one-line UTF-8 JSONL fixture
+was actually committed to the existing Draft PR branch (NOT main):
+
+- Immutable Git commit: `f5c180aa1842b0680dde4dd7442a30d890c13583`.
+- Public-resource candidate: `https://raw.githubusercontent.com/mojtaba2020/Crypto_Intelligence_OS_Core/f5c180aa1842b0680dde4dd7442a30d890c13583/research/alpha_public_get_canary_20261025.jsonl`
+- Schema marker: `alpha-public-get-canary-v1`, `SYNTHETIC_ONLY_NO_RUN`.
+- **Expected length**: 367 bytes; **SHA-256**:
+  `2ddb60f2003011b89502534c7fd20dbc0ccb28a2d1918da520001d048560eaaf`.
+- Git blob SHA-1:
+  `51294b5f9894a02cd93f5b3fef6a491d9a2a8141`.
+- Exactly one LF-terminated JSON line. Hashes were computed
+  locally and the blob identity agrees with the **connected GitHub**
+  file/immutable-commit read.
+
+**Observed limits:** Our ordinary web fetch could not retrieve that
+fresh GitHub/raw URL from this execution environment (`DisabledError`).
+The separate sandbox network fetch was blocked by DNS; the GitHub
+connector did read the file, but its authorized connector access
+**is NOT an independently attested unauthenticated public GET**.
+Therefore the accurate decision is:
+
+`SOURCE_REPO_BLOB_VERIFIED=YES`;
+`EXTERNAL_PUBLIC_GET_WITNESSED=NO`;
+`SIGNED_FIRST_PUBLIC_AVAILABLE_TIME=NONE`;
+`TECHNICAL_PREFLIGHT=BLOCKED`;
+`PILOT_EVIDENCE=BLOCKED`;
+`NO_RUN/NO_FREEZE`.
+
+This synthetic canary is ready for **one** external witness operator's
+real fresh GET; the operator must independently retrieve the immutable
+link and submit a time-bounded, verifiable SHA-256 receipt. The fact
+that GitHub reports a commit date, the connected connector returns
+its file bytes, or a monitoring page displays green is NOT a substitute.
+If PingPane cannot supply accessible per-check exact-body hashes,
+bounded trustworthy UTC times and separately attestable records, this
+vendor must be rejected rather than upgraded to Pro.
+
+**No account was created and no external monitor/scheduler was enabled.**
