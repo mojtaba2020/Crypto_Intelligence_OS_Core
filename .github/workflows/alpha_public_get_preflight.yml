@@ -27,12 +27,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          GET_STARTED_UTC="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
           status="$(curl --silent --show-error --location --max-time 25 --retry 0 --output canary.raw --write-out '%{http_code}' "$CANARY_URL")"
+          GET_COMPLETED_UTC="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
           test "$status" = "200"
           echo "$EXPECTED_SHA256  canary.raw" | sha256sum --check --status
           test "$(wc -c < canary.raw)" -eq 367
-          python3 - <<'PY'
+          export GET_STARTED_UTC GET_COMPLETED_UTC
+          HTTP_STATUS="$status" python3 - <<'PY'
+          import hashlib
           import json
+          import os
           from pathlib import Path
 
           b = Path("canary.raw").read_bytes()
@@ -41,7 +46,29 @@ jobs:
           assert row["experimental_status"] == "SYNTHETIC_ONLY_NO_RUN"
           assert row["source_data"] == "NONE"
           assert row["model_predictions"] == "NONE"
+          observed_hash = hashlib.sha256(b).hexdigest()
+          assert observed_hash == os.environ["EXPECTED_SHA256"]
+          receipt = {
+              "schema": "alpha-public-get-technical-receipt-v1",
+              "scope": "DEVELOPER_OWNED_SYNTHETIC_TEST_NOT_INDEPENDENT",
+              "source_url": os.environ["CANARY_URL"],
+              "http_status": int(os.environ["HTTP_STATUS"]),
+              "raw_body_bytes": len(b),
+              "raw_body_sha256": observed_hash,
+              "runner_reported_get_started_utc": os.environ["GET_STARTED_UTC"],
+              "runner_reported_get_completed_utc": os.environ["GET_COMPLETED_UTC"],
+              "github_repository": os.environ["GITHUB_REPOSITORY"],
+              "github_run_id": os.environ["GITHUB_RUN_ID"],
+              "github_workflow_ref": os.environ["GITHUB_WORKFLOW_REF"],
+              "independent_custody": False,
+              "first_public_availability_proven": False,
+          }
+          Path("get-receipt.json").write_text(
+              json.dumps(receipt, sort_keys=True, separators=(",", ":")) + "\n",
+              encoding="utf-8",
+          )
           print("TECHNICAL_ONLY_EXTERNAL_GET_MATCH; 367 exact raw bytes; SHA-256 checked")
+          print("HTTP_CONTEXT_RECEIPT_READY; RUNNER_CLOCK_NOT_EXTERNAL_PROOF")
           print("NOT_INDEPENDENT_CUSTODY; NOT_PROOF_OF_FIRST_PUBLIC_AVAILABILITY")
           PY
 
@@ -53,6 +80,14 @@ jobs:
         with:
           subject-path: canary.raw
 
+      # This second independently verifiable signature binds URL/status/bytes
+      # to the workflow-produced receipt. Runner timestamps are self-reported,
+      # not independent authenticated first-public-time evidence.
+      - name: Cryptographically attest GET context receipt (engineering only)
+        uses: actions/attest@v4
+        with:
+          subject-path: get-receipt.json
+
       - name: Verify signed attestation against this repository and exact bytes
         env:
           GH_TOKEN: ${{ github.token }}
@@ -60,6 +95,9 @@ jobs:
         run: |
           set -euo pipefail
           gh attestation verify canary.raw --repo "$GITHUB_REPOSITORY" --format json > verified-attestation.json
+          gh attestation verify get-receipt.json --repo "$GITHUB_REPOSITORY" --format json > verified-receipt-attestation.json
           test -s verified-attestation.json
+          test -s verified-receipt-attestation.json
           echo "GITHUB_ATTESTATION_VERIFIED_TECHNICAL_ONLY"
+          echo "GET_RECEIPT_ATTESTATION_VERIFIED_TECHNICAL_ONLY"
           echo "WORKFLOW_OWNER_NOT_INDEPENDENT; MARKET_PILOT_STILL_BLOCKED"
