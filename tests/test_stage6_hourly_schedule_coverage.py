@@ -3,7 +3,10 @@
 from datetime import UTC, datetime
 
 import pytest
-from scripts.stage6_hourly_schedule_coverage import audit_hourly_schedule_coverage
+from scripts.stage6_hourly_schedule_coverage import (
+    audit_github_schedule_arrivals,
+    audit_hourly_schedule_coverage,
+)
 
 START = int(datetime(2026, 10, 16, tzinfo=UTC).timestamp())
 HOUR = 3600
@@ -133,8 +136,6 @@ def test_valid_distinct_runs_and_shared_batch_time_remain_unverified() -> None:
     assert result["independent_github_log_provenance_verified"] is False
     assert result["scientific_authorization"] == "NO_RUN"
 
-
-from scripts.stage6_hourly_schedule_coverage import audit_github_schedule_arrivals
 
 
 def _synthetic_actions_rows() -> list[dict[str, object]]:
