@@ -11,6 +11,9 @@ on:
 
 permissions:
   contents: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
 
 jobs:
   public-get-canary:
@@ -41,3 +44,11 @@ jobs:
           print("TECHNICAL_ONLY_EXTERNAL_GET_MATCH; 367 exact raw bytes; SHA-256 checked")
           print("NOT_INDEPENDENT_CUSTODY; NOT_PROOF_OF_FIRST_PUBLIC_AVAILABILITY")
           PY
+
+      # Signed GitHub/Sigstore provenance establishes THIS runner's artifact
+      # and signer identity, NOT an independent scientific witness, and is
+      # timestamped AFTER the GitHub raw file already existed.
+      - name: Cryptographically attest fetched canary bytes (engineering only)
+        uses: actions/attest@v4
+        with:
+          subject-path: canary.raw
