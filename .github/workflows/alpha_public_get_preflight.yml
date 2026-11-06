@@ -1,0 +1,116 @@
+# ONE-SHOT RESEARCH PREFLIGHT. This is NOT independent forecast-publication
+# evidence: the forecast developer controls this repository and workflow.
+# This job only checks that a public GitHub-hosted runner can download the
+# exact, immutable synthetic raw JSONL response bytes by unauthenticated GET.
+name: Alpha synthetic external GET preflight
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/alpha_public_get_preflight.yml
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+jobs:
+  public-get-canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check unauthenticated public HTTP bytes
+        env:
+          CANARY_URL: https://raw.githubusercontent.com/mojtaba2020/Crypto_Intelligence_OS_Core/f5c180aa1842b0680dde4dd7442a30d890c13583/research/alpha_public_get_canary_20261025.jsonl
+          EXPECTED_SHA256: 2ddb60f2003011b89502534c7fd20dbc0ccb28a2d1918da520001d048560eaaf
+        shell: bash
+        run: |
+          set -euo pipefail
+          GET_STARTED_UTC="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          status="$(curl --silent --show-error --location --max-time 25 --retry 0 --output canary.raw --write-out '%{http_code}' "$CANARY_URL")"
+          GET_COMPLETED_UTC="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          test "$status" = "200"
+          echo "$EXPECTED_SHA256  canary.raw" | sha256sum --check --status
+          test "$(wc -c < canary.raw)" -eq 367
+          export GET_STARTED_UTC GET_COMPLETED_UTC
+          HTTP_STATUS="$status" python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          b = Path("canary.raw").read_bytes()
+          assert b.endswith(b"\n") and b.count(b"\n") == 1
+          row = json.loads(b)
+          assert row["experimental_status"] == "SYNTHETIC_ONLY_NO_RUN"
+          assert row["source_data"] == "NONE"
+          assert row["model_predictions"] == "NONE"
+          observed_hash = hashlib.sha256(b).hexdigest()
+          assert observed_hash == os.environ["EXPECTED_SHA256"]
+          receipt = {
+              "schema": "alpha-public-get-technical-receipt-v1",
+              "scope": "DEVELOPER_OWNED_SYNTHETIC_TEST_NOT_INDEPENDENT",
+              "source_url": os.environ["CANARY_URL"],
+              "http_status": int(os.environ["HTTP_STATUS"]),
+              "raw_body_bytes": len(b),
+              "raw_body_sha256": observed_hash,
+              "runner_reported_get_started_utc": os.environ["GET_STARTED_UTC"],
+              "runner_reported_get_completed_utc": os.environ["GET_COMPLETED_UTC"],
+              "github_repository": os.environ["GITHUB_REPOSITORY"],
+              "github_run_id": os.environ["GITHUB_RUN_ID"],
+              "github_workflow_ref": os.environ["GITHUB_WORKFLOW_REF"],
+              "independent_custody": False,
+              "first_public_availability_proven": False,
+          }
+          Path("get-receipt.json").write_text(
+              json.dumps(receipt, sort_keys=True, separators=(",", ":")) + "\n",
+              encoding="utf-8",
+          )
+          print("TECHNICAL_ONLY_EXTERNAL_GET_MATCH; 367 exact raw bytes; SHA-256 checked")
+          print("HTTP_CONTEXT_RECEIPT_READY; RUNNER_CLOCK_NOT_EXTERNAL_PROOF")
+          print("NOT_INDEPENDENT_CUSTODY; NOT_PROOF_OF_FIRST_PUBLIC_AVAILABILITY")
+          PY
+
+      # Signed GitHub/Sigstore provenance establishes THIS runner's artifact
+      # and signer identity, NOT an independent scientific witness, and is
+      # timestamped AFTER the GitHub raw file already existed.
+      - name: Cryptographically attest fetched canary bytes (engineering only)
+        uses: actions/attest@v4
+        with:
+          subject-path: canary.raw
+
+      # This second independently verifiable signature binds URL/status/bytes
+      # to the workflow-produced receipt. Runner timestamps are self-reported,
+      # not independent authenticated first-public-time evidence.
+      - name: Cryptographically attest GET context receipt (engineering only)
+        uses: actions/attest@v4
+        with:
+          subject-path: get-receipt.json
+
+      # Preserve the signed subjects, not merely the attestations, so an
+      # outside reviewer can independently verify their exact bytes later.
+      # Public synthetic only; never upload credentials or real market inputs.
+      - name: Preserve exact signed subjects for external verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-get-evidence-${{ github.run_id }}
+          path: |
+            canary.raw
+            get-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Verify signed attestation against this repository and exact bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh attestation verify canary.raw --repo "$GITHUB_REPOSITORY" --format json > verified-attestation.json
+          gh attestation verify get-receipt.json --repo "$GITHUB_REPOSITORY" --format json > verified-receipt-attestation.json
+          test -s verified-attestation.json
+          test -s verified-receipt-attestation.json
+          echo "GITHUB_ATTESTATION_VERIFIED_TECHNICAL_ONLY"
+          echo "GET_RECEIPT_ATTESTATION_VERIFIED_TECHNICAL_ONLY"
+          echo "WORKFLOW_OWNER_NOT_INDEPENDENT; MARKET_PILOT_STILL_BLOCKED"
