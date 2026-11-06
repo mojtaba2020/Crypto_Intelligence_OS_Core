@@ -265,7 +265,12 @@ def test_github_metadata_failed_run_still_counts_creation_not_success() -> None:
     assert result["valid_forecast_count"] == "UNKNOWN"
 
 
-def _scheduled_candidate(run_id: int, when: int, *, name: str = "BTC Hourly Prospective Forecasts") -> dict[str, object]:
+def _scheduled_candidate(
+    run_id: int,
+    when: int,
+    *,
+    name: str = "BTC Hourly Prospective Forecasts",
+) -> dict[str, object]:
     return {
         "github_run_id": run_id,
         "created_at_utc": when,
