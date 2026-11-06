@@ -242,3 +242,66 @@ def audit_github_schedule_arrivals(
         "valid_forecast_count": "UNKNOWN",
         "scientific_authorization": "NO_RUN",
     }
+
+
+def audit_fixed_utc_s15_run_candidates(
+    start_utc: int,
+    stop_utc: int,
+    scheduled_runs: Sequence[Mapping[str, object]],
+    *,
+    api_total_count: int,
+) -> dict[str, object]:
+    """Screen a *candidate* six-slot UTC schedule against GitHub run creations.
+
+    A run created in [S, S+15m] is a possible start, never evidence that an
+    actual forecast was published by the S+15m deadline. Runs created before S
+    might still publish after S; those require job-level evidence and are not
+    silently reclassified here. No network, prices, scoring or dispatch.
+    """
+    from datetime import UTC, datetime
+
+    baseline = audit_github_schedule_arrivals(
+        start_utc, stop_utc, scheduled_runs, api_total_count=api_total_count
+    )
+    eligible: dict[int, list[int]] = {
+        origin: []
+        for day in range(start_utc, stop_utc, SECONDS_PER_DAY)
+        for origin in range(day, day + SECONDS_PER_DAY, FOUR_HOURS)
+    }
+    for row in scheduled_runs:
+        if row["workflow_name"] != HOURLY_WORKFLOW_NAME:
+            continue
+        created = row["created_at_utc"]
+        slot = created - (created % FOUR_HOURS)
+        if slot in eligible and slot <= created <= slot + 15 * 60:
+            eligible[slot].append(row["github_run_id"])
+
+    matched = sum(bool(ids) for ids in eligible.values())
+    return {
+        "status": "CANDIDATE_RUN_CREATION_TIMES_ONLY_NOT_PUBLICATION",
+        "source_workflow": HOURLY_WORKFLOW_NAME,
+        "fixed_utc_slot_hours": [0, 4, 8, 12, 16, 20],
+        "post_origin_run_creation_deadline_seconds": 900,
+        "expected_fixed_origin_slots": len(eligible),
+        "slots_with_post_origin_run_creation_by_s15": matched,
+        "slots_without_post_origin_run_creation_by_s15": len(eligible) - matched,
+        "four_hour_buckets_with_any_run_creation_regardless_of_timeliness": baseline[
+            "four_hour_windows_with_any_run_creation"
+        ],
+        "run_creation_is_forecast_issuance": False,
+        "pre_origin_starts_need_separate_review": True,
+        "independent_publication_verified": False,
+        "scientific_authorization": "NO_RUN",
+        "slots": [
+            {
+                "origin_utc": datetime.fromtimestamp(origin, UTC).isoformat(),
+                "post_origin_candidate_run_ids": sorted(ids),
+                "status": (
+                    "RUN_CREATED_WITHIN_S15_UNVERIFIED"
+                    if ids
+                    else "NO_POST_ORIGIN_RUN_CREATED_WITHIN_S15"
+                ),
+            }
+            for origin, ids in eligible.items()
+        ],
+    }
