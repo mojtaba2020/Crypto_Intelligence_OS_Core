@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 import pytest
 from scripts.stage6_hourly_schedule_coverage import (
+    audit_fixed_utc_s15_run_candidates,
     audit_github_schedule_arrivals,
     audit_hourly_schedule_coverage,
 )
@@ -262,3 +263,83 @@ def test_github_metadata_failed_run_still_counts_creation_not_success() -> None:
     assert result["observed_schedule_run_creations"] == 39
     assert result["successful_workflow_conclusions_not_valid_issuances"] == 38
     assert result["valid_forecast_count"] == "UNKNOWN"
+
+
+def _scheduled_candidate(run_id: int, when: int, *, name: str = "BTC Hourly Prospective Forecasts") -> dict[str, object]:
+    return {
+        "github_run_id": run_id,
+        "created_at_utc": when,
+        "workflow_name": name,
+        "event": "schedule",
+        "conclusion": "success",
+    }
+
+
+def test_fixed_s15_filters_late_runs_even_inside_four_hour_buckets() -> None:
+    # The nonempty 4h buckets are NOT a proxy for six fixed timely starts.
+    start = int(datetime(2026, 11, 1, tzinfo=UTC).timestamp())
+    runs = [
+        _scheduled_candidate(1, start + 14 * 60),
+        _scheduled_candidate(2, start + 4 * HOUR + 30 * 60),
+        _scheduled_candidate(3, start + 8 * HOUR + 15 * 60),
+        _scheduled_candidate(4, start + 12 * HOUR + 15 * 60 + 1),
+        _scheduled_candidate(5, start + 16 * HOUR - 1),
+        _scheduled_candidate(6, start + 20 * HOUR + 5 * 60, name="Other"),
+    ]
+    result = audit_fixed_utc_s15_run_candidates(
+        start, start + 24 * HOUR, runs, api_total_count=len(runs)
+    )
+    assert result["expected_fixed_origin_slots"] == 6
+    assert result["slots_with_post_origin_run_creation_by_s15"] == 2
+    assert result["slots_without_post_origin_run_creation_by_s15"] == 4
+    assert result["four_hour_buckets_with_any_run_creation_regardless_of_timeliness"] == 4
+    assert result["slots"][0]["post_origin_candidate_run_ids"] == [1]
+    assert result["slots"][2]["post_origin_candidate_run_ids"] == [3]
+    assert result["slots"][4]["post_origin_candidate_run_ids"] == []
+    assert result["run_creation_is_forecast_issuance"] is False
+    assert result["independent_publication_verified"] is False
+    assert result["scientific_authorization"] == "NO_RUN"
+
+
+def test_fixed_s15_multiple_runs_same_slot_count_only_once() -> None:
+    start = int(datetime(2026, 11, 1, tzinfo=UTC).timestamp())
+    runs = [
+        _scheduled_candidate(10, start + 3 * 60),
+        _scheduled_candidate(11, start + 10 * 60),
+    ]
+    result = audit_fixed_utc_s15_run_candidates(
+        start, start + 24 * HOUR, runs, api_total_count=len(runs)
+    )
+    assert result["slots_with_post_origin_run_creation_by_s15"] == 1
+    assert result["slots"][0]["post_origin_candidate_run_ids"] == [10, 11]
+
+
+def test_fixed_s15_early_run_is_not_relabelled_as_post_origin() -> None:
+    start = int(datetime(2026, 11, 1, tzinfo=UTC).timestamp())
+    runs = [_scheduled_candidate(1, start + 4 * HOUR - 1)]
+    result = audit_fixed_utc_s15_run_candidates(
+        start, start + 24 * HOUR, runs, api_total_count=1
+    )
+    assert result["slots_with_post_origin_run_creation_by_s15"] == 0
+    assert result["pre_origin_starts_need_separate_review"] is True
+
+
+def test_fixed_s15_requires_complete_api_page_and_bounded_days() -> None:
+    start = int(datetime(2026, 11, 1, tzinfo=UTC).timestamp())
+    runs = [_scheduled_candidate(1, start)]
+    with pytest.raises(ValueError, match="Incomplete"):
+        audit_fixed_utc_s15_run_candidates(start, start + 24 * HOUR, runs, api_total_count=2)
+    with pytest.raises(ValueError, match="bounded"):
+        audit_fixed_utc_s15_run_candidates(start, start + 8 * 24 * HOUR, [], api_total_count=0)
+
+
+def test_fixed_s15_rejects_outcomes_and_duplicate_ids() -> None:
+    start = int(datetime(2026, 11, 1, tzinfo=UTC).timestamp())
+    runs = [_scheduled_candidate(1, start)]
+    with pytest.raises(ValueError, match="Duplicate"):
+        audit_fixed_utc_s15_run_candidates(
+            start, start + 24 * HOUR, runs + runs, api_total_count=2
+        )
+    runs[0]["future_price"] = 1_000_000
+    with pytest.raises(ValueError, match="price-blind"):
+        audit_fixed_utc_s15_run_candidates(start, start + 24 * HOUR, runs, api_total_count=1)
