@@ -42,6 +42,15 @@ class MaturedExample:
 
 
 @dataclass(frozen=True)
+class TrainedComparison:
+    """An internal fitted model with the claimed fit instant retained."""
+
+    fitted_at_utc: datetime
+    numerical_fit: FittedComparison
+    training_rows: int
+
+
+@dataclass(frozen=True)
 class UnscoredForecast:
     """Local model predictions, NOT prospective publicly issued forecasts."""
 
@@ -122,7 +131,7 @@ def make_matured_example(
 
 def fit_matured_comparisons(
     examples: Sequence[MaturedExample], *, fit_at_utc: datetime, ridge: float
-) -> FittedComparison:
+) -> TrainedComparison:
     """Fit existing candidate + ablation + placebo on matured development rows.
 
     Source provenance and protected-OOS isolation must be established separately.
@@ -150,11 +159,16 @@ def fit_matured_comparisons(
         checked_rows.append(row)
     checked_rows.sort(key=lambda row: row.origin_utc)
     numeric_rows = [(row.features, row.realized_log_return) for row in checked_rows]
-    return fit_candidate_and_controls(numeric_rows, ridge=ridge)
+    numerical = fit_candidate_and_controls(numeric_rows, ridge=ridge)
+    return TrainedComparison(
+        fitted_at_utc=fit_at_utc,
+        numerical_fit=numerical,
+        training_rows=numerical.training_rows,
+    )
 
 
 def predict_unscored_four_hour(
-    model: FittedComparison,
+    model: TrainedComparison,
     bars: Sequence[HourlyClose],
     *,
     origin_utc: datetime,
@@ -162,8 +176,13 @@ def predict_unscored_four_hour(
 ) -> UnscoredForecast:
     """Return four positive USD prices without issuing or publishing forecasts."""
     _origin(origin_utc, issued_at_utc)
+    if not isinstance(model, TrainedComparison):
+        raise ValueError("model must carry the original fit timestamp")
+    _utc(model.fitted_at_utc, "model fit time")
+    if model.fitted_at_utc > issued_at_utc:
+        raise ValueError("model was fitted after prediction issue (lookahead)")
     features = _features(bars, origin_utc, issued_at_utc)
-    details = predict_with_diagnostics(model, features)
+    details = predict_with_diagnostics(model.numerical_fit, features)
     current = float(bars[-1].close_usd)
     try:
         prices = tuple(current * math.exp(value) for value in details.returns())
