@@ -49,7 +49,7 @@ class FourHourTrainingBridgeTests(unittest.TestCase):
         examples = [self.build(n) for n in range(35)]
         model = fit_matured_comparisons(examples, fit_at_utc=self.fit_at, ridge=100.0)
         self.assertEqual(model.training_rows, 35)
-        o, i, bars, _ = self.example(36)
+        o, i, bars, _ = self.example(72)
         result = predict_unscored_four_hour(model, bars, origin_utc=o, issued_at_utc=i)
         self.assertAlmostEqual(result.persistence_usd, bars[-1].close_usd)
         self.assertTrue(
@@ -58,6 +58,13 @@ class FourHourTrainingBridgeTests(unittest.TestCase):
                 for value in (result.candidate_usd, result.ablation_usd, result.placebo_usd)
             )
         )
+
+    def test_model_fit_after_issue_is_blocked(self):
+        examples = [self.build(n) for n in range(30)]
+        model = fit_matured_comparisons(examples, fit_at_utc=self.fit_at, ridge=100.0)
+        o, i, bars, _ = self.example(36)
+        with self.assertRaisesRegex(ValueError, "fitted after prediction issue"):
+            predict_unscored_four_hour(model, bars, origin_utc=o, issued_at_utc=i)
 
     def test_future_label_blocked(self):
         o, i, bars, target = self.example()
