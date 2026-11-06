@@ -322,9 +322,7 @@ def test_fixed_s15_multiple_runs_same_slot_count_only_once() -> None:
 def test_fixed_s15_early_run_is_not_relabelled_as_post_origin() -> None:
     start = int(datetime(2026, 11, 1, tzinfo=UTC).timestamp())
     runs = [_scheduled_candidate(1, start + 4 * HOUR - 1)]
-    result = audit_fixed_utc_s15_run_candidates(
-        start, start + 24 * HOUR, runs, api_total_count=1
-    )
+    result = audit_fixed_utc_s15_run_candidates(start, start + 24 * HOUR, runs, api_total_count=1)
     assert result["slots_with_post_origin_run_creation_by_s15"] == 0
     assert result["pre_origin_starts_need_separate_review"] is True
 
@@ -342,9 +340,7 @@ def test_fixed_s15_rejects_outcomes_and_duplicate_ids() -> None:
     start = int(datetime(2026, 11, 1, tzinfo=UTC).timestamp())
     runs = [_scheduled_candidate(1, start)]
     with pytest.raises(ValueError, match="Duplicate"):
-        audit_fixed_utc_s15_run_candidates(
-            start, start + 24 * HOUR, runs + runs, api_total_count=2
-        )
+        audit_fixed_utc_s15_run_candidates(start, start + 24 * HOUR, runs + runs, api_total_count=2)
     runs[0]["future_price"] = 1_000_000
     with pytest.raises(ValueError, match="price-blind"):
         audit_fixed_utc_s15_run_candidates(start, start + 24 * HOUR, runs, api_total_count=1)
