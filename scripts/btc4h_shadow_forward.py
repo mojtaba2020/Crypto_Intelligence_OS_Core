@@ -17,7 +17,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
-from crypto_intelligence_os.hybrid_forecasting import _estimate, _fit
 from scripts.alpha_coinbase_historical_replay import fetch_candles, iso
 from scripts.alpha_interaction_candidate import _independent_interaction_projection
 from scripts.alpha_volume_confirmation import (
@@ -26,6 +25,8 @@ from scripts.alpha_volume_confirmation import (
     volume_confirmation_features,
 )
 from scripts.alpha_volume_historical_replay import fetch_public_hourly_close_volume
+
+from crypto_intelligence_os.hybrid_forecasting import _estimate, _fit
 
 VERSION = "btc4h-volume-shadow-v1-ridge100"
 RIDGE = 100.0
@@ -348,7 +349,9 @@ def run_once(
         received = get_time()
         if target_start not in price_by_time:
             continue
-        score = calculate_score(row, actual=price_by_time[target_start], target_received_at=received)
+        score = calculate_score(
+            row, actual=price_by_time[target_start], target_received_at=received
+        )
         _append(score_ledger, score)
         newly_scored += 1
         scored_set.add(key)
