@@ -12,7 +12,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from crypto_intelligence_os.hybrid_forecasting import _estimate, _fit
 from scripts.alpha_4h_training_bridge import (
     FiveMinuteTarget,
     make_matured_example,
@@ -21,6 +20,8 @@ from scripts.alpha_interaction_candidate import (
     HourlyClose,
     _independent_interaction_projection,
 )
+
+from crypto_intelligence_os.hybrid_forecasting import _estimate, _fit
 
 
 @dataclass(frozen=True)
@@ -144,6 +145,21 @@ def make_volume_training_row(
     )
 
 
+def _interaction_residual(
+    momentum: float,
+    volume_surprise: float,
+    interaction: float,
+    projection: tuple[float, float, float],
+    enabled: bool,
+) -> float:
+    shift, slope_m, slope_v = projection
+    return (
+        interaction - (shift + slope_m * momentum + slope_v * volume_surprise)
+        if enabled
+        else 0.0
+    )
+
+
 def walk_forward_volume_candidate(
     examples: Sequence[VolumeTrainingRow], *, ridge: float = 100.0
 ) -> VolumeReplay:
@@ -197,13 +213,8 @@ def walk_forward_volume_candidate(
             continue
         triples = [(row.features, row.realized_log_return) for row in past]
         projection, enabled = _independent_interaction_projection(triples)
-        shift, slope_m, slope_v = projection
-
-        def residual(m: float, v: float, z: float) -> float:
-            return z - (shift + slope_m * m + slope_v * v) if enabled else 0.0
-
         full = [
-            ((m, v, residual(m, v, z)), y)
+            ((m, v, _interaction_residual(m, v, z, projection, enabled)), y)
             for (m, v, z), y in triples
         ]
         additive = [((m, v), y) for (m, v, _), y in triples]
@@ -213,7 +224,7 @@ def walk_forward_volume_candidate(
         momentum_fit = _fit(momentum, ridge=ridge)
         m, v, z = current.features
         forecasts = (
-            _estimate(*candidate_fit, (m, v, residual(m, v, z))),
+            _estimate(*candidate_fit, (m, v, _interaction_residual(m, v, z, projection, enabled))),
             _estimate(*additive_fit, (m, v)),
             _estimate(*momentum_fit, (m,)),
             0.0,
