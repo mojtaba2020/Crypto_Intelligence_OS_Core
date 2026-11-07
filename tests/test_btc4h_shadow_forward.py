@@ -133,11 +133,13 @@ def test_score_before_target_close_is_impossible():
     origin, _, _, forecast = _issue()
     with pytest.raises(ValueError, match="pre-target"):
         shadow.calculate_score(
-            forecast, actual=66000,
+            forecast,
+            actual=66000,
             target_received_at=origin + timedelta(hours=4, minutes=14),
         )
     score = shadow.calculate_score(
-        forecast, actual=66000,
+        forecast,
+        actual=66000,
         target_received_at=origin + timedelta(hours=4, minutes=15, seconds=5),
     )
     assert score["target_observed_at_utc"] == shadow.iso(
@@ -162,7 +164,8 @@ def test_score_does_not_accept_forged_late_issue_or_collection():
     altered["hourly_data_collected_at_utc"] = shadow.iso(origin + timedelta(minutes=13))
     with pytest.raises(ValueError, match="source evidence"):
         shadow.calculate_score(
-            altered, actual=65000,
+            altered,
+            actual=65000,
             target_received_at=origin + timedelta(hours=5),
         )
 
@@ -204,7 +207,9 @@ def test_live_pipeline_issues_once_and_scores_only_after_future_target(tmp_path,
     report = tmp_path / "report.json"
 
     early = shadow.run_once(
-        ledger=ledger, score_ledger=scores, report=report,
+        ledger=ledger,
+        score_ledger=scores,
+        report=report,
         clock=lambda: origin + timedelta(minutes=9),
     )
     assert early["research_status"] == "MISSED_ISSUE_WINDOW"
@@ -212,7 +217,9 @@ def test_live_pipeline_issues_once_and_scores_only_after_future_target(tmp_path,
     assert not calls
 
     on_time = shadow.run_once(
-        ledger=ledger, score_ledger=scores, report=report,
+        ledger=ledger,
+        score_ledger=scores,
+        report=report,
         clock=lambda: origin + timedelta(minutes=11),
     )
     assert on_time["research_status"] == "ISSUED_BEFORE_TARGET"
@@ -221,7 +228,9 @@ def test_live_pipeline_issues_once_and_scores_only_after_future_target(tmp_path,
     assert calls == ["hourly", "historical_training_targets"]
 
     duplicate = shadow.run_once(
-        ledger=ledger, score_ledger=scores, report=report,
+        ledger=ledger,
+        score_ledger=scores,
+        report=report,
         clock=lambda: origin + timedelta(minutes=11),
     )
     assert duplicate["research_status"] == "ALREADY_ISSUED"
@@ -230,7 +239,9 @@ def test_live_pipeline_issues_once_and_scores_only_after_future_target(tmp_path,
     assert calls == ["hourly", "historical_training_targets"]
 
     later = shadow.run_once(
-        ledger=ledger, score_ledger=scores, report=report,
+        ledger=ledger,
+        score_ledger=scores,
+        report=report,
         clock=lambda: origin + timedelta(hours=8, minutes=20),
     )
     assert later["research_status"] == "MISSED_ISSUE_WINDOW"
@@ -241,7 +252,9 @@ def test_live_pipeline_issues_once_and_scores_only_after_future_target(tmp_path,
     assert len(shadow._read_jsonl(scores)) == 1
 
     scored_again = shadow.run_once(
-        ledger=ledger, score_ledger=scores, report=report,
+        ledger=ledger,
+        score_ledger=scores,
+        report=report,
         clock=lambda: origin + timedelta(hours=8, minutes=20),
     )
     assert scored_again["newly_scored"] == 0
@@ -250,18 +263,16 @@ def test_live_pipeline_issues_once_and_scores_only_after_future_target(tmp_path,
 
 def test_fetch_finishing_after_window_must_not_issue(tmp_path, monkeypatch):
     origin, hourly, targets = _fixture()
-    monkeypatch.setattr(
-        shadow, "fetch_public_hourly_close_volume", lambda *_args: hourly
+    monkeypatch.setattr(shadow, "fetch_public_hourly_close_volume", lambda *_args: hourly)
+    monkeypatch.setattr(shadow, "fetch_candles", lambda *_args, **_kwargs: targets)
+    ticks = iter(
+        [
+            origin + timedelta(minutes=11),
+            origin + timedelta(minutes=11, seconds=30),
+            origin + timedelta(minutes=15, seconds=1),
+            origin + timedelta(minutes=15, seconds=1),
+        ]
     )
-    monkeypatch.setattr(
-        shadow, "fetch_candles", lambda *_args, **_kwargs: targets
-    )
-    ticks = iter([
-        origin + timedelta(minutes=11),
-        origin + timedelta(minutes=11, seconds=30),
-        origin + timedelta(minutes=15, seconds=1),
-        origin + timedelta(minutes=15, seconds=1),
-    ])
     result = shadow.run_once(
         ledger=tmp_path / "issued.jsonl",
         score_ledger=tmp_path / "scores.jsonl",
