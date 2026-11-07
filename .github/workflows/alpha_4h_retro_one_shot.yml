@@ -1,0 +1,70 @@
+# One-time public-history exploration on the opening of this stacked Draft PR.
+# NOT a live forecast, operational schedule, independent data receipt or Stage-6 run.
+name: BTC 4h retrospective diagnostic — one shot
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-retrospective:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@v7
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Install research package
+        run: python -m pip install -e .
+      - name: Run fixed bounded October 2026 historical diagnostic
+        run: |
+          python scripts/alpha_coinbase_historical_replay.py \
+            --start 2026-10-01 \
+            --end 2026-10-29 \
+            --output alpha_4h_retrospective_20261001_20261029.json
+      - name: Render evidence-limited summary
+        if: success()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(
+              Path("alpha_4h_retrospective_20261001_20261029.json").read_text()
+          )
+          lines = [
+              "## BTC 4h fixed historical replay — exploratory only",
+              "",
+              "**NOT a witnessed real-time or out-of-sample forecasting result.**",
+              "**Original source availability is UNKNOWN; hypothetical availability used.**",
+              "",
+              f"- Scheduled four-hour origins: {report['scheduled_slots']}",
+              f"- Usable historical origins: {report['complete_historical_rows']}",
+              f"- Matured, scored development origins: {report['scored_historical_origins']}",
+              f"- Historical candidate gain vs persistence: {report['candidate_relative_error_reduction_pct']}%",
+              f"- Interaction truly applied: {report['interaction_applied']}",
+              f"- SHA-256 1h snapshot: {report['hourly_snapshot_digest_sha256']}",
+              f"- SHA-256 5m snapshot: {report['five_minute_snapshot_digest_sha256']}",
+              "",
+              "No trading, no promotion, no pristine holdout, no source-vintage certification.",
+          ]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as stream:
+              stream.write("\n".join(lines) + "\n")
+          PY
+      - name: Preserve aggregate research diagnostics
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alpha-4h-historical-exploration-202610
+          path: alpha_4h_retrospective_20261001_20261029.json
+          retention-days: 30
+          if-no-files-found: error
