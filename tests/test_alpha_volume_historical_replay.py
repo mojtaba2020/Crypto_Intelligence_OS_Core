@@ -38,10 +38,7 @@ class VolumeResearchReplayTests(unittest.TestCase):
         self.assertEqual(result["cold_start_origins"], 31)
         self.assertEqual(result["walk_forward_scored"], 17)
         self.assertTrue(
-            all(
-                math.isfinite(value)
-                for value in result["mean_absolute_log_price_error"].values()
-            )
+            all(math.isfinite(value) for value in result["mean_absolute_log_price_error"].values())
         )
         self.assertFalse(result["initial_source_vintage_proven"])
         self.assertFalse(result["original_forecasts_issued_on_these_dates"])
