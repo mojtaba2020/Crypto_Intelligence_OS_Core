@@ -58,7 +58,7 @@ def fetch_candles(
         query = urllib.parse.urlencode(
             {"start": iso(cursor), "end": iso(stop), "granularity": granularity}
         )
-        request = urllib.request.Request(
+        request = urllib.request.Request(  # noqa: S310 -- fixed HTTPS Coinbase endpoint
             f"{API}?{query}", headers={"User-Agent": USER_AGENT}
         )
         for attempt in range(4):
