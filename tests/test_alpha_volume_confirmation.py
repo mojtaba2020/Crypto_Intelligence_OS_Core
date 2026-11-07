@@ -24,12 +24,8 @@ class VolumeConfirmationTests(unittest.TestCase):
         bars = []
         for j in range(25):
             open_at = origin - timedelta(hours=25 - j)
-            close = 60000 * math.exp(
-                0.0003 * (4 * n - 25 + j) + 0.006 * math.sin((4 * n + j) / 10)
-            )
-            volume = 10.0 if constant_volume else 8.0 + 2.5 * (
-                1.0 + math.sin((4 * n + j) / 9)
-            )
+            close = 60000 * math.exp(0.0003 * (4 * n - 25 + j) + 0.006 * math.sin((4 * n + j) / 10))
+            volume = 10.0 if constant_volume else 8.0 + 2.5 * (1.0 + math.sin((4 * n + j) / 9))
             bars.append(
                 HourlyVolumeBar(
                     bar_open_utc=open_at,
@@ -72,13 +68,10 @@ class VolumeConfirmationTests(unittest.TestCase):
         self.assertAlmostEqual(product, m * v)
 
     def test_rejects_volume_observed_after_forecast(self):
-        origin, issue, bars, target = self.raw()
+        _, issue, bars, _ = self.raw()
         bars[-1] = replace(bars[-1], first_observed_at_utc=issue + timedelta(seconds=1))
         with self.assertRaisesRegex(ValueError, "available"):
-            make_volume_training_row(
-                bars, origin_utc=origin, issued_at_utc=issue,
-                target=target, fit_at_utc=self.fit_at,
-            )
+            volume_confirmation_features(bars, issued_at_utc=issue)
 
     def test_rejects_zero_volume_and_holes(self):
         _, issue, bars, _ = self.raw()
@@ -94,12 +87,17 @@ class VolumeConfirmationTests(unittest.TestCase):
         origin, issue, bars, target = self.raw()
         with self.assertRaisesRegex(ValueError, "unmatured"):
             make_volume_training_row(
-                bars, origin_utc=origin, issued_at_utc=issue, target=target,
+                bars,
+                origin_utc=origin,
+                issued_at_utc=issue,
+                target=target,
                 fit_at_utc=origin + timedelta(hours=4),
             )
         with self.assertRaisesRegex(ValueError, "wrong fixed"):
             make_volume_training_row(
-                bars, origin_utc=origin, issued_at_utc=issue,
+                bars,
+                origin_utc=origin,
+                issued_at_utc=issue,
                 target=replace(target, bar_open_utc=target.bar_open_utc + timedelta(minutes=5)),
                 fit_at_utc=self.fit_at,
             )
@@ -119,9 +117,7 @@ class VolumeConfirmationTests(unittest.TestCase):
 
     def test_delayed_prior_label_never_added_to_training(self):
         rows = [self.record(n) for n in range(40)]
-        rows[29] = replace(
-            rows[29], target_first_observed_at_utc=self.start + timedelta(days=19)
-        )
+        rows[29] = replace(rows[29], target_first_observed_at_utc=self.start + timedelta(days=19))
         audit = walk_forward_volume_candidate(rows)
         self.assertEqual(audit.scored[0].origin_utc, self.raw(32)[0])
         self.assertEqual(audit.scored[0].eligible_training_rows, 30)
