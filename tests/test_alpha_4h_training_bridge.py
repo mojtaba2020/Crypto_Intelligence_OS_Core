@@ -10,6 +10,7 @@ from scripts.alpha_4h_training_bridge import (
     fit_matured_comparisons,
     make_matured_example,
     predict_unscored_four_hour,
+    walk_forward_development_diagnostic,
 )
 from scripts.alpha_interaction_candidate import HourlyClose
 
@@ -58,6 +59,39 @@ class FourHourTrainingBridgeTests(unittest.TestCase):
                 for value in (result.candidate_usd, result.ablation_usd, result.placebo_usd)
             )
         )
+
+    def test_walk_forward_scores_only_matured_past_outcomes(self):
+        rows = [self.build(n) for n in range(36)]
+        report = walk_forward_development_diagnostic(rows, ridge=100.0)
+        self.assertEqual(report.expected_slots_between_first_and_last, 36)
+        self.assertEqual(report.missing_origin_slots, 0)
+        self.assertEqual(report.cold_start_rows, 31)
+        self.assertEqual(len(report.scored_rows), 5)
+        self.assertEqual(report.scored_rows[0].eligible_training_rows, 30)
+        self.assertEqual(report.scored_rows[0].origin_utc, self.example(31)[0])
+        self.assertAlmostEqual(
+            report.scored_rows[0].persistence_abs_log_error,
+            abs(rows[31].realized_log_return),
+        )
+        self.assertIsNotNone(report.mean_candidate_abs_log_error)
+
+    def test_walk_forward_refuses_immature_preceding_label(self):
+        rows = [self.build(n) for n in range(36)]
+        rows[30] = replace(
+            rows[30],
+            target_first_observed_at_utc=self.start + timedelta(days=9),
+        )
+        report = walk_forward_development_diagnostic(rows, ridge=100.0)
+        self.assertEqual(report.cold_start_rows, 32)
+        self.assertEqual(report.scored_rows[0].origin_utc, self.example(32)[0])
+        self.assertEqual(report.scored_rows[0].eligible_training_rows, 30)
+
+    def test_walk_forward_reports_missing_origin_instead_of_hiding_it(self):
+        rows = [self.build(n) for n in range(36) if n != 20]
+        report = walk_forward_development_diagnostic(rows, ridge=100.0)
+        self.assertEqual(report.expected_slots_between_first_and_last, 36)
+        self.assertEqual(report.supplied_matured_rows, 35)
+        self.assertEqual(report.missing_origin_slots, 1)
 
     def test_model_fit_after_issue_is_blocked(self):
         examples = [self.build(n) for n in range(30)]
