@@ -225,9 +225,7 @@ def run_replay(
             "abstentions": uncertainty.abstentions,
             "correct_directional_calls": uncertainty.correct_calls,
             "directional_call_rate_pct": uncertainty.directional_call_rate_pct,
-            "correct_direction_on_calls_pct": (
-                uncertainty.directional_hit_rate_on_calls_pct
-            ),
+            "correct_direction_on_calls_pct": (uncertainty.directional_hit_rate_on_calls_pct),
             "interval_coverage_pct": uncertainty.interval_coverage_pct,
             "directional_calls_pct_all_168_expected": (
                 uncertainty.all_bridge_expected_call_rate_pct
