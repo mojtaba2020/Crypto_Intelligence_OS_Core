@@ -26,6 +26,7 @@ from scripts.alpha_4h_training_bridge import (
     make_matured_example,
     walk_forward_development_diagnostic,
 )
+from scripts.alpha_4h_uncertainty import audit_causal_uncertainty
 from scripts.alpha_interaction_candidate import HourlyClose
 
 API = "https://api.exchange.coinbase.com/products/BTC-USD/candles"
@@ -159,6 +160,7 @@ def run_replay(
     if len(examples) < 32:
         raise ValueError("too few complete historical origins to form and test a model")
     report = walk_forward_development_diagnostic(examples, ridge=RIDGE)
+    uncertainty = audit_causal_uncertainty(report)
     scores = report.scored_rows
     if not scores:
         raise ValueError("no evaluable walk-forward predictions")
@@ -210,6 +212,31 @@ def run_replay(
             100 * (persistence - candidate) / persistence, 4
         ),
         "direction_secondary_nonflat": direction,
+        "past_error_uncertainty_historical_only": {
+            "fixed_rolling_calibration_rows": 32,
+            "nominal_interval_design_pct": 90,
+            "nominal_future_coverage_guaranteed": False,
+            "scored_origins_without_mature_prior_residuals": (
+                uncertainty.without_prior_calibration
+            ),
+            "calibrated_origins": uncertainty.calibrated_origins,
+            "up_signals": uncertainty.up_calls,
+            "down_signals": uncertainty.down_calls,
+            "abstentions": uncertainty.abstentions,
+            "correct_directional_calls": uncertainty.correct_calls,
+            "directional_call_rate_pct": uncertainty.directional_call_rate_pct,
+            "correct_direction_on_calls_pct": (
+                uncertainty.directional_hit_rate_on_calls_pct
+            ),
+            "interval_coverage_pct": uncertainty.interval_coverage_pct,
+            "directional_calls_pct_all_168_expected": (
+                uncertainty.all_bridge_expected_call_rate_pct
+            ),
+            "caution": (
+                "Conditional direction accuracy includes abstentions in its coverage "
+                "denominator; historical coverage is not a forward guarantee."
+            ),
+        },
         "hourly_candles_downloaded": len(hourly),
         "five_minute_candles_downloaded": len(fivemin),
         "hourly_snapshot_digest_sha256": _digest(hourly),
