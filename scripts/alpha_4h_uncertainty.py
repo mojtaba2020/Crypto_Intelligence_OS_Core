@@ -139,8 +139,8 @@ def audit_causal_uncertainty(report: WalkForwardReport) -> UncertaintyAudit:
         signal = "UP" if lower > 0 else "DOWN" if upper < 0 else "ABSTAIN"
         correct = None
         if signal != "ABSTAIN":
-            correct = (row.realized_log_return > 0) if signal == "UP" else (
-                row.realized_log_return < 0
+            correct = (
+                (row.realized_log_return > 0) if signal == "UP" else (row.realized_log_return < 0)
             )
         decisions.append(
             CausalInterval(
