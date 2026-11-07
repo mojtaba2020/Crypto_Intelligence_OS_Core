@@ -2,11 +2,9 @@
 
 import json
 import math
-from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
-
 from scripts import btc4h_shadow_forward as shadow
 
 
@@ -47,7 +45,7 @@ def _issue():
 
 
 def test_forecast_is_a_real_future_target_with_four_model_controls():
-    origin, hourly, targets, row = _issue()
+    origin, hourly, _, row = _issue()
     assert row["origin_utc"] == shadow.iso(origin)
     assert row["target_5m_close_utc"] == shadow.iso(origin + timedelta(hours=4, minutes=15))
     assert row["issued_at_utc"] == shadow.iso(origin + timedelta(minutes=12))
