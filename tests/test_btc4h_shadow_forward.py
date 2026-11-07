@@ -181,3 +181,94 @@ def test_ledger_append_replay_idempotent_jsonl(tmp_path):
         out.write("not-json\n")
     with pytest.raises(json.JSONDecodeError):
         shadow._read_jsonl(p)
+
+
+def test_live_pipeline_issues_once_and_scores_only_after_future_target(tmp_path, monkeypatch):
+    origin, hourly, targets = _fixture()
+    calls = []
+
+    def fetch_hourly(*_args):
+        calls.append("hourly")
+        return hourly
+
+    def fetch_five_minute(start, end, *, granularity):
+        assert granularity == 300
+        if end - start > timedelta(days=1):
+            calls.append("historical_training_targets")
+            return targets
+        calls.append("actual_future_target")
+        return {start: 66000.0}
+
+    monkeypatch.setattr(shadow, "fetch_public_hourly_close_volume", fetch_hourly)
+    monkeypatch.setattr(shadow, "fetch_candles", fetch_five_minute)
+    ledger = tmp_path / "issued.jsonl"
+    scores = tmp_path / "scored.jsonl"
+    report = tmp_path / "report.json"
+
+    early = shadow.run_once(
+        ledger=ledger, score_ledger=scores, report=report,
+        clock=lambda: origin + timedelta(minutes=9),
+    )
+    assert early["research_status"] == "MISSED_ISSUE_WINDOW"
+    assert early["newly_issued"] == 0
+    assert not calls
+
+    on_time = shadow.run_once(
+        ledger=ledger, score_ledger=scores, report=report,
+        clock=lambda: origin + timedelta(minutes=11),
+    )
+    assert on_time["research_status"] == "ISSUED_BEFORE_TARGET"
+    assert on_time["newly_issued"] == 1
+    assert on_time["newly_scored"] == 0
+    assert calls == ["hourly", "historical_training_targets"]
+
+    duplicate = shadow.run_once(
+        ledger=ledger, score_ledger=scores, report=report,
+        clock=lambda: origin + timedelta(minutes=11),
+    )
+    assert duplicate["research_status"] == "ALREADY_ISSUED"
+    assert duplicate["newly_issued"] == 0
+    assert duplicate["newly_scored"] == 0
+    assert calls == ["hourly", "historical_training_targets"]
+
+    later = shadow.run_once(
+        ledger=ledger, score_ledger=scores, report=report,
+        clock=lambda: origin + timedelta(hours=8, minutes=20),
+    )
+    assert later["research_status"] == "MISSED_ISSUE_WINDOW"
+    assert later["newly_issued"] == 0
+    assert later["newly_scored"] == 1
+    assert calls[-1] == "actual_future_target"
+    assert len(shadow._read_jsonl(ledger)) == 1
+    assert len(shadow._read_jsonl(scores)) == 1
+
+    scored_again = shadow.run_once(
+        ledger=ledger, score_ledger=scores, report=report,
+        clock=lambda: origin + timedelta(hours=8, minutes=20),
+    )
+    assert scored_again["newly_scored"] == 0
+    assert len(shadow._read_jsonl(scores)) == 1
+
+
+def test_fetch_finishing_after_window_must_not_issue(tmp_path, monkeypatch):
+    origin, hourly, targets = _fixture()
+    monkeypatch.setattr(
+        shadow, "fetch_public_hourly_close_volume", lambda *_args: hourly
+    )
+    monkeypatch.setattr(
+        shadow, "fetch_candles", lambda *_args, **_kwargs: targets
+    )
+    ticks = iter([
+        origin + timedelta(minutes=11),
+        origin + timedelta(minutes=11, seconds=30),
+        origin + timedelta(minutes=15, seconds=1),
+        origin + timedelta(minutes=15, seconds=1),
+    ])
+    result = shadow.run_once(
+        ledger=tmp_path / "issued.jsonl",
+        score_ledger=tmp_path / "scores.jsonl",
+        report=tmp_path / "run.json",
+        clock=lambda: next(ticks),
+    )
+    assert result["research_status"] == "MISSED_ISSUE_WINDOW_AFTER_FETCH"
+    assert result["newly_issued"] == 0
