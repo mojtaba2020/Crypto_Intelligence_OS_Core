@@ -200,3 +200,113 @@ def predict_unscored_four_hour(
         interaction_applied=details.interaction_applied,
         fallback_reason=details.fallback_reason,
     )
+
+
+@dataclass(frozen=True)
+class WalkForwardScore:
+    """A scored DEVELOPMENT forecast, never an independently witnessed issuance."""
+
+    origin_utc: datetime
+    eligible_training_rows: int
+    candidate_abs_log_error: float
+    ablation_abs_log_error: float
+    placebo_abs_log_error: float
+    persistence_abs_log_error: float
+    interaction_applied: bool
+
+
+@dataclass(frozen=True)
+class WalkForwardReport:
+    """Complete-case numerical diagnostics; missed-origin bias remains visible."""
+
+    expected_slots_between_first_and_last: int
+    supplied_matured_rows: int
+    missing_origin_slots: int
+    cold_start_rows: int
+    scored_rows: tuple[WalkForwardScore, ...]
+    mean_candidate_abs_log_error: float | None
+    mean_ablation_abs_log_error: float | None
+    mean_placebo_abs_log_error: float | None
+    mean_persistence_abs_log_error: float | None
+
+
+def walk_forward_development_diagnostic(
+    examples: Sequence[MaturedExample], *, ridge: float
+) -> WalkForwardReport:
+    """Score a fixed four-way comparison using only labels mature at EACH origin.
+
+    Caller must supply previously constructed valid rows from development-only
+    data. This re-fits before each origin, never on the scored origin's label.
+    Research-only diagnostics: source claims are unauthenticated, missing slots
+    are NOT scored, and this does not certify prospective predictive alpha.
+    """
+    if not 2 <= len(examples) <= 512:
+        raise ValueError("development diagnostic requires 2..512 matured rows")
+    if not math.isfinite(ridge) or ridge <= 0:
+        raise ValueError("ridge must be finite and positive")
+    rows = sorted(examples, key=lambda row: row.origin_utc)
+    origins: set[datetime] = set()
+    for row in rows:
+        if not isinstance(row, MaturedExample):
+            raise ValueError("invalid development example")
+        _origin(row.origin_utc, row.issued_at_utc)
+        _utc(row.target_first_observed_at_utc, "target receipt")
+        if row.origin_utc in origins:
+            raise ValueError("duplicate development origin")
+        if row.target_first_observed_at_utc < row.origin_utc + timedelta(hours=4, minutes=15):
+            raise ValueError("target allegedly available before close")
+        if (
+            not math.isfinite(row.realized_log_return)
+            or not math.isfinite(row.reference_close_usd)
+            or row.reference_close_usd <= 0
+        ):
+            raise ValueError("invalid development outcome or reference")
+        origins.add(row.origin_utc)
+
+    expected = int((rows[-1].origin_utc - rows[0].origin_utc) / timedelta(hours=4)) + 1
+    scored: list[WalkForwardScore] = []
+    cold_start = 0
+    for i, candidate in enumerate(rows):
+        # Critically: the previous 4h origin's target closes at S+4h15m;
+        # a forecast issued at S+10m must NOT train on that preceding label.
+        mature_past = [
+            row for row in rows[:i] if row.target_first_observed_at_utc <= candidate.issued_at_utc
+        ]
+        if len(mature_past) < 30:
+            cold_start += 1
+            continue
+        model = fit_matured_comparisons(
+            mature_past, fit_at_utc=candidate.issued_at_utc, ridge=ridge
+        )
+        diagnostics = predict_with_diagnostics(model.numerical_fit, candidate.features)
+        losses = tuple(abs(p - candidate.realized_log_return) for p in diagnostics.returns())
+        if not all(math.isfinite(loss) for loss in losses):
+            raise ValueError("nonfinite walk-forward loss")
+        scored.append(
+            WalkForwardScore(
+                origin_utc=candidate.origin_utc,
+                eligible_training_rows=len(mature_past),
+                candidate_abs_log_error=losses[0],
+                ablation_abs_log_error=losses[1],
+                placebo_abs_log_error=losses[2],
+                persistence_abs_log_error=losses[3],
+                interaction_applied=diagnostics.interaction_applied,
+            )
+        )
+
+    def mean_loss(field: str) -> float | None:
+        if not scored:
+            return None
+        return math.fsum(getattr(item, field) for item in scored) / len(scored)
+
+    return WalkForwardReport(
+        expected_slots_between_first_and_last=expected,
+        supplied_matured_rows=len(rows),
+        missing_origin_slots=expected - len(rows),
+        cold_start_rows=cold_start,
+        scored_rows=tuple(scored),
+        mean_candidate_abs_log_error=mean_loss("candidate_abs_log_error"),
+        mean_ablation_abs_log_error=mean_loss("ablation_abs_log_error"),
+        mean_placebo_abs_log_error=mean_loss("placebo_abs_log_error"),
+        mean_persistence_abs_log_error=mean_loss("persistence_abs_log_error"),
+    )
