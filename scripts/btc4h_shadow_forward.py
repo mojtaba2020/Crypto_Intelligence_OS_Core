@@ -15,7 +15,7 @@ import math
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from crypto_intelligence_os.hybrid_forecasting import _estimate, _fit
 from scripts.alpha_coinbase_historical_replay import fetch_candles, iso
@@ -276,13 +276,16 @@ def run_once(
     score_ledger: Path,
     report: Path,
     code_sha: str = "local-research",
+    clock: Callable[[], datetime] | None = None,
 ) -> dict[str, Any]:
     """One invocation: issue in the on-time slot, then score matured older rows.
 
     No backfilling missed origins. Missed slots are explicit, not fake forecasts.
     External runner/commit times are not independent third-party attestation.
     """
-    before = datetime.now(UTC)
+    get_time = clock if clock is not None else lambda: datetime.now(UTC)
+    before = get_time()
+    utc(before)
     existing = _read_jsonl(ledger)
     keys = [(r["version"], r["origin_utc"]) for r in existing]
     if len(keys) != len(set(keys)):
@@ -297,14 +300,14 @@ def run_once(
         hourly = fetch_public_hourly_close_volume(
             origin - timedelta(days=HISTORY_DAYS, hours=25), origin
         )
-        hourly_read = datetime.now(UTC)
+        hourly_read = get_time()
         targets = fetch_candles(
             origin - timedelta(days=HISTORY_DAYS) + timedelta(hours=4, minutes=10),
             origin - timedelta(hours=8) + timedelta(hours=4, minutes=15),
             granularity=300,
         )
-        target_read = datetime.now(UTC)
-        finished = datetime.now(UTC)
+        target_read = get_time()
+        finished = get_time()
         if not in_issue_window(finished) or origin_at(finished) != origin:
             status = "MISSED_ISSUE_WINDOW_AFTER_FETCH"
         else:
@@ -331,9 +334,9 @@ def run_once(
         if key in scored_set:
             continue
         close = datetime.fromisoformat(row["target_5m_close_utc"].replace("Z", "+00:00"))
-        if close > datetime.now(UTC):
+        if close > get_time():
             continue
-        if datetime.now(UTC) - close > timedelta(days=39):
+        if get_time() - close > timedelta(days=39):
             overdue_unavailable += 1
             continue
         target_start = datetime.fromisoformat(
@@ -342,7 +345,7 @@ def run_once(
         price_by_time = fetch_candles(
             target_start, target_start + timedelta(minutes=5), granularity=300
         )
-        received = datetime.now(UTC)
+        received = get_time()
         if target_start not in price_by_time:
             continue
         score = calculate_score(row, actual=price_by_time[target_start], target_received_at=received)
