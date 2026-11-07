@@ -124,8 +124,7 @@ def make_volume_training_row(
 ) -> VolumeTrainingRow:
     """Reuse the exact S+4h15m target/receipt guard from the 4h bridge."""
     proxy = [
-        HourlyClose(bar.bar_open_utc, bar.close_usd, bar.first_observed_at_utc)
-        for bar in bars
+        HourlyClose(bar.bar_open_utc, bar.close_usd, bar.first_observed_at_utc) for bar in bars
     ]
     mature = make_matured_example(
         proxy,
@@ -154,9 +153,7 @@ def _interaction_residual(
 ) -> float:
     shift, slope_m, slope_v = projection
     return (
-        interaction - (shift + slope_m * momentum + slope_v * volume_surprise)
-        if enabled
-        else 0.0
+        interaction - (shift + slope_m * momentum + slope_v * volume_surprise) if enabled else 0.0
     )
 
 
@@ -195,9 +192,8 @@ def walk_forward_volume_candidate(
             raise ValueError("duplicate four-hour origin")
         origins.add(row.origin_utc)
         m, v, z = row.features
-        if (
-            not all(map(math.isfinite, (m, v, z, row.realized_log_return)))
-            or not math.isclose(z, m * v, rel_tol=1e-9, abs_tol=1e-12)
+        if not all(map(math.isfinite, (m, v, z, row.realized_log_return))) or not math.isclose(
+            z, m * v, rel_tol=1e-9, abs_tol=1e-12
         ):
             raise ValueError("invalid volume research features or label")
 
@@ -205,8 +201,7 @@ def walk_forward_volume_candidate(
     skipped = 0
     for index, current in enumerate(rows):
         past = [
-            row for row in rows[:index]
-            if row.target_first_observed_at_utc <= current.issued_at_utc
+            row for row in rows[:index] if row.target_first_observed_at_utc <= current.issued_at_utc
         ]
         if len(past) < 30:
             skipped += 1
