@@ -22,8 +22,7 @@ class CausalUncertaintyTests(unittest.TestCase):
                 WalkForwardScore(
                     origin_utc=origin,
                     issued_at_utc=origin + timedelta(minutes=10),
-                    target_first_observed_at_utc=origin
-                    + timedelta(hours=4, minutes=15, seconds=1),
+                    target_first_observed_at_utc=origin + timedelta(hours=4, minutes=15, seconds=1),
                     reference_close_usd=50000.0,
                     eligible_training_rows=31 + i,
                     candidate_abs_log_error=abs(prediction - actual),
