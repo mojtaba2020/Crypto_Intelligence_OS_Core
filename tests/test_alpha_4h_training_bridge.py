@@ -77,8 +77,8 @@ class FourHourTrainingBridgeTests(unittest.TestCase):
 
     def test_walk_forward_refuses_immature_preceding_label(self):
         rows = [self.build(n) for n in range(36)]
-        rows[30] = replace(
-            rows[30],
+        rows[29] = replace(
+            rows[29],
             target_first_observed_at_utc=self.start + timedelta(days=9),
         )
         report = walk_forward_development_diagnostic(rows, ridge=100.0)
