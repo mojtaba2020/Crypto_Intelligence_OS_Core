@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   inspect-volume-candidate:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'research/alpha-4h-volume-confirmation-20261106'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:

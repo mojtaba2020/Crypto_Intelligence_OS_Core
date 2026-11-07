@@ -1,0 +1,122 @@
+# Forward-only SHADOW study. Does not run from a Draft PR.
+# Will schedule only if deliberately merged into the default branch.
+# No trades, no private exchange credentials, no certification of independent custody.
+name: BTC 4h forward-only shadow ledger
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "11 0,4,8,12,16,20 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: btc4h-forward-ledger-single-writer
+  cancel-in-progress: false
+
+jobs:
+  four-hour-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout research engine
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Use Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Restore existing shadow ledger from dedicated data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          DATA_BRANCH="data/btc4h-shadow-forward"
+          mkdir -p research .research
+          if git ls-remote --exit-code --heads origin "refs/heads/$DATA_BRANCH" > /dev/null; then
+            git fetch origin "refs/heads/$DATA_BRANCH:refs/remotes/origin/$DATA_BRANCH"
+            for file in btc4h_shadow_forecasts.jsonl btc4h_shadow_scores.jsonl; do
+              if git cat-file -e "origin/$DATA_BRANCH:research/$file" 2>/dev/null; then
+                git show "origin/$DATA_BRANCH:research/$file" > "research/$file"
+              fi
+            done
+          else
+            echo "No prior shadow ledger: initializing forward-only."
+          fi
+      - name: Install existing research engine
+        run: python -m pip install -e .
+      - name: Try ON-TIME issue and score only already-mature outcomes
+        run: |
+          python -m scripts.btc4h_shadow_forward \
+            --ledger research/btc4h_shadow_forecasts.jsonl \
+            --score-ledger research/btc4h_shadow_scores.jsonl \
+            --report .research/btc4h_shadow_run_report.json \
+            --code-sha "$GITHUB_SHA"
+      - name: Validate append-only outputs and print run diagnostics
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path(".research/btc4h_shadow_run_report.json").read_text())
+          lines = [
+              "## BTC 4h true forward-only shadow study",
+              "",
+              "**No late-origin backfill, no live trading and no validated predictive alpha.**",
+              f"- On-time issuance status: {report['research_status']}",
+              f"- Newly issued this run: {report['newly_issued']}",
+              f"- Newly matured scores: {report['newly_scored']}",
+              f"- Total issued / scored: {report['total_issued']} / {report['total_scored']}",
+              f"- Overdue target bars unavailable: {report['overdue_targets_unavailable_in_api_window']}",
+              "- Market receipt timestamps are runner observed, not independent source vintage.",
+          ]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as output:
+              output.write("\n".join(lines) + "\n")
+          PY
+      - name: Save ONLY the new forward ledgers to a separate Git branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          DATA_BRANCH="data/btc4h-shadow-forward"
+          mkdir -p "$RUNNER_TEMP/forward-ledgers"
+          for file in btc4h_shadow_forecasts.jsonl btc4h_shadow_scores.jsonl; do
+            if [ -f "research/$file" ]; then
+              cp "research/$file" "$RUNNER_TEMP/forward-ledgers/$file"
+              rm -f "research/$file"
+            fi
+          done
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git show-ref --verify --quiet "refs/remotes/origin/$DATA_BRANCH"; then
+            git switch -C "$DATA_BRANCH" "origin/$DATA_BRANCH"
+          else
+            git switch -c "$DATA_BRANCH"
+          fi
+
+          mkdir -p research
+          for file in btc4h_shadow_forecasts.jsonl btc4h_shadow_scores.jsonl; do
+            if [ -f "$RUNNER_TEMP/forward-ledgers/$file" ]; then
+              cp "$RUNNER_TEMP/forward-ledgers/$file" "research/$file"
+              git add "research/$file"
+            fi
+          done
+          if ! git diff --cached --quiet; then
+            git commit -m "Record forward-issued 4h BTC shadow research (run $GITHUB_RUN_ID)"
+            git push origin "HEAD:refs/heads/$DATA_BRANCH"
+            echo "New shadow evidence committed on branch: $DATA_BRANCH" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No new forward evidence; nothing backfilled." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload one-run report for audit of skipped slots too
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc4h-forward-shadow-run
+          path: .research/btc4h_shadow_run_report.json
+          if-no-files-found: warn
+          retention-days: 30
