@@ -39,9 +39,7 @@ def iso(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
-def fetch_candles(
-    start: datetime, end: datetime, *, granularity: int
-) -> dict[datetime, float]:
+def fetch_candles(start: datetime, end: datetime, *, granularity: int) -> dict[datetime, float]:
     """Fetch bounded PUBLIC Coinbase history, retaining exact bucket-open clocks.
 
     No timestamp from this API proves that candle content was known at that
@@ -83,11 +81,7 @@ def fetch_candles(
             close = float(item[4])
             if not cursor <= opened < stop:
                 continue  # Coinbase may return a boundary candle
-            if (
-                int(opened.timestamp()) % granularity != 0
-                or not math.isfinite(close)
-                or close <= 0
-            ):
+            if int(opened.timestamp()) % granularity != 0 or not math.isfinite(close) or close <= 0:
                 raise ValueError("invalid or misaligned historical candle")
             if opened in candles and candles[opened] != close:
                 raise ValueError("conflicting duplicate historical close")
@@ -129,9 +123,7 @@ def run_replay(
     cursor = start
     last_fit = end + timedelta(days=1)
     while cursor < end:
-        hourly_starts = [
-            cursor - timedelta(hours=(25 - i)) for i in range(25)
-        ]
+        hourly_starts = [cursor - timedelta(hours=(25 - i)) for i in range(25)]
         if any(t not in hourly for t in hourly_starts):
             rejected["missing_1h"] += 1
             cursor += timedelta(hours=4)
@@ -184,26 +176,21 @@ def run_replay(
         raise ValueError("historical sample has no price movements")
     direction = {}
     for variant in ("candidate", "ablation", "placebo"):
-        predictions = [
-            getattr(row, f"{variant}_predicted_log_return") for row in scores
-        ]
+        predictions = [getattr(row, f"{variant}_predicted_log_return") for row in scores]
         nonflat = [
             (prediction, row.realized_log_return)
             for prediction, row in zip(predictions, scores, strict=True)
             if abs(prediction) > 1e-12
         ]
         correct = sum(
-            (predicted > 0) == (realized > 0)
-            for predicted, realized in nonflat
-            if realized != 0
+            (predicted > 0) == (realized > 0) for predicted, realized in nonflat if realized != 0
         )
         assessed = sum(realized != 0 for _, realized in nonflat)
         direction[variant] = {
             "forecasts_nonflat": len(nonflat),
             "assessed_nonflat_actual": assessed,
             "correct_nonflat": correct,
-            "conditional_accuracy_pct": round(100 * correct / assessed, 3)
-            if assessed else None,
+            "conditional_accuracy_pct": round(100 * correct / assessed, 3) if assessed else None,
             "all_scored_denominator": len(scores),
         }
     return {
