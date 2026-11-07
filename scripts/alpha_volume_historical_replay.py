@@ -179,11 +179,13 @@ def run_volume_historical_replay(
         name: math.fsum(getattr(item, key) for item in audit.scored) / len(audit.scored)
         for name, key in losses.items()
     }
+
     def relative_gain(baseline: str) -> float | None:
         baseline_loss = means[baseline]
         return (
             100.0 * (baseline_loss - means["volume_interaction_candidate"]) / baseline_loss
-            if baseline_loss > 0 else None
+            if baseline_loss > 0
+            else None
         )
 
     directional = {}
@@ -195,8 +197,7 @@ def run_volume_historical_replay(
         nonflat = [
             (getattr(score, field), score.realized_log_return)
             for score in audit.scored
-            if abs(getattr(score, field)) > 1e-12
-            and score.realized_log_return != 0
+            if abs(getattr(score, field)) > 1e-12 and score.realized_log_return != 0
         ]
         correct = sum((p > 0) == (actual > 0) for p, actual in nonflat)
         directional[name] = {
