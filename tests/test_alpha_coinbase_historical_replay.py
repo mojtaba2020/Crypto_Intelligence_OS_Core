@@ -35,6 +35,14 @@ class CoinbaseHistoricalReplayTests(unittest.TestCase):
         self.assertIsNotNone(report["mean_absolute_log_price_error"]["candidate"])
         self.assertIsNotNone(report["direction_secondary_nonflat"]["candidate"])
         self.assertFalse(report["data_first_observed_authenticated"])
+        uncertainty = report["past_error_uncertainty_historical_only"]
+        self.assertEqual(uncertainty["fixed_rolling_calibration_rows"], 32)
+        self.assertFalse(uncertainty["nominal_future_coverage_guaranteed"])
+        self.assertEqual(
+            uncertainty["scored_origins_without_mature_prior_residuals"], 17
+        )
+        self.assertEqual(uncertainty["calibrated_origins"], 0)
+
         self.assertEqual(report["model_status"], "NO_RUN_NO_FREEZE_FOR_SCIENTIFIC_CONFIRMATION")
 
     def test_missing_5min_target_stays_missing(self):
