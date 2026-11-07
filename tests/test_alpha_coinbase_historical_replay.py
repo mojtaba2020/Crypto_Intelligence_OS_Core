@@ -38,9 +38,7 @@ class CoinbaseHistoricalReplayTests(unittest.TestCase):
         uncertainty = report["past_error_uncertainty_historical_only"]
         self.assertEqual(uncertainty["fixed_rolling_calibration_rows"], 32)
         self.assertFalse(uncertainty["nominal_future_coverage_guaranteed"])
-        self.assertEqual(
-            uncertainty["scored_origins_without_mature_prior_residuals"], 17
-        )
+        self.assertEqual(uncertainty["scored_origins_without_mature_prior_residuals"], 17)
         self.assertEqual(uncertainty["calibrated_origins"], 0)
 
         self.assertEqual(report["model_status"], "NO_RUN_NO_FREEZE_FOR_SCIENTIFIC_CONFIRMATION")
