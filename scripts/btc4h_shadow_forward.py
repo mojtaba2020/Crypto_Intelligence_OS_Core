@@ -193,12 +193,8 @@ def calculate_score(
         raise ValueError("invalid version or unsafe forecast ledger")
     issued = datetime.fromisoformat(forecast["issued_at_utc"].replace("Z", "+00:00"))
     origin = datetime.fromisoformat(forecast["origin_utc"].replace("Z", "+00:00"))
-    target_open = datetime.fromisoformat(
-        forecast["target_5m_bar_open_utc"].replace("Z", "+00:00")
-    )
-    target_close = datetime.fromisoformat(
-        forecast["target_5m_close_utc"].replace("Z", "+00:00")
-    )
+    target_open = datetime.fromisoformat(forecast["target_5m_bar_open_utc"].replace("Z", "+00:00"))
+    target_close = datetime.fromisoformat(forecast["target_5m_close_utc"].replace("Z", "+00:00"))
     if (
         origin_at(issued) != origin
         or not in_issue_window(issued)
@@ -224,15 +220,14 @@ def calculate_score(
     if not all(math.isfinite(price) and price > 0 for price in preds.values()):
         raise ValueError("invalid forecast price")
     actual_return = math.log(actual / ref)
-    losses = {
-        name: abs(math.log(preds[name] / actual))
-        for name in MODEL_NAMES
-    }
+    losses = {name: abs(math.log(preds[name] / actual)) for name in MODEL_NAMES}
     direction = {
         name: (
-            None if abs(math.log(preds[name] / ref)) <= 1e-12
+            None
+            if abs(math.log(preds[name] / ref)) <= 1e-12
             else (preds[name] > ref) == (actual > ref)
-            if actual != ref else None
+            if actual != ref
+            else None
         )
         for name in MODEL_NAMES
     }
@@ -341,9 +336,7 @@ def run_once(
         if get_time() - close > timedelta(days=39):
             overdue_unavailable += 1
             continue
-        target_start = datetime.fromisoformat(
-            row["target_5m_bar_open_utc"].replace("Z", "+00:00")
-        )
+        target_start = datetime.fromisoformat(row["target_5m_bar_open_utc"].replace("Z", "+00:00"))
         price_by_time = fetch_candles(
             target_start, target_start + timedelta(minutes=5), granularity=300
         )
