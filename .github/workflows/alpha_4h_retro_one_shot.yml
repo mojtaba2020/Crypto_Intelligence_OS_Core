@@ -4,7 +4,7 @@ name: BTC 4h retrospective diagnostic — one shot
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened]
 
 permissions:
   contents: read
