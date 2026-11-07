@@ -178,7 +178,8 @@ def run_replay(
     }
     persistence = report.mean_persistence_abs_log_error
     candidate = report.mean_candidate_abs_log_error
-    assert candidate is not None and persistence is not None
+    if candidate is None or persistence is None:
+        raise ValueError("no historical comparisons available")
     if persistence <= 0:
         raise ValueError("historical sample has no price movements")
     direction = {}
