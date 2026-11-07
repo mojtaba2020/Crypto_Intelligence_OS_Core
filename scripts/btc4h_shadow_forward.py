@@ -13,9 +13,10 @@ import hashlib
 import json
 import math
 import os
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from scripts.alpha_coinbase_historical_replay import fetch_candles, iso
 from scripts.alpha_interaction_candidate import _independent_interaction_projection
