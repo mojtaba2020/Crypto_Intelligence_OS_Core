@@ -213,6 +213,10 @@ class WalkForwardScore:
     placebo_abs_log_error: float
     persistence_abs_log_error: float
     interaction_applied: bool
+    realized_log_return: float
+    candidate_predicted_log_return: float
+    ablation_predicted_log_return: float
+    placebo_predicted_log_return: float
 
 
 @dataclass(frozen=True)
@@ -291,6 +295,10 @@ def walk_forward_development_diagnostic(
                 placebo_abs_log_error=losses[2],
                 persistence_abs_log_error=losses[3],
                 interaction_applied=diagnostics.interaction_applied,
+                realized_log_return=candidate.realized_log_return,
+                candidate_predicted_log_return=diagnostics.candidate_log_return,
+                ablation_predicted_log_return=diagnostics.ablation_log_return,
+                placebo_predicted_log_return=diagnostics.placebo_log_return,
             )
         )
 
