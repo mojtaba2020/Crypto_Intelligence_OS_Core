@@ -1,6 +1,6 @@
 # One-time public-history exploration on the opening of this stacked Draft PR.
 # NOT a live forecast, operational schedule, independent data receipt or Stage-6 run.
-name: BTC 4h retrospective diagnostic — one shot
+name: BTC 4h historical uncertainty audit — one shot
 
 on:
   pull_request:
@@ -52,10 +52,15 @@ jobs:
               f"- Matured, scored development origins: {report['scored_historical_origins']}",
               f"- Historical candidate gain vs persistence: {report['candidate_relative_error_reduction_pct']}%",
               f"- Interaction truly applied: {report['interaction_applied']}",
+              f"- Causal-calibrated historical origins: {report['past_error_uncertainty_historical_only']['calibrated_origins']}",
+              f"- UP / DOWN / ABSTAIN: {report['past_error_uncertainty_historical_only']['up_signals']} / {report['past_error_uncertainty_historical_only']['down_signals']} / {report['past_error_uncertainty_historical_only']['abstentions']}",
+              f"- Accuracy ON called directions only: {report['past_error_uncertainty_historical_only']['correct_direction_on_calls_pct']}%",
+              f"- Percent of ALL 4h scheduled slots with a directional call: {report['past_error_uncertainty_historical_only']['directional_calls_pct_all_168_expected']}%",
+              f"- Historical interval coverage: {report['past_error_uncertainty_historical_only']['interval_coverage_pct']}%",
               f"- SHA-256 1h snapshot: {report['hourly_snapshot_digest_sha256']}",
               f"- SHA-256 5m snapshot: {report['five_minute_snapshot_digest_sha256']}",
               "",
-              "No trading, no promotion, no pristine holdout, no source-vintage certification.",
+              "No 90% guarantee, no trading, no promotion, no pristine holdout or source-vintage certification.",
           ]
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as stream:
               stream.write("\n".join(lines) + "\n")
@@ -64,7 +69,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: alpha-4h-historical-exploration-202610
+          name: alpha-4h-historical-uncertainty-202610
           path: alpha_4h_retrospective_20261001_20261029.json
           retention-days: 30
           if-no-files-found: error

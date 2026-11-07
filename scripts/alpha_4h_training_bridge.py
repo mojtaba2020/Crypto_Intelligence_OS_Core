@@ -207,6 +207,9 @@ class WalkForwardScore:
     """A scored DEVELOPMENT forecast, never an independently witnessed issuance."""
 
     origin_utc: datetime
+    issued_at_utc: datetime
+    target_first_observed_at_utc: datetime
+    reference_close_usd: float
     eligible_training_rows: int
     candidate_abs_log_error: float
     ablation_abs_log_error: float
@@ -289,6 +292,9 @@ def walk_forward_development_diagnostic(
         scored.append(
             WalkForwardScore(
                 origin_utc=candidate.origin_utc,
+                issued_at_utc=candidate.issued_at_utc,
+                target_first_observed_at_utc=candidate.target_first_observed_at_utc,
+                reference_close_usd=candidate.reference_close_usd,
                 eligible_training_rows=len(mature_past),
                 candidate_abs_log_error=losses[0],
                 ablation_abs_log_error=losses[1],
