@@ -1,0 +1,72 @@
+# Only inspect ONE already exposed historical window. No production schedule.
+name: BTC 4h volume-confirmation exploratory challenge
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-volume-candidate:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v7
+      - name: Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Install research core
+        run: python -m pip install -e .
+      - name: Compute fixed causal historical volume challenger
+        run: |
+          python -m scripts.alpha_volume_historical_replay \
+            --start 2026-10-01 \
+            --end 2026-10-29 \
+            --output alpha_4h_volume_202610_research.json
+      - name: Publish clearly limited research summary
+        if: success()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          r = json.loads(Path("alpha_4h_volume_202610_research.json").read_text())
+          loss = r["mean_absolute_log_price_error"]
+          lines = [
+              "## BTC four-hour volume candidate — historical EXPLORATION only",
+              "",
+              "**This exposed October 2026 period was ALREADY used to evaluate",
+              "the earlier price-only hypothesis; no fresh OOS or live issuance exists.**",
+              "Coinbase historical first-receipt timestamps are not authenticated.",
+              "",
+              f"- Scheduled / complete / scored: {r['scheduled_origins']} / {r['complete_origins']} / {r['walk_forward_scored']}",
+              f"- Candidate mean abs log error: {loss['volume_interaction_candidate']}",
+              f"- Additive price + volume mean abs log error: {loss['price_plus_volume_additive']}",
+              f"- Price-only momentum mean abs log error: {loss['price_only_momentum']}",
+              f"- Persistence mean abs log error: {loss['persistence']}",
+              f"- Candidate gain vs Persistence: {r['candidate_gain_vs_persistence_pct']}%",
+              f"- Candidate gain vs price-only: {r['candidate_gain_vs_price_only_pct']}%",
+              f"- Candidate gain vs volume additive: {r['candidate_gain_vs_volume_additive_pct']}%",
+              f"- True volume-interaction applied: {r['candidate_interaction_active']} / {r['walk_forward_scored']}",
+              f"- BTC OHLCV SHA256 (canonical): {r['hourly_time_close_volume_sha256']}",
+              "",
+              "No Alpha validation, no promotion, no trading; NO_RUN / NO_FREEZE.",
+          ]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as stream:
+              stream.write("\n".join(lines) + "\n")
+          PY
+      - name: Archive aggregate diagnostics
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alpha-volume-202610-exploratory-json
+          path: alpha_4h_volume_202610_research.json
+          retention-days: 30
+          if-no-files-found: error
