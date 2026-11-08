@@ -1,0 +1,184 @@
+# BOUNDED research-only first-light for Nov 8, 2026 UTC (NOT the BTC live system).
+# Pinned, already-tested code runs only on this single test date.
+# Two issue attempts at 16:08/16:11 UTC, one score-only observation after 20:15.
+# No market orders or permanent recurring 4h monitoring.
+name: BTC 4h first light — Nov 8 2026
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "8,11 16 8 11 *"
+    - cron: "20 20 8 11 *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: btc4h-forward-ledger-single-writer
+  cancel-in-progress: false
+
+jobs:
+  time-guard:
+    runs-on: ubuntu-latest
+    outputs:
+      eligible: ${{ steps.check.outputs.eligible }}
+    steps:
+      - name: Only issue or score on Nov 8, 2026 UTC
+        id: check
+        shell: bash
+        run: |
+          if [ "$(date -u +%F)" = "2026-11-08" ]; then
+            echo "eligible=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "2026 first-light test has expired; no market access or writes." >> "$GITHUB_STEP_SUMMARY"
+          fi
+  four-hour-research:
+    needs: time-guard
+    if: needs.time-guard.outputs.eligible == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BTC4H_PINNED_RESEARCH_SHA: "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9"
+    steps:
+      - name: Checkout locked PR-109 research engine; do not change main model
+        uses: actions/checkout@v7
+        with:
+          ref: "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9"
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Use Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Restore existing shadow ledger from dedicated data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          DATA_BRANCH="data/btc4h-shadow-forward"
+          mkdir -p research .research
+          if git ls-remote --exit-code --heads origin "refs/heads/$DATA_BRANCH" > /dev/null; then
+            git fetch origin "refs/heads/$DATA_BRANCH:refs/remotes/origin/$DATA_BRANCH"
+            for file in btc4h_shadow_forecasts.jsonl btc4h_shadow_scores.jsonl btc4h_shadow_publication_receipts.jsonl btc4h_study_start_utc.txt; do
+              if git cat-file -e "origin/$DATA_BRANCH:research/$file" 2>/dev/null; then
+                git show "origin/$DATA_BRANCH:research/$file" > "research/$file"
+              fi
+            done
+            if [ ! -f research/btc4h_study_start_utc.txt ]; then
+              echo "FAIL CLOSED: existing study branch lacks its fixed start anchor" >&2
+              exit 1
+            fi
+          else
+            echo "No prior shadow ledger: initializing forward-only."
+          fi
+      - name: Fix study start at FIRST attempted runner, before seeing results
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f research/btc4h_study_start_utc.txt ]; then
+            python - <<'PY' > research/btc4h_study_start_utc.txt
+          from datetime import UTC, datetime
+
+          current = datetime.now(UTC)
+          start = current.replace(hour=(current.hour // 4) * 4, minute=0, second=0, microsecond=0)
+          print(start.isoformat().replace("+00:00", "Z"))
+          PY
+          fi
+          cat research/btc4h_study_start_utc.txt
+      - name: Install existing research engine
+        run: python -m pip install -e .
+      - name: Publish fixed first-attempt study anchor BEFORE reading outcomes
+        run: bash .github/scripts/publish_btc4h_shadow.sh anchor
+      - name: Attempt ON-TIME forecast issue ONLY (no older scoring dependency)
+        id: issue_run
+        continue-on-error: true
+        run: |
+          python -m scripts.btc4h_shadow_forward \
+            --phase issue \
+            --ledger research/btc4h_shadow_forecasts.jsonl \
+            --score-ledger research/btc4h_shadow_scores.jsonl \
+            --report .research/btc4h_shadow_issue_report.json \
+            --code-sha "$BTC4H_PINNED_RESEARCH_SHA"
+      - name: Publish new forecast to Git BEFORE scoring any older targets
+        if: steps.issue_run.outcome == 'success'
+        run: bash .github/scripts/publish_btc4h_shadow.sh issue
+      - name: Confirm issued forecast in remote Git before target closes
+        if: steps.issue_run.outcome == 'success'
+        run: bash .github/scripts/confirm_btc4h_publication.sh
+      - name: Score only previously issued and now-matured targets
+        run: |
+          python -m scripts.btc4h_shadow_forward \
+            --phase score \
+            --ledger research/btc4h_shadow_forecasts.jsonl \
+            --score-ledger research/btc4h_shadow_scores.jsonl \
+            --report .research/btc4h_shadow_score_report.json \
+            --code-sha "$BTC4H_PINNED_RESEARCH_SHA"
+      - name: Audit ALL scheduled slots and re-evaluate every stored score
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m scripts.btc4h_shadow_audit \
+            --ledger research/btc4h_shadow_forecasts.jsonl \
+            --scores research/btc4h_shadow_scores.jsonl \
+            --receipts research/btc4h_shadow_publication_receipts.jsonl \
+            --study-start "$(cat research/btc4h_study_start_utc.txt)" \
+            --report .research/btc4h_shadow_audit_report.json
+      - name: Validate append-only outputs and print run diagnostics
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          issue_path = Path(".research/btc4h_shadow_issue_report.json")
+          issue = json.loads(issue_path.read_text()) if issue_path.exists() else {}
+          scores = json.loads(Path(".research/btc4h_shadow_score_report.json").read_text())
+          audit = json.loads(Path(".research/btc4h_shadow_audit_report.json").read_text())
+          lines = [
+              "## BTC 4h true forward-only shadow study",
+              "",
+              "**No late-origin backfill, no live trading and no validated predictive alpha.**",
+              f"- On-time issuance status: {issue.get('research_status', 'ISSUE_PHASE_FAILED')}",
+              f"- Newly issued this run: {issue.get('newly_issued', 0)}",
+              f"- Started with S+8..10m early prefetch: {issue.get('early_prefetch_started', False)}",
+              f"- Newly matured scores: {scores['newly_scored']}",
+              f"- Total issued / scored: {scores['total_issued']} / {scores['total_scored']}",
+              f"- Overdue target bars unavailable: {scores['overdue_targets_unavailable_in_api_window']}",
+              f"- Due scheduled origins / issued / missed: {audit['finalized_issue_slots']} / {audit['issued_in_finalized_slots']} / {audit['missed_finalized_slots']}",
+              f"- Forecast issue coverage of due slots: {audit['issue_delivery_rate_pct']}%",
+              f"- Matured not scored: {audit['unscored_matured_origins']}",
+              f"- Git remote issue receipts verified internally: {audit['confirmed_remote_receipts']}/{audit['issued_forecasts']}",
+              "- Receipt times use runner clock; no independent GitHub-server-time attestation.",
+              f"- Real-issue candidate vs Persistence log-error gain: {audit['candidate_gain_vs_persistence_pct']}%",
+              "- Two attempts per 4h origin; no guarantee either is on time.",
+              "- Market receipt timestamps are runner observed, not independent source vintage.",
+          ]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as output:
+              output.write("\n".join(lines) + "\n")
+          PY
+      - name: Publish matured scores (forecasts already separately committed)
+        run: bash .github/scripts/publish_btc4h_shadow.sh score
+      - name: Surface failed issue attempt without discarding already-published scores
+        if: steps.issue_run.outcome == 'failure'
+        run: |
+          echo "On-time issue attempt failed; no forecast backfilled." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+      - name: Upload one-run report for audit of skipped slots too
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc4h-forward-shadow-run
+          path: |
+            .research/btc4h_shadow_issue_report.json
+            .research/btc4h_shadow_score_report.json
+            .research/btc4h_shadow_audit_report.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Mark the 2026-11-08 first-light trial as bounded
+        if: always()
+        run: |
+          echo "Bounded 2026-11-08 UTC study; no perpetual cron engine enabled." >> "$GITHUB_STEP_SUMMARY"
+          echo "Model source pinned to $BTC4H_PINNED_RESEARCH_SHA (unmerged research)." >> "$GITHUB_STEP_SUMMARY"
+          echo "First-party Git evidence only, NOT independently certified market alpha." >> "$GITHUB_STEP_SUMMARY"
