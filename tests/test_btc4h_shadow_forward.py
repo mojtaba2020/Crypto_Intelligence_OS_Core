@@ -412,3 +412,71 @@ def test_one_minute_before_prefetch_makes_no_network_call(tmp_path, monkeypatch)
     )
     assert result["research_status"] == "NOT_YET_PREFETCH_WINDOW"
     assert result["newly_issued"] == 0
+
+
+
+def test_separate_issue_and_score_phases_keep_forecast_safe(tmp_path, monkeypatch):
+    origin, hourly, targets = _fixture()
+    calls = []
+
+    def hourly_fetch(*_args):
+        calls.append("hourly_training")
+        return hourly
+
+    def five_minute_fetch(start, end, *, granularity):
+        assert granularity == 300
+        if end - start > timedelta(days=1):
+            calls.append("past_training_targets")
+            return targets
+        calls.append("later_realized_outcome")
+        return {start: 66100.0}
+
+    monkeypatch.setattr(shadow, "fetch_public_hourly_close_volume", hourly_fetch)
+    monkeypatch.setattr(shadow, "fetch_candles", five_minute_fetch)
+    ledger = tmp_path / "issued.jsonl"
+    scores = tmp_path / "scores.jsonl"
+    report = tmp_path / "report.json"
+
+    issued = shadow.run_once(
+        ledger=ledger,
+        score_ledger=scores,
+        report=report,
+        phase="issue",
+        clock=lambda: origin + timedelta(minutes=11),
+    )
+    assert issued["phase"] == "issue"
+    assert issued["newly_issued"] == 1
+    assert issued["newly_scored"] == 0
+    assert calls == ["hourly_training", "past_training_targets"]
+    assert not scores.exists()
+    original_record = shadow._read_jsonl(ledger)[0]
+
+    calls.clear()
+    scored = shadow.run_once(
+        ledger=ledger,
+        score_ledger=scores,
+        report=report,
+        phase="score",
+        clock=lambda: origin + timedelta(hours=8, minutes=20),
+    )
+    assert scored["phase"] == "score"
+    assert scored["newly_issued"] == 0
+    assert scored["newly_scored"] == 1
+    assert calls == ["later_realized_outcome"]
+    assert shadow._read_jsonl(ledger)[0] == original_record
+    assert len(shadow._read_jsonl(scores)) == 1
+
+
+def test_unknown_phase_is_rejected_before_market_access(tmp_path, monkeypatch):
+    def fail_market(*_args, **_kwargs):
+        pytest.fail("invalid phase must not call market")
+
+    monkeypatch.setattr(shadow, "fetch_public_hourly_close_volume", fail_market)
+    monkeypatch.setattr(shadow, "fetch_candles", fail_market)
+    with pytest.raises(ValueError, match="phase must"):
+        shadow.run_once(
+            ledger=tmp_path / "issued.jsonl",
+            score_ledger=tmp_path / "scores.jsonl",
+            report=tmp_path / "report.json",
+            phase="backdate",
+        )
