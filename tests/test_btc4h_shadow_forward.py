@@ -210,9 +210,9 @@ def test_live_pipeline_issues_once_and_scores_only_after_future_target(tmp_path,
         ledger=ledger,
         score_ledger=scores,
         report=report,
-        clock=lambda: origin + timedelta(minutes=9),
+        clock=lambda: origin + timedelta(minutes=7),
     )
-    assert early["research_status"] == "MISSED_ISSUE_WINDOW"
+    assert early["research_status"] == "NOT_YET_PREFETCH_WINDOW"
     assert early["newly_issued"] == 0
     assert not calls
 
@@ -280,4 +280,141 @@ def test_fetch_finishing_after_window_must_not_issue(tmp_path, monkeypatch):
         clock=lambda: next(ticks),
     )
     assert result["research_status"] == "MISSED_ISSUE_WINDOW_AFTER_FETCH"
+    assert result["newly_issued"] == 0
+
+
+
+def test_early_prefetch_waits_until_actual_issue_window_and_backup_dedupes(
+    tmp_path, monkeypatch
+):
+    origin, hourly, targets = _fixture()
+    moment = [origin + timedelta(minutes=8, seconds=30)]
+    calls = []
+    slept = []
+
+    def fetch_hourly(*_args):
+        calls.append("hourly")
+        moment[0] = origin + timedelta(minutes=8, seconds=50)
+        return hourly
+
+    def fetch_targets(*_args, **_kwargs):
+        calls.append("targets")
+        moment[0] = origin + timedelta(minutes=9, seconds=20)
+        return targets
+
+    def sleep_for(seconds):
+        slept.append(seconds)
+        moment[0] += timedelta(seconds=seconds)
+
+    monkeypatch.setattr(shadow, "fetch_public_hourly_close_volume", fetch_hourly)
+    monkeypatch.setattr(shadow, "fetch_candles", fetch_targets)
+    ledger = tmp_path / "issued.jsonl"
+    score_ledger = tmp_path / "scores.jsonl"
+    report = tmp_path / "report.json"
+    result = shadow.run_once(
+        ledger=ledger,
+        score_ledger=score_ledger,
+        report=report,
+        clock=lambda: moment[0],
+        sleeper=sleep_for,
+    )
+    assert result["research_status"] == "ISSUED_BEFORE_TARGET"
+    assert result["early_prefetch_started"] is True
+    assert result["newly_issued"] == 1
+    assert calls == ["hourly", "targets"]
+    assert slept == [40.0]
+    issued = shadow._read_jsonl(ledger)
+    assert len(issued) == 1
+    assert issued[0]["issued_at_utc"] == shadow.iso(origin + timedelta(minutes=10))
+    assert issued[0]["hourly_data_collected_at_utc"] == shadow.iso(
+        origin + timedelta(minutes=8, seconds=50)
+    )
+    moment[0] = origin + timedelta(minutes=11)
+    duplicate = shadow.run_once(
+        ledger=ledger,
+        score_ledger=score_ledger,
+        report=report,
+        clock=lambda: moment[0],
+        sleeper=sleep_for,
+    )
+    assert duplicate["research_status"] == "ALREADY_ISSUED"
+    assert duplicate["newly_issued"] == 0
+    assert calls == ["hourly", "targets"]
+    assert len(shadow._read_jsonl(ledger)) == 1
+
+
+def test_computation_exceeding_deadline_cannot_backdate_issuance(tmp_path, monkeypatch):
+    origin, hourly, targets = _fixture()
+    moment = [origin + timedelta(minutes=11)]
+
+    monkeypatch.setattr(
+        shadow, "fetch_public_hourly_close_volume", lambda *_args: hourly
+    )
+    monkeypatch.setattr(
+        shadow, "fetch_candles", lambda *_args, **_kwargs: targets
+    )
+    original_calculation = shadow.calculate_issue
+
+    def slow_calculation(**kwargs):
+        candidate = original_calculation(**kwargs)
+        moment[0] = origin + timedelta(minutes=15, seconds=1)
+        return candidate
+
+    monkeypatch.setattr(shadow, "calculate_issue", slow_calculation)
+    ledger = tmp_path / "issued.jsonl"
+    result = shadow.run_once(
+        ledger=ledger,
+        score_ledger=tmp_path / "scores.jsonl",
+        report=tmp_path / "run.json",
+        clock=lambda: moment[0],
+        sleeper=lambda seconds: pytest.fail(f"unexpected wait: {seconds}"),
+    )
+    assert result["research_status"] == "MISSED_ISSUE_WINDOW_AFTER_COMPUTE"
+    assert result["newly_issued"] == 0
+    assert not ledger.exists()
+
+
+def test_early_attempt_that_fetches_too_slowly_is_not_backfilled(tmp_path, monkeypatch):
+    origin, hourly, targets = _fixture()
+    moment = [origin + timedelta(minutes=8)]
+
+    def fetch_hourly(*_args):
+        moment[0] = origin + timedelta(minutes=11)
+        return hourly
+
+    def fetch_targets(*_args, **_kwargs):
+        moment[0] = origin + timedelta(minutes=16)
+        return targets
+
+    monkeypatch.setattr(shadow, "fetch_public_hourly_close_volume", fetch_hourly)
+    monkeypatch.setattr(shadow, "fetch_candles", fetch_targets)
+    ledger = tmp_path / "issued.jsonl"
+    result = shadow.run_once(
+        ledger=ledger,
+        score_ledger=tmp_path / "scored.jsonl",
+        report=tmp_path / "run.json",
+        clock=lambda: moment[0],
+        sleeper=lambda seconds: pytest.fail(f"unexpected wait: {seconds}"),
+    )
+    assert result["research_status"] == "MISSED_ISSUE_WINDOW_AFTER_FETCH"
+    assert result["early_prefetch_started"] is True
+    assert result["newly_issued"] == 0
+    assert not ledger.exists()
+
+
+def test_one_minute_before_prefetch_makes_no_network_call(tmp_path, monkeypatch):
+    origin, _hourly, _targets = _fixture()
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("source fetch before S+8m")
+
+    monkeypatch.setattr(shadow, "fetch_public_hourly_close_volume", forbidden)
+    monkeypatch.setattr(shadow, "fetch_candles", forbidden)
+    result = shadow.run_once(
+        ledger=tmp_path / "issued.jsonl",
+        score_ledger=tmp_path / "scores.jsonl",
+        report=tmp_path / "report.json",
+        clock=lambda: origin + timedelta(minutes=7),
+        sleeper=lambda seconds: pytest.fail("must not wait before S+8m"),
+    )
+    assert result["research_status"] == "NOT_YET_PREFETCH_WINDOW"
     assert result["newly_issued"] == 0
