@@ -57,9 +57,9 @@ jobs:
             python - <<'PY' > research/btc4h_study_start_utc.txt
           from datetime import UTC, datetime
 
-          from scripts.btc4h_shadow_forward import origin_at, iso
-
-          print(iso(origin_at(datetime.now(UTC))))
+          current = datetime.now(UTC)
+          start = current.replace(hour=(current.hour // 4) * 4, minute=0, second=0, microsecond=0)
+          print(start.isoformat().replace("+00:00", "Z"))
           PY
           fi
           cat research/btc4h_study_start_utc.txt
