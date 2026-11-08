@@ -168,16 +168,13 @@ def test_nonissue_phases_cannot_insert_a_forecast(tmp_path, phase):
     )
 
 
-
 def test_score_phase_cannot_rewrite_a_published_receipt(tmp_path):
     project, env = _repo(tmp_path)
     research = project / "research"
     anchor = "2026-11-08T12:00:00Z"
     (research / "btc4h_study_start_utc.txt").write_text(anchor + "\n", encoding="utf-8")
     assert _publish(project, env, "anchor").returncode == 0
-    (research / "btc4h_shadow_forecasts.jsonl").write_text(
-        '{"origin_utc":"A"}\n', encoding="utf-8"
-    )
+    (research / "btc4h_shadow_forecasts.jsonl").write_text('{"origin_utc":"A"}\n', encoding="utf-8")
     assert _publish(project, env, "issue").returncode == 0
     receipt_file = research / "btc4h_shadow_publication_receipts.jsonl"
     receipt_file.write_text('{"origin_utc":"A"}\n', encoding="utf-8")
