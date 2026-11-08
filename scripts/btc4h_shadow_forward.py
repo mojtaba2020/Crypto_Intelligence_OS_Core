@@ -355,7 +355,9 @@ def run_once(
                 issued = candidate
                 status = "ISSUED_BEFORE_TARGET"
                 existing.append(issued)
-    previous_scores = _read_jsonl(score_ledger)
+    # An old malformed score must NEVER block publication of a fresh issue.
+    # The separate score phase will still fail closed on that corrupt ledger.
+    previous_scores = _read_jsonl(score_ledger) if phase != "issue" else []
     scored_keys = [(r["version"], r["origin_utc"]) for r in previous_scores]
     if len(scored_keys) != len(set(scored_keys)):
         raise ValueError("duplicate score origin")
