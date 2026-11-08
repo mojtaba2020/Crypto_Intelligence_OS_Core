@@ -58,9 +58,7 @@ def in_issue_window(at: datetime) -> bool:
 def in_prefetch_window(at: datetime) -> bool:
     """Fetch only in the current origin's S+8m..S+15m interval."""
     s = origin_at(at)
-    return s + timedelta(minutes=EARLIEST_PREFETCH_MINUTE) <= at <= s + timedelta(
-        minutes=15
-    )
+    return s + timedelta(minutes=EARLIEST_PREFETCH_MINUTE) <= at <= s + timedelta(minutes=15)
 
 
 def _digest(mapping: dict[datetime, Any]) -> str:
@@ -393,7 +391,8 @@ def run_once(
         "overdue_targets_unavailable_in_api_window": overdue_unavailable,
         "early_prefetch_started": bool(
             origin_at(before) + timedelta(minutes=EARLIEST_PREFETCH_MINUTE)
-            <= before < origin_at(before) + timedelta(minutes=10)
+            <= before
+            < origin_at(before) + timedelta(minutes=10)
         ),
         "real_forward_issue_proof_independent": False,
         "note": "Never backfill missed origins; GitHub schedule delivery is not guaranteed.",
