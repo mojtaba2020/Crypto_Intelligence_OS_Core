@@ -291,6 +291,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ledger", type=Path, required=True)
     parser.add_argument("--scores", type=Path, required=True)
+    parser.add_argument("--receipts", type=Path, required=False)
     parser.add_argument("--study-start", required=True)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument(
@@ -300,13 +301,23 @@ def main() -> None:
     now = datetime.now(UTC)
     start = _parse_utc(args.study_start)
     end = _parse_utc(args.study_end) if args.study_end else origin_at(now) + FOUR_HOURS
+    issued = _read_jsonl(args.ledger)
+    scores = _read_jsonl(args.scores)
     result = audit_shadow_ledgers(
-        _read_jsonl(args.ledger),
-        _read_jsonl(args.scores),
+        issued,
+        scores,
         study_start_utc=start,
         study_end_exclusive_utc=end,
         as_of_utc=now,
     )
+    if args.receipts is not None:
+        # Import here to avoid a module-level import cycle:
+        # publication receipts reuse _validate_forecast from this module.
+        from scripts.btc4h_publication_receipts import validate_receipts
+
+        result.update(
+            validate_receipts(issued, _read_jsonl(args.receipts), as_of_utc=now)
+        )
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(result, sort_keys=True))
