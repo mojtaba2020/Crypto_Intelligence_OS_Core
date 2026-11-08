@@ -6,8 +6,8 @@ set -euo pipefail
 
 phase="${1:-}"
 case "$phase" in
-  anchor|issue|score) ;;
-  *) echo "usage: publish_btc4h_shadow.sh {anchor|issue|score}" >&2; exit 2 ;;
+  anchor|issue|receipt|score) ;;
+  *) echo "usage: publish_btc4h_shadow.sh {anchor|issue|receipt|score}" >&2; exit 2 ;;
 esac
 data_branch="data/btc4h-shadow-forward"
 source_dir="${GITHUB_WORKSPACE:-$PWD}/research"
@@ -42,11 +42,12 @@ destination_path = Path(destination)
 anchor = "btc4h_study_start_utc.txt"
 forecast = "btc4h_shadow_forecasts.jsonl"
 scores = "btc4h_shadow_scores.jsonl"
+receipts = "btc4h_shadow_publication_receipts.jsonl"
 required = source_path / anchor
 if not required.is_file() or not required.read_text(encoding="utf-8").strip():
     raise SystemExit("study anchor missing; publishing forbidden")
 
-for name in (anchor, forecast, scores):
+for name in (anchor, forecast, receipts, scores):
     old = destination_path / name
     new = source_path / name
     historical = old.read_bytes() if old.exists() else b""
@@ -73,6 +74,8 @@ for name in (anchor, forecast, scores):
             raise SystemExit("forecast ledger changed outside issue phase")
         if name == scores and phase != "score" and historical != proposed:
             raise SystemExit("score ledger changed outside score phase")
+        if name == receipts and phase != "receipt" and historical != proposed:
+            raise SystemExit("publication receipt changed outside receipt phase")
     if phase == "anchor" and name != anchor and historical != proposed:
         raise SystemExit("anchor phase must not modify forecasts or scores")
     if proposed and historical != proposed:
