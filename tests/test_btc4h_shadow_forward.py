@@ -283,7 +283,6 @@ def test_fetch_finishing_after_window_must_not_issue(tmp_path, monkeypatch):
     assert result["newly_issued"] == 0
 
 
-
 def test_early_prefetch_waits_until_actual_issue_window_and_backup_dedupes(tmp_path, monkeypatch):
     origin, hourly, targets = _fixture()
     moment = [origin + timedelta(minutes=8, seconds=30)]
