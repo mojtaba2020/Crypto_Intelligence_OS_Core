@@ -284,9 +284,7 @@ def test_fetch_finishing_after_window_must_not_issue(tmp_path, monkeypatch):
 
 
 
-def test_early_prefetch_waits_until_actual_issue_window_and_backup_dedupes(
-    tmp_path, monkeypatch
-):
+def test_early_prefetch_waits_until_actual_issue_window_and_backup_dedupes(tmp_path, monkeypatch):
     origin, hourly, targets = _fixture()
     moment = [origin + timedelta(minutes=8, seconds=30)]
     calls = []
@@ -347,12 +345,8 @@ def test_computation_exceeding_deadline_cannot_backdate_issuance(tmp_path, monke
     origin, hourly, targets = _fixture()
     moment = [origin + timedelta(minutes=11)]
 
-    monkeypatch.setattr(
-        shadow, "fetch_public_hourly_close_volume", lambda *_args: hourly
-    )
-    monkeypatch.setattr(
-        shadow, "fetch_candles", lambda *_args, **_kwargs: targets
-    )
+    monkeypatch.setattr(shadow, "fetch_public_hourly_close_volume", lambda *_args: hourly)
+    monkeypatch.setattr(shadow, "fetch_candles", lambda *_args, **_kwargs: targets)
     original_calculation = shadow.calculate_issue
 
     def slow_calculation(**kwargs):
@@ -404,6 +398,7 @@ def test_early_attempt_that_fetches_too_slowly_is_not_backfilled(tmp_path, monke
 
 def test_one_minute_before_prefetch_makes_no_network_call(tmp_path, monkeypatch):
     origin, _hourly, _targets = _fixture()
+
     def forbidden(*_args, **_kwargs):
         pytest.fail("source fetch before S+8m")
 
