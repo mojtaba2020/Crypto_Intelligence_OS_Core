@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import subprocess
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,9 @@ if GIT is None or BASH is None:
     pytest.skip("requires local Git and Bash executables", allow_module_level=True)
 
 SCRIPT = Path(__file__).resolve().parents[1] / ".github/scripts/publish_btc4h_shadow.sh"
+CONFIRM_SCRIPT = (
+    Path(__file__).resolve().parents[1] / ".github/scripts/confirm_btc4h_publication.sh"
+)
 DATA_REF = "origin/data/btc4h-shadow-forward"
 
 
@@ -106,6 +110,15 @@ def test_anchor_is_saved_first_then_forecast_before_any_score(tmp_path):
     assert not (research / "btc4h_shadow_scores.jsonl").exists()
     assert _git(project, "rev-parse", "HEAD") == main_before
 
+    # Publication receipt is an independently committed append-only phase.
+    receipt = {"origin_utc": anchor, "remote_issue_commit_sha": "c" * 40}
+    (research / "btc4h_shadow_publication_receipts.jsonl").write_text(
+        json.dumps(receipt) + "\n", encoding="utf-8"
+    )
+    confirmed = _publish(project, env, "receipt")
+    assert confirmed.returncode == 0, confirmed.stderr
+    assert json.loads(_remote_file(project, "btc4h_shadow_publication_receipts.jsonl")) == receipt
+
     # A downstream scoring failure cannot erase the previously pushed issue.
     (research / "btc4h_shadow_scores.jsonl").write_text("invalid json\n", encoding="utf-8")
     corrupted = _publish(project, env, "score")
@@ -144,7 +157,7 @@ def test_cannot_rewrite_existing_forecast_or_study_start(tmp_path):
     assert "study anchor changed" in moved.stderr
 
 
-@pytest.mark.parametrize("phase", ["anchor", "score"])
+@pytest.mark.parametrize("phase", ["anchor", "receipt", "score"])
 def test_nonissue_phases_cannot_insert_a_forecast(tmp_path, phase):
     project, env = _repo(tmp_path)
     research = project / "research"
@@ -157,3 +170,68 @@ def test_nonissue_phases_cannot_insert_a_forecast(tmp_path, phase):
     assert (
         "must not modify forecasts" in attempted.stderr or "outside issue phase" in attempted.stderr
     )
+
+
+def test_score_phase_cannot_rewrite_a_published_receipt(tmp_path):
+    project, env = _repo(tmp_path)
+    research = project / "research"
+    anchor = "2026-11-08T12:00:00Z"
+    (research / "btc4h_study_start_utc.txt").write_text(anchor + "\n", encoding="utf-8")
+    assert _publish(project, env, "anchor").returncode == 0
+    (research / "btc4h_shadow_forecasts.jsonl").write_text('{"origin_utc":"A"}\n', encoding="utf-8")
+    assert _publish(project, env, "issue").returncode == 0
+    receipt_file = research / "btc4h_shadow_publication_receipts.jsonl"
+    receipt_file.write_text('{"origin_utc":"A"}\n', encoding="utf-8")
+    assert _publish(project, env, "receipt").returncode == 0
+
+    receipt_file.write_text('{"origin_utc":"FORGED"}\n', encoding="utf-8")
+    attempt = _publish(project, env, "score")
+    assert attempt.returncode != 0
+    assert "non-append-only" in attempt.stderr
+    assert json.loads(_remote_file(project, "btc4h_shadow_publication_receipts.jsonl")) == {
+        "origin_utc": "A"
+    }
+
+
+def _confirm(project: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(  # noqa: S603 -- local fake Git remote, no real GitHub actions
+        [BASH, str(CONFIRM_SCRIPT)],
+        cwd=project,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_confirm_script_rejects_changed_forecast_bytes_on_remote(tmp_path):
+    project, env = _repo(tmp_path)
+    research = project / "research"
+    (research / "btc4h_study_start_utc.txt").write_text("2026-11-08T12:00:00Z\n", encoding="utf-8")
+    assert _publish(project, env, "anchor").returncode == 0
+    target = (datetime.now(UTC) + timedelta(days=1)).isoformat().replace("+00:00", "Z")
+    forecast = {"origin_utc": "2026-11-08T12:00:00Z", "target_5m_close_utc": target}
+    ledger = research / "btc4h_shadow_forecasts.jsonl"
+    ledger.write_text(json.dumps(forecast) + "\n", encoding="utf-8")
+    assert _publish(project, env, "issue").returncode == 0
+
+    # Simulated tampering after the remote push must not get a new receipt.
+    ledger.write_text(json.dumps({**forecast, "fake_change": True}) + "\n", encoding="utf-8")
+    rejected = _confirm(project, env)
+    assert rejected.returncode != 0
+    assert "disagree" in rejected.stderr
+    assert not (research / "btc4h_shadow_publication_receipts.jsonl").exists()
+
+
+def test_confirm_script_fails_closed_on_already_matured_target(tmp_path):
+    project, env = _repo(tmp_path)
+    research = project / "research"
+    target = (datetime.now(UTC) - timedelta(seconds=1)).isoformat().replace("+00:00", "Z")
+    (research / "btc4h_shadow_forecasts.jsonl").write_text(
+        json.dumps({"origin_utc": "2026-11-08T12:00:00Z", "target_5m_close_utc": target}) + "\n",
+        encoding="utf-8",
+    )
+    result = _confirm(project, env)
+    assert result.returncode != 0
+    assert "target already closed" in result.stderr
+    assert not (research / "btc4h_shadow_publication_receipts.jsonl").exists()
