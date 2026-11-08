@@ -1,13 +1,13 @@
 # BOUNDED research-only first-light for Nov 8, 2026 UTC (NOT the BTC live system).
 # Pinned, already-tested code runs only on this single test date.
-# Two issue attempts at 16:08/16:11 UTC, one score-only observation after 20:15.
+# Prewarmed first attempt at 16:04, backup at 16:11 UTC; issue only after S+08m.
 # No market orders or permanent recurring 4h monitoring.
 name: BTC 4h first light — Nov 8 2026
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "8,11 16 8 11 *"
+    - cron: "4,11 16 8 11 *"
     - cron: "20 20 8 11 *"
 
 permissions:
@@ -89,6 +89,21 @@ jobs:
         run: python -m pip install -e .
       - name: Publish fixed first-attempt study anchor BEFORE reading outcomes
         run: bash .github/scripts/publish_btc4h_shadow.sh anchor
+      - name: Hold early startup until original S+08m permitted prefetch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import time
+          from datetime import UTC, datetime
+
+          start = datetime(2026, 11, 8, 16, 8, tzinfo=UTC)
+          remaining = (start - datetime.now(UTC)).total_seconds()
+          if remaining > 300:
+              raise SystemExit("Unexpectedly early runner; refusing long sleep")
+          if remaining > 0:
+              time.sleep(remaining)
+          PY
       - name: Attempt ON-TIME forecast issue ONLY (no older scoring dependency)
         id: issue_run
         continue-on-error: true
