@@ -34,7 +34,11 @@ def _git(directory: Path, *args: str) -> str:
 def _repo(tmp_path: Path) -> tuple[Path, dict[str, str]]:
     bare = tmp_path / "upstream.git"
     project = tmp_path / "project"
-    subprocess.run(  # noqa: S603 -- static local test fixture commands[GIT, "init", "--bare", str(bare)], check=True, capture_output=True)
+    subprocess.run(  # noqa: S603 -- local fake Git repository only
+        [GIT, "init", "--bare", str(bare)],
+        check=True,
+        capture_output=True,
+    )
     subprocess.run(  # noqa: S603 -- static local test fixture commands
         [GIT, "init", "-b", "main", str(project)],
         check=True,
