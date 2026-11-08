@@ -102,7 +102,7 @@ def test_remote_commit_mismatch_rejected_before_claiming_publication():
 def test_self_issued_future_timestamp_and_unvalidated_sha_are_rejected():
     altered = _issue()
     altered["issued_at_utc"] = iso(_stamp(14))
-    with pytest.raises(ValueError, match="issue|cutoff|invalid"):
+    with pytest.raises(ValueError, match=r"issue|cutoff|invalid"):
         make_issue_receipt(
             altered,
             remote_commit_sha="c" * 40,
@@ -144,7 +144,7 @@ def test_duplicate_orphan_and_late_claimed_receipts_fail_closed():
         validate_receipts([_issue()], [orphan], as_of_utc=_stamp(20))
     late = copy.deepcopy(good)
     late["first_party_remote_confirmed_at_utc"] = iso(_stamp(16 + 4 * 60))
-    with pytest.raises(ValueError, match="future-dated|pre-target"):
+    with pytest.raises(ValueError, match=r"future-dated|pre-target"):
         validate_receipts([_issue()], [late], as_of_utc=_stamp(20))
 
 
