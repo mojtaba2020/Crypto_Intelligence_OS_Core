@@ -235,7 +235,8 @@ def audit_shadow_ledgers(
     losses = {
         name: (
             math.fsum(row["absolute_log_price_errors"][name] for row in mappable) / len(mappable)
-            if mappable else None
+            if mappable
+            else None
         )
         for name in MODEL_NAMES
     }
@@ -251,9 +252,7 @@ def audit_shadow_ledgers(
         for row in mappable
         if row["direction_correct_if_nonflat"]["volume_interaction"] is not None
     ]
-    accuracy = (
-        100.0 * sum(x is True for x in nonflat) / len(nonflat) if nonflat else None
-    )
+    accuracy = 100.0 * sum(x is True for x in nonflat) / len(nonflat) if nonflat else None
     return {
         "status": "FIRST_PARTY_INTERNAL_AUDIT_ONLY",
         "version": VERSION,
