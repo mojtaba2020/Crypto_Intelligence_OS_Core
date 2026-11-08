@@ -193,7 +193,6 @@ def test_score_phase_cannot_rewrite_a_published_receipt(tmp_path):
     }
 
 
-
 def _confirm(project: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # noqa: S603 -- local fake Git remote, no real GitHub actions
         [BASH, str(CONFIRM_SCRIPT)],
@@ -208,9 +207,7 @@ def _confirm(project: Path, env: dict[str, str]) -> subprocess.CompletedProcess[
 def test_confirm_script_rejects_changed_forecast_bytes_on_remote(tmp_path):
     project, env = _repo(tmp_path)
     research = project / "research"
-    (research / "btc4h_study_start_utc.txt").write_text(
-        "2026-11-08T12:00:00Z\n", encoding="utf-8"
-    )
+    (research / "btc4h_study_start_utc.txt").write_text("2026-11-08T12:00:00Z\n", encoding="utf-8")
     assert _publish(project, env, "anchor").returncode == 0
     target = (datetime.now(UTC) + timedelta(days=1)).isoformat().replace("+00:00", "Z")
     forecast = {"origin_utc": "2026-11-08T12:00:00Z", "target_5m_close_utc": target}
@@ -231,8 +228,7 @@ def test_confirm_script_fails_closed_on_already_matured_target(tmp_path):
     research = project / "research"
     target = (datetime.now(UTC) - timedelta(seconds=1)).isoformat().replace("+00:00", "Z")
     (research / "btc4h_shadow_forecasts.jsonl").write_text(
-        json.dumps({"origin_utc": "2026-11-08T12:00:00Z", "target_5m_close_utc": target})
-        + "\n",
+        json.dumps({"origin_utc": "2026-11-08T12:00:00Z", "target_5m_close_utc": target}) + "\n",
         encoding="utf-8",
     )
     result = _confirm(project, env)
