@@ -106,6 +106,15 @@ def test_anchor_is_saved_first_then_forecast_before_any_score(tmp_path):
     assert not (research / "btc4h_shadow_scores.jsonl").exists()
     assert _git(project, "rev-parse", "HEAD") == main_before
 
+    # Publication receipt is an independently committed append-only phase.
+    receipt = {"origin_utc": anchor, "remote_issue_commit_sha": "c" * 40}
+    (research / "btc4h_shadow_publication_receipts.jsonl").write_text(
+        json.dumps(receipt) + "\n", encoding="utf-8"
+    )
+    confirmed = _publish(project, env, "receipt")
+    assert confirmed.returncode == 0, confirmed.stderr
+    assert json.loads(_remote_file(project, "btc4h_shadow_publication_receipts.jsonl")) == receipt
+
     # A downstream scoring failure cannot erase the previously pushed issue.
     (research / "btc4h_shadow_scores.jsonl").write_text("invalid json\n", encoding="utf-8")
     corrupted = _publish(project, env, "score")
@@ -144,7 +153,7 @@ def test_cannot_rewrite_existing_forecast_or_study_start(tmp_path):
     assert "study anchor changed" in moved.stderr
 
 
-@pytest.mark.parametrize("phase", ["anchor", "score"])
+@pytest.mark.parametrize("phase", ["anchor", "receipt", "score"])
 def test_nonissue_phases_cannot_insert_a_forecast(tmp_path, phase):
     project, env = _repo(tmp_path)
     research = project / "research"
@@ -157,3 +166,27 @@ def test_nonissue_phases_cannot_insert_a_forecast(tmp_path, phase):
     assert (
         "must not modify forecasts" in attempted.stderr or "outside issue phase" in attempted.stderr
     )
+
+
+
+def test_score_phase_cannot_rewrite_a_published_receipt(tmp_path):
+    project, env = _repo(tmp_path)
+    research = project / "research"
+    anchor = "2026-11-08T12:00:00Z"
+    (research / "btc4h_study_start_utc.txt").write_text(anchor + "\n", encoding="utf-8")
+    assert _publish(project, env, "anchor").returncode == 0
+    (research / "btc4h_shadow_forecasts.jsonl").write_text(
+        '{"origin_utc":"A"}\n', encoding="utf-8"
+    )
+    assert _publish(project, env, "issue").returncode == 0
+    receipt_file = research / "btc4h_shadow_publication_receipts.jsonl"
+    receipt_file.write_text('{"origin_utc":"A"}\n', encoding="utf-8")
+    assert _publish(project, env, "receipt").returncode == 0
+
+    receipt_file.write_text('{"origin_utc":"FORGED"}\n', encoding="utf-8")
+    attempt = _publish(project, env, "score")
+    assert attempt.returncode != 0
+    assert "non-append-only" in attempt.stderr
+    assert json.loads(_remote_file(project, "btc4h_shadow_publication_receipts.jsonl")) == {
+        "origin_utc": "A"
+    }
