@@ -1,0 +1,29 @@
+{
+  "first_party_not_independent_timestamp": true,
+  "five_minute_history_received_at_utc": "2026-11-08T15:00:34.181027Z",
+  "hourly_received_at_utc": "2026-11-08T15:00:30.607548Z",
+  "issued_at_utc": "2026-11-08T15:00:34.189279Z",
+  "kind": "DISTINCT_9AM_OFF_GRID_LIVE_PILOT_NOT_OFFICIAL_4H_STUDY",
+  "mature_historical_training_examples": 59,
+  "model_source_sha": "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9",
+  "no_trades": true,
+  "off_grid_origin_vs_official_study": true,
+  "origin_reference_close_usd": 75936.1,
+  "origin_utc": "2026-11-08T15:00:00Z",
+  "price_forecasts_usd": {
+    "persistence": 75936.1,
+    "price_only": 75861.53333631733,
+    "price_plus_volume": 75862.4480217177,
+    "volume_interaction": 75863.17135622336
+  },
+  "research_only": true,
+  "return_forecasts": {
+    "persistence": 0.0,
+    "price_only": -0.0009824483826456232,
+    "price_plus_volume": -0.000970391153561758,
+    "volume_interaction": -0.0009608563827215775
+  },
+  "source": "Coinbase Exchange BTC-USD hourly OHLCV and 5m closed targets",
+  "target_5m_close_utc": "2026-11-08T19:15:00Z",
+  "target_5m_open_utc": "2026-11-08T19:10:00Z"
+}
