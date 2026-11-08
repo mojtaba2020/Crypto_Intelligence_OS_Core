@@ -302,7 +302,11 @@ def run_once(
         raise ValueError("duplicate issued forecast origin in persistent ledger")
     current_origin = iso(origin_at(before))
     issued: dict[str, Any] | None = None
-    status = "MISSED_ISSUE_WINDOW"
+    status = (
+        "NOT_YET_PREFETCH_WINDOW"
+        if before < origin_at(before) + timedelta(minutes=EARLIEST_PREFETCH_MINUTE)
+        else "MISSED_ISSUE_WINDOW"
+    )
     if (VERSION, current_origin) in keys:
         status = "ALREADY_ISSUED"
     elif in_prefetch_window(before):
