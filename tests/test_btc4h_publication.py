@@ -12,7 +12,6 @@ from pathlib import Path
 
 import pytest
 
-
 GIT = shutil.which("git")
 BASH = shutil.which("bash")
 if GIT is None or BASH is None:
