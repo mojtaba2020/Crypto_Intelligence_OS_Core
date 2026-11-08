@@ -1,0 +1,9 @@
+{
+  "forecast_file_sha256": "7baeafe95312239e87ac99e3fded750aab61112f14851ca226ffac0cade9670d",
+  "kind": "FIRST_PARTY_REMOTE_GIT_RECEIPT_NOT_INDEPENDENT_TIME_WITNESS",
+  "origin_utc": "2026-11-08T15:00:00Z",
+  "remote_confirmation_utc": "2026-11-08T15:00:36.008236Z",
+  "remote_forecast_commit": "96f8873fae5e7c1c45117d609b31d89956bde4cb",
+  "research_only": true,
+  "target_close_utc": "2026-11-08T19:15:00Z"
+}
