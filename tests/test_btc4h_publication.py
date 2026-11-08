@@ -114,9 +114,7 @@ def test_anchor_is_saved_first_then_forecast_before_any_score(tmp_path):
     assert json.loads(_remote_file(project, "btc4h_shadow_forecasts.jsonl")) == forecast
 
     score = {"origin_utc": anchor, "absolute_log_price_errors": {"persistence": 0.005}}
-    (research / "btc4h_shadow_scores.jsonl").write_text(
-        json.dumps(score) + "\n", encoding="utf-8"
-    )
+    (research / "btc4h_shadow_scores.jsonl").write_text(json.dumps(score) + "\n", encoding="utf-8")
     valid = _publish(project, env, "score")
     assert valid.returncode == 0, valid.stderr
     assert json.loads(_remote_file(project, "btc4h_shadow_scores.jsonl")) == score
@@ -137,9 +135,7 @@ def test_cannot_rewrite_existing_forecast_or_study_start(tmp_path):
     changed = _publish(project, env, "issue")
     assert changed.returncode != 0
     assert "non-append-only" in changed.stderr
-    assert json.loads(_remote_file(project, "btc4h_shadow_forecasts.jsonl")) == {
-        "origin_utc": "A"
-    }
+    assert json.loads(_remote_file(project, "btc4h_shadow_forecasts.jsonl")) == {"origin_utc": "A"}
 
     ledger.write_text('{"origin_utc":"A"}\n', encoding="utf-8")
     anchor_file.write_text("2026-11-09T00:00:00Z\n", encoding="utf-8")
@@ -152,15 +148,12 @@ def test_cannot_rewrite_existing_forecast_or_study_start(tmp_path):
 def test_nonissue_phases_cannot_insert_a_forecast(tmp_path, phase):
     project, env = _repo(tmp_path)
     research = project / "research"
-    (research / "btc4h_study_start_utc.txt").write_text(
-        "2026-11-08T12:00:00Z\n", encoding="utf-8"
-    )
+    (research / "btc4h_study_start_utc.txt").write_text("2026-11-08T12:00:00Z\n", encoding="utf-8")
     (research / "btc4h_shadow_forecasts.jsonl").write_text(
         '{"origin_utc":"unscheduled"}\n', encoding="utf-8"
     )
     attempted = _publish(project, env, phase)
     assert attempted.returncode != 0
     assert (
-        "must not modify forecasts" in attempted.stderr
-        or "outside issue phase" in attempted.stderr
+        "must not modify forecasts" in attempted.stderr or "outside issue phase" in attempted.stderr
     )
