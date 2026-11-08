@@ -414,7 +414,6 @@ def test_one_minute_before_prefetch_makes_no_network_call(tmp_path, monkeypatch)
     assert result["newly_issued"] == 0
 
 
-
 def test_separate_issue_and_score_phases_keep_forecast_safe(tmp_path, monkeypatch):
     origin, hourly, targets = _fixture()
     calls = []
@@ -482,15 +481,10 @@ def test_unknown_phase_is_rejected_before_market_access(tmp_path, monkeypatch):
         )
 
 
-
 def test_corrupt_prior_score_cannot_erase_new_issue(tmp_path, monkeypatch):
     origin, hourly, targets = _fixture()
-    monkeypatch.setattr(
-        shadow, "fetch_public_hourly_close_volume", lambda *_args: hourly
-    )
-    monkeypatch.setattr(
-        shadow, "fetch_candles", lambda *_args, **_kwargs: targets
-    )
+    monkeypatch.setattr(shadow, "fetch_public_hourly_close_volume", lambda *_args: hourly)
+    monkeypatch.setattr(shadow, "fetch_candles", lambda *_args, **_kwargs: targets)
     ledger = tmp_path / "issued.jsonl"
     scores = tmp_path / "corrupt_scores.jsonl"
     scores.write_text("not-json\n", encoding="utf-8")
