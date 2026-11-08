@@ -1,0 +1,31 @@
+{
+  "absolute_log_price_errors": {
+    "persistence": 0.0024058331175334006,
+    "price_only": 0.0014233847348878485,
+    "price_plus_volume": 0.0014354419639719125,
+    "volume_interaction": 0.0014449767348118233
+  },
+  "actual_btc_usd_close": 75753.63,
+  "confirmed_remote_before_target_utc": "2026-11-08T15:00:36.008236Z",
+  "direction_correct_if_nonflat": {
+    "persistence": null,
+    "price_only": true,
+    "price_plus_volume": true,
+    "volume_interaction": true
+  },
+  "issued_at_utc": "2026-11-08T15:00:34.189279Z",
+  "kind": "POST_TARGET_SCORE_OF_PRECOMMITTED_9AM_OFFGRID_RESEARCH_PILOT",
+  "no_trades": true,
+  "one_observation_not_statistical_evidence_of_alpha": true,
+  "origin_utc": "2026-11-08T15:00:00Z",
+  "outcome_observed_at_utc": "2026-11-08T22:57:52.018634Z",
+  "price_forecasts_usd": {
+    "persistence": 75936.1,
+    "price_only": 75861.53333631733,
+    "price_plus_volume": 75862.4480217177,
+    "volume_interaction": 75863.17135622336
+  },
+  "reference_close_usd": 75936.1,
+  "target_5m_bar_close_utc": "2026-11-08T19:15:00Z",
+  "volume_interaction_gain_vs_persistence_pct": 39.938613186383556
+}
