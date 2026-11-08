@@ -315,9 +315,7 @@ def main() -> None:
         # publication receipts reuse _validate_forecast from this module.
         from scripts.btc4h_publication_receipts import validate_receipts
 
-        result.update(
-            validate_receipts(issued, _read_jsonl(args.receipts), as_of_utc=now)
-        )
+        result.update(validate_receipts(issued, _read_jsonl(args.receipts), as_of_utc=now))
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(result, sort_keys=True))
