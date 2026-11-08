@@ -35,9 +35,7 @@ def _issue():
         "target_5m_bar_open_utc": iso(origin + timedelta(hours=4, minutes=10)),
         "target_5m_close_utc": iso(origin + timedelta(hours=4, minutes=15)),
         "origin_reference_close_usd": reference,
-        "price_forecasts_usd": {
-            name: reference * math.exp(returns[name]) for name in MODEL_NAMES
-        },
+        "price_forecasts_usd": {name: reference * math.exp(returns[name]) for name in MODEL_NAMES},
         "return_forecasts": returns,
         "mature_historical_training_examples": 59,
         "source_hourly_digest_sha256": "a" * 64,
