@@ -38,6 +38,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [ "$(date -u +%Y-%m-%d)" != "2026-11-08" ]; then
+            echo "2026 pilot expired; no score run." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$(date -u +%s)" -le "$(date -u -d '2026-11-08 19:15:00 UTC' +%s)" ]; then
+            echo "Real target not yet closed; skipping without any score or market download." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           BRANCH="data/btc4h-nineam-pilot-20261108"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
