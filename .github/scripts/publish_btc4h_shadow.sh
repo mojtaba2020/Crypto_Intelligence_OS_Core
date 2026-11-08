@@ -32,6 +32,7 @@ mkdir -p "$work_tree/research"
 # Validate local content against the LAST PUBLISHED server branch: no row
 # removal, edits or rearrangement of previous forecast/score records.
 python - "$phase" "$source_dir" "$work_tree/research" <<'PY'
+import json
 import sys
 from pathlib import Path
 
@@ -60,6 +61,14 @@ for name in (anchor, forecast, scores):
             raise SystemExit(f"non-append-only modification to {name}")
         if proposed and not proposed.endswith(b"\n"):
             raise SystemExit(f"truncated JSONL record in {name}")
+        if proposed:
+            for line in proposed.splitlines():
+                try:
+                    row = json.loads(line)
+                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise SystemExit(f"invalid JSONL row in {name}: {exc}") from exc
+                if not isinstance(row, dict):
+                    raise SystemExit(f"nonobject JSONL row in {name}")
         if name == forecast and phase != "issue" and historical != proposed:
             raise SystemExit("forecast ledger changed outside issue phase")
         if name == scores and phase != "score" and historical != proposed:
