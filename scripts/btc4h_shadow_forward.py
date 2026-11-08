@@ -284,12 +284,15 @@ def run_once(
     code_sha: str = "local-research",
     clock: Callable[[], datetime] | None = None,
     sleeper: Callable[[float], None] | None = None,
+    phase: str = "both",
 ) -> dict[str, Any]:
     """One invocation: issue in the on-time slot, then score matured older rows.
 
     No backfilling missed origins. Missed slots are explicit, not fake forecasts.
     External runner/commit times are not independent third-party attestation.
     """
+    if phase not in ("issue", "score", "both"):
+        raise ValueError("phase must be issue, score or both")
     get_time = clock if clock is not None else lambda: datetime.now(UTC)
     sleep_for = sleeper if sleeper is not None else time.sleep
     before = get_time()
@@ -305,7 +308,9 @@ def run_once(
         if before < origin_at(before) + timedelta(minutes=EARLIEST_PREFETCH_MINUTE)
         else "MISSED_ISSUE_WINDOW"
     )
-    if (VERSION, current_origin) in keys:
+    if phase == "score":
+        status = "SCORE_ONLY"
+    elif (VERSION, current_origin) in keys:
         status = "ALREADY_ISSUED"
     elif in_prefetch_window(before):
         origin = origin_at(before)
@@ -350,14 +355,16 @@ def run_once(
                 issued = candidate
                 status = "ISSUED_BEFORE_TARGET"
                 existing.append(issued)
-    previous_scores = _read_jsonl(score_ledger)
+    # An old malformed score must NEVER block publication of a fresh issue.
+    # The separate score phase will still fail closed on that corrupt ledger.
+    previous_scores = _read_jsonl(score_ledger) if phase != "issue" else []
     scored_keys = [(r["version"], r["origin_utc"]) for r in previous_scores]
     if len(scored_keys) != len(set(scored_keys)):
         raise ValueError("duplicate score origin")
     scored_set = set(scored_keys)
     newly_scored = 0
     overdue_unavailable = 0
-    for row in existing:
+    for row in existing if phase != "issue" else ():
         key = (row["version"], row["origin_utc"])
         if key in scored_set:
             continue
@@ -383,6 +390,7 @@ def run_once(
 
     result = {
         "research_status": status,
+        "phase": phase,
         "observed_run_at_utc": iso(before),
         "newly_issued": 1 if issued else 0,
         "newly_scored": newly_scored,
@@ -408,6 +416,7 @@ def main() -> None:
     parser.add_argument("--score-ledger", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--code-sha", default="local-research")
+    parser.add_argument("--phase", choices=("issue", "score", "both"), default="both")
     args = parser.parse_args()
     print(
         json.dumps(
@@ -416,6 +425,7 @@ def main() -> None:
                 score_ledger=args.score_ledger,
                 report=args.report,
                 code_sha=args.code_sha,
+                phase=args.phase,
             ),
             sort_keys=True,
         )

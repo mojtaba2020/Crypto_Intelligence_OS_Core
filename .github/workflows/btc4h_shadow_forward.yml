@@ -66,12 +66,28 @@ jobs:
           cat research/btc4h_study_start_utc.txt
       - name: Install existing research engine
         run: python -m pip install -e .
-      - name: Try ON-TIME issue and score only already-mature outcomes
+      - name: Publish fixed first-attempt study anchor BEFORE reading outcomes
+        run: bash .github/scripts/publish_btc4h_shadow.sh anchor
+      - name: Attempt ON-TIME forecast issue ONLY (no older scoring dependency)
+        id: issue_run
+        continue-on-error: true
         run: |
           python -m scripts.btc4h_shadow_forward \
+            --phase issue \
             --ledger research/btc4h_shadow_forecasts.jsonl \
             --score-ledger research/btc4h_shadow_scores.jsonl \
-            --report .research/btc4h_shadow_run_report.json \
+            --report .research/btc4h_shadow_issue_report.json \
+            --code-sha "$GITHUB_SHA"
+      - name: Publish new forecast to Git BEFORE scoring any older targets
+        if: steps.issue_run.outcome == 'success'
+        run: bash .github/scripts/publish_btc4h_shadow.sh issue
+      - name: Score only previously issued and now-matured targets
+        run: |
+          python -m scripts.btc4h_shadow_forward \
+            --phase score \
+            --ledger research/btc4h_shadow_forecasts.jsonl \
+            --score-ledger research/btc4h_shadow_scores.jsonl \
+            --report .research/btc4h_shadow_score_report.json \
             --code-sha "$GITHUB_SHA"
       - name: Audit ALL scheduled slots and re-evaluate every stored score
         shell: bash
@@ -90,18 +106,20 @@ jobs:
           import os
           from pathlib import Path
 
-          report = json.loads(Path(".research/btc4h_shadow_run_report.json").read_text())
+          issue_path = Path(".research/btc4h_shadow_issue_report.json")
+          issue = json.loads(issue_path.read_text()) if issue_path.exists() else {}
+          scores = json.loads(Path(".research/btc4h_shadow_score_report.json").read_text())
           audit = json.loads(Path(".research/btc4h_shadow_audit_report.json").read_text())
           lines = [
               "## BTC 4h true forward-only shadow study",
               "",
               "**No late-origin backfill, no live trading and no validated predictive alpha.**",
-              f"- On-time issuance status: {report['research_status']}",
-              f"- Newly issued this run: {report['newly_issued']}",
-              f"- Started with S+8..10m early prefetch: {report['early_prefetch_started']}",
-              f"- Newly matured scores: {report['newly_scored']}",
-              f"- Total issued / scored: {report['total_issued']} / {report['total_scored']}",
-              f"- Overdue target bars unavailable: {report['overdue_targets_unavailable_in_api_window']}",
+              f"- On-time issuance status: {issue.get('research_status', 'ISSUE_PHASE_FAILED')}",
+              f"- Newly issued this run: {issue.get('newly_issued', 0)}",
+              f"- Started with S+8..10m early prefetch: {issue.get('early_prefetch_started', False)}",
+              f"- Newly matured scores: {scores['newly_scored']}",
+              f"- Total issued / scored: {scores['total_issued']} / {scores['total_scored']}",
+              f"- Overdue target bars unavailable: {scores['overdue_targets_unavailable_in_api_window']}",
               f"- Due scheduled origins / issued / missed: {audit['finalized_issue_slots']} / {audit['issued_in_finalized_slots']} / {audit['missed_finalized_slots']}",
               f"- Forecast issue coverage of due slots: {audit['issue_delivery_rate_pct']}%",
               f"- Matured not scored: {audit['unscored_matured_origins']}",
@@ -112,48 +130,21 @@ jobs:
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as output:
               output.write("\n".join(lines) + "\n")
           PY
-      - name: Save ONLY the new forward ledgers to a separate Git branch
-        shell: bash
+      - name: Publish matured scores (forecasts already separately committed)
+        run: bash .github/scripts/publish_btc4h_shadow.sh score
+      - name: Surface failed issue attempt without discarding already-published scores
+        if: steps.issue_run.outcome == 'failure'
         run: |
-          set -euo pipefail
-          DATA_BRANCH="data/btc4h-shadow-forward"
-          mkdir -p "$RUNNER_TEMP/forward-ledgers"
-          for file in btc4h_shadow_forecasts.jsonl btc4h_shadow_scores.jsonl btc4h_study_start_utc.txt; do
-            if [ -f "research/$file" ]; then
-              cp "research/$file" "$RUNNER_TEMP/forward-ledgers/$file"
-              rm -f "research/$file"
-            fi
-          done
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git show-ref --verify --quiet "refs/remotes/origin/$DATA_BRANCH"; then
-            git switch -C "$DATA_BRANCH" "origin/$DATA_BRANCH"
-          else
-            git switch -c "$DATA_BRANCH"
-          fi
-
-          mkdir -p research
-          for file in btc4h_shadow_forecasts.jsonl btc4h_shadow_scores.jsonl btc4h_study_start_utc.txt; do
-            if [ -f "$RUNNER_TEMP/forward-ledgers/$file" ]; then
-              cp "$RUNNER_TEMP/forward-ledgers/$file" "research/$file"
-              git add "research/$file"
-            fi
-          done
-          if ! git diff --cached --quiet; then
-            git commit -m "Record forward-issued 4h BTC shadow research (run $GITHUB_RUN_ID)"
-            git push origin "HEAD:refs/heads/$DATA_BRANCH"
-            echo "New shadow evidence committed on branch: $DATA_BRANCH" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "No new forward evidence; nothing backfilled." >> "$GITHUB_STEP_SUMMARY"
-          fi
+          echo "On-time issue attempt failed; no forecast backfilled." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
       - name: Upload one-run report for audit of skipped slots too
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: btc4h-forward-shadow-run
           path: |
-            .research/btc4h_shadow_run_report.json
+            .research/btc4h_shadow_issue_report.json
+            .research/btc4h_shadow_score_report.json
             .research/btc4h_shadow_audit_report.json
           if-no-files-found: warn
           retention-days: 30
