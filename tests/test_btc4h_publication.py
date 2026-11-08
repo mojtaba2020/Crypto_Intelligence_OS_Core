@@ -6,19 +6,25 @@ real publication is triggered during this test.
 
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
 
+GIT = shutil.which("git")
+BASH = shutil.which("bash")
+if GIT is None or BASH is None:
+    pytest.skip("requires local Git and Bash executables", allow_module_level=True)
+
 SCRIPT = Path(__file__).resolve().parents[1] / ".github/scripts/publish_btc4h_shadow.sh"
 DATA_REF = "origin/data/btc4h-shadow-forward"
 
 
 def _git(directory: Path, *args: str) -> str:
-    return subprocess.run(
-        ["git", "-C", str(directory), *args],
+    return subprocess.run(  # noqa: S603 -- static local test fixture commands
+        [GIT, "-C", str(directory), *args],
         check=True,
         capture_output=True,
         text=True,
@@ -28,9 +34,9 @@ def _git(directory: Path, *args: str) -> str:
 def _repo(tmp_path: Path) -> tuple[Path, dict[str, str]]:
     bare = tmp_path / "upstream.git"
     project = tmp_path / "project"
-    subprocess.run(["git", "init", "--bare", str(bare)], check=True, capture_output=True)
-    subprocess.run(
-        ["git", "init", "-b", "main", str(project)],
+    subprocess.run(  # noqa: S603 -- static local test fixture commands[GIT, "init", "--bare", str(bare)], check=True, capture_output=True)
+    subprocess.run(  # noqa: S603 -- static local test fixture commands
+        [GIT, "init", "-b", "main", str(project)],
         check=True,
         capture_output=True,
     )
@@ -55,8 +61,8 @@ def _repo(tmp_path: Path) -> tuple[Path, dict[str, str]]:
 
 
 def _publish(project: Path, env: dict[str, str], phase: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["bash", str(SCRIPT), phase],
+    return subprocess.run(  # noqa: S603 -- static local test fixture commands
+        [BASH, str(SCRIPT), phase],
         cwd=project,
         env=env,
         capture_output=True,
@@ -151,4 +157,7 @@ def test_nonissue_phases_cannot_insert_a_forecast(tmp_path, phase):
     )
     attempted = _publish(project, env, phase)
     assert attempted.returncode != 0
-    assert "must not modify forecasts" in attempted.stderr or "outside issue phase" in attempted.stderr
+    assert (
+        "must not modify forecasts" in attempted.stderr
+        or "outside issue phase" in attempted.stderr
+    )
