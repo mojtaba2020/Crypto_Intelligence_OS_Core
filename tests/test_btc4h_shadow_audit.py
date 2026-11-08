@@ -136,9 +136,7 @@ def test_wrong_target_and_source_after_issue_rejected():
     with pytest.raises(ValueError, match="outcome interval"):
         audit_shadow_ledgers([bad], [], **params)
     bad = copy.deepcopy(first)
-    bad["hourly_data_collected_at_utc"] = iso(
-        params["study_start_utc"] + timedelta(minutes=14)
-    )
+    bad["hourly_data_collected_at_utc"] = iso(params["study_start_utc"] + timedelta(minutes=14))
     with pytest.raises(ValueError, match="source timestamp"):
         audit_shadow_ledgers([bad], [], **params)
 
