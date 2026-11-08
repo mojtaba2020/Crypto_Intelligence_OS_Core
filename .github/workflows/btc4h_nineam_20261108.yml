@@ -1,0 +1,203 @@
+# One-time off-grid 9am Houston BTC4h research-only pilot.
+# Not part of the official 16:00 UTC predeclared study.
+name: BTC4h 9am Houston off-grid first forecast — Nov 8
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/btc4h_nineam_20261108.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: btc4h-nineam-single-experiment
+  cancel-in-progress: false
+
+jobs:
+  issue-nineam:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - name: Checkout pinned four-model research engine, not main market system
+        uses: actions/checkout@v7
+        with:
+          ref: "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9"
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Install research engine
+        run: python -m pip install -e .
+      - name: Issue genuine off-grid 09:00 Houston 4h prediction
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p research
+          python - <<'PY'
+          import json
+          import math
+          import time
+          from datetime import UTC, datetime, timedelta
+          from pathlib import Path
+
+          import scripts.btc4h_shadow_forward as four
+          from scripts.alpha_coinbase_historical_replay import fetch_candles, iso
+          from scripts.alpha_volume_historical_replay import fetch_public_hourly_close_volume
+          from scripts.alpha_volume_confirmation import volume_confirmation_features, _interaction_residual
+          from scripts.alpha_interaction_candidate import _independent_interaction_projection
+          from crypto_intelligence_os.hybrid_forecasting import _fit, _estimate
+
+          origin = datetime(2026, 11, 8, 15, 0, tzinfo=UTC)
+          now = datetime.now(UTC)
+          if now.date() != origin.date() or now > origin + timedelta(minutes=8):
+              raise SystemExit("9AM_PILOT_MISSED: refuse retrospective prediction")
+          if now < origin + timedelta(seconds=30):
+              delay = (origin + timedelta(seconds=30) - now).total_seconds()
+              if delay > 300:
+                  raise SystemExit("Unexpectedly early 9am pilot")
+              time.sleep(delay)
+          if datetime.now(UTC) > origin + timedelta(minutes=8):
+              raise SystemExit("9AM_PILOT_MISSED_AFTER_WAIT")
+          hourly = fetch_public_hourly_close_volume(
+              origin - timedelta(days=10, hours=25), origin
+          )
+          read_hourly = datetime.now(UTC)
+          targets = fetch_candles(
+              origin - timedelta(days=10) + timedelta(hours=4, minutes=10),
+              origin - timedelta(hours=8) + timedelta(hours=4, minutes=15),
+              granularity=300
+          )
+          read_targets = datetime.now(UTC)
+          issued = datetime.now(UTC)
+          if not origin <= issued <= origin + timedelta(minutes=8):
+              raise SystemExit("9AM_PILOT_MISSED_AFTER_DOWNLOAD")
+          recent = four._bars(hourly, origin, read_hourly)
+          if recent is None:
+              raise SystemExit("9AM_PILOT_MISSING_RECENT_CLOSED_HOURLY_BARS")
+          candidate_features = volume_confirmation_features(recent, issued_at_utc=issued)
+          training = []
+          cursor = origin - timedelta(days=10)
+          while cursor <= origin - timedelta(hours=8):
+              bars = four._bars(hourly, cursor, read_hourly)
+              target_open = cursor + timedelta(hours=4, minutes=10)
+              if bars is not None and target_open in targets:
+                  x = volume_confirmation_features(bars, issued_at_utc=issued)
+                  training.append((x, math.log(targets[target_open] / bars[-1].close_usd)))
+              cursor += timedelta(hours=4)
+          if len(training) < 30:
+              raise SystemExit(f"9AM_PILOT_INSUFFICIENT_TRAINING_{len(training)}")
+          projection, enabled = _independent_interaction_projection(training)
+          full = [
+              ((m, v, _interaction_residual(m, v, z, projection, enabled)), y)
+              for (m, v, z), y in training
+          ]
+          additive = [((m, v), y) for (m, v, _), y in training]
+          momentum = [((m,), y) for (m, _, _), y in training]
+          m, v, z = candidate_features
+          predicted_returns = {
+              "volume_interaction": _estimate(
+                  *_fit(full, ridge=100.0),
+                  (m, v, _interaction_residual(m, v, z, projection, enabled)),
+              ),
+              "price_plus_volume": _estimate(*_fit(additive, ridge=100.0), (m, v)),
+              "price_only": _estimate(*_fit(momentum, ridge=100.0), (m,)),
+              "persistence": 0.0,
+          }
+          if any(not math.isfinite(ret) or abs(ret) >= 0.5 for ret in predicted_returns.values()):
+              raise SystemExit("9AM_PILOT_INVALID_PROJECTION")
+          reference = recent[-1].close_usd
+          prices = {key: reference * math.exp(value) for key, value in predicted_returns.items()}
+          recorded_at = datetime.now(UTC)
+          if recorded_at > origin + timedelta(minutes=8):
+              raise SystemExit("9AM_PILOT_TOO_LATE_TO_RECORD")
+          forecast = {
+              "kind": "DISTINCT_9AM_OFF_GRID_LIVE_PILOT_NOT_OFFICIAL_4H_STUDY",
+              "source": "Coinbase Exchange BTC-USD hourly OHLCV and 5m closed targets",
+              "origin_utc": iso(origin),
+              "issued_at_utc": iso(recorded_at),
+              "hourly_received_at_utc": iso(read_hourly),
+              "five_minute_history_received_at_utc": iso(read_targets),
+              "target_5m_open_utc": iso(origin + timedelta(hours=4, minutes=10)),
+              "target_5m_close_utc": iso(origin + timedelta(hours=4, minutes=15)),
+              "origin_reference_close_usd": reference,
+              "price_forecasts_usd": prices,
+              "return_forecasts": predicted_returns,
+              "mature_historical_training_examples": len(training),
+              "model_source_sha": "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9",
+              "off_grid_origin_vs_official_study": True,
+              "first_party_not_independent_timestamp": True,
+              "research_only": True,
+              "no_trades": True,
+          }
+          Path("research/btc4h_9am_pilot_forecast.json").write_text(
+              json.dumps(forecast, sort_keys=True, indent=2) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(forecast, sort_keys=True))
+          PY
+
+      - name: Publish original forecast BEFORE target closes and verify Git content
+        shell: bash
+        run: |
+          set -euo pipefail
+          BRANCH="data/btc4h-nineam-pilot-20261108"
+          FILE="research/btc4h_9am_pilot_forecast.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+          test "$(git show "origin/$BRANCH:research/btc4h_9am_pilot_start_utc.txt")" = "2026-11-08T15:00:00Z"
+          w="$(mktemp -d "${RUNNER_TEMP:-/tmp}/nineam.XXXXXX")"
+          trap 'git worktree remove --force "$w" >/dev/null 2>&1 || true; rmdir "$w" >/dev/null 2>&1 || true' EXIT
+          git worktree add --detach "$w" "origin/$BRANCH"
+          test ! -f "$w/$FILE"
+          cp "$FILE" "$w/$FILE"
+          git -C "$w" add "$FILE"
+          git -C "$w" commit -m "BTC4h REAL off-grid 9am forecast — Nov 8 before outcome"
+          git -C "$w" push origin "HEAD:refs/heads/$BRANCH"
+          remote="$(git ls-remote origin "refs/heads/$BRANCH" | awk '{print $1}')"
+          git fetch origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+          test "$remote" = "$(git rev-parse "refs/remotes/origin/$BRANCH")"
+          git show "$remote:$FILE" | cmp - "$FILE"
+          python - "$FILE" "$w/research/btc4h_9am_pilot_receipt.json" "$remote" <<'PY'
+          import hashlib
+          import json
+          import sys
+          from datetime import UTC, datetime
+
+          from scripts.alpha_coinbase_historical_replay import iso
+
+          forecast_file, receipt_file, verified_remote_sha = sys.argv[1:]
+          forecast = json.load(open(forecast_file, encoding="utf-8"))
+          confirm = datetime.now(UTC)
+          target_close = datetime.fromisoformat(forecast["target_5m_close_utc"].replace("Z", "+00:00"))
+          if confirm >= target_close:
+              raise SystemExit("REMOTE_CONFIRMED_TOO_LATE")
+          original = open(forecast_file, "rb").read()
+          receipt = {
+              "kind": "FIRST_PARTY_REMOTE_GIT_RECEIPT_NOT_INDEPENDENT_TIME_WITNESS",
+              "origin_utc": forecast["origin_utc"],
+              "remote_confirmation_utc": iso(confirm),
+              "remote_forecast_commit": verified_remote_sha,
+              "forecast_file_sha256": hashlib.sha256(original).hexdigest(),
+              "target_close_utc": forecast["target_5m_close_utc"],
+              "research_only": True,
+          }
+          open(receipt_file, "w", encoding="utf-8").write(json.dumps(receipt, sort_keys=True, indent=2)+"\n")
+          print(json.dumps(receipt, sort_keys=True))
+          PY
+          git -C "$w" add research/btc4h_9am_pilot_receipt.json
+          git -C "$w" commit -m "BTC4h 9am pilot remote confirmation receipt"
+          git -C "$w" push origin "HEAD:refs/heads/$BRANCH"
+          echo "REAL OFF-GRID 9AM FORECAST PUBLISHED: SHA $remote" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload run artifacts even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc4h-nineam-houston-attempt
+          path: research/btc4h_9am_pilot_forecast.json
+          if-no-files-found: warn
+          retention-days: 14
