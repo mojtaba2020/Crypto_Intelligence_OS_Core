@@ -5,7 +5,6 @@ import math
 from datetime import UTC, datetime, timedelta
 
 import pytest
-
 from scripts.btc4h_shadow_audit import audit_shadow_ledgers
 from scripts.btc4h_shadow_forward import MODEL_NAMES, VERSION, calculate_score, iso
 
