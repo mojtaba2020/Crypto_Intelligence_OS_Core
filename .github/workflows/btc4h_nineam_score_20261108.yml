@@ -1,0 +1,144 @@
+# 9am Houston pilot: score after the future 19:10-19:15 UTC BTC-USD bar closes.
+# This off-grid pilot is separate from the official 16:00 UTC prospective study.
+name: BTC4h 9am Houston pilot — actual future outcome
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/btc4h_nineam_score_20261108.yml"
+  schedule:
+    - cron: "20,35 19 8 11 *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: btc4h-nineam-pilot-score-only
+  cancel-in-progress: false
+
+jobs:
+  score-fixed-issue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Read immutable pinned research code
+        uses: actions/checkout@v7
+        with:
+          ref: "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9"
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Use Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Install public market research dependencies
+        run: python -m pip install -e .
+      - name: Score only AFTER fixed target close; validate forecast Git receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          BRANCH="data/btc4h-nineam-pilot-20261108"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+          w="$(mktemp -d "${RUNNER_TEMP:-/tmp}/nineam-score.XXXXXX")"
+          trap 'git worktree remove --force "$w" >/dev/null 2>&1 || true; rmdir "$w" >/dev/null 2>&1 || true' EXIT
+          git worktree add --detach "$w" "origin/$BRANCH"
+          python - "$w" <<'PY'
+          import hashlib
+          import json
+          import math
+          import subprocess
+          import sys
+          from datetime import UTC, datetime, timedelta
+          from pathlib import Path
+
+          from scripts.alpha_coinbase_historical_replay import fetch_candles, iso
+
+          root = Path(sys.argv[1])
+          start_path = root / "research/btc4h_9am_pilot_start_utc.txt"
+          prediction_path = root / "research/btc4h_9am_pilot_forecast.json"
+          receipt_path = root / "research/btc4h_9am_pilot_receipt.json"
+          score_path = root / "research/btc4h_9am_pilot_score.json"
+          if score_path.exists():
+              print("Already evaluated; no changes to existing score.")
+              raise SystemExit(0)
+          if start_path.read_text(encoding="utf-8").strip() != "2026-11-08T15:00:00Z":
+              raise SystemExit("INVALID_OR_CHANGED_STUDY_START")
+          original = prediction_path.read_bytes()
+          prediction = json.loads(original)
+          receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+          if (
+              prediction["kind"] != "DISTINCT_9AM_OFF_GRID_LIVE_PILOT_NOT_OFFICIAL_4H_STUDY"
+              or prediction["origin_utc"] != "2026-11-08T15:00:00Z"
+              or receipt["origin_utc"] != prediction["origin_utc"]
+              or receipt["forecast_file_sha256"] != hashlib.sha256(original).hexdigest()
+          ):
+              raise SystemExit("ORIGINAL_OR_RECEIPT_MISMATCH")
+          original_blob = subprocess.run(
+              ["git", "-C", str(root), "show",
+               receipt["remote_forecast_commit"]+":research/btc4h_9am_pilot_forecast.json"],
+              check=True, capture_output=True,
+          ).stdout
+          if original_blob != original:
+              raise SystemExit("FIRST_PUBLISHED_GIT_FORECAST_CHANGED")
+          stamp = datetime.fromisoformat(receipt["remote_confirmation_utc"].replace("Z","+00:00"))
+          issue = datetime.fromisoformat(prediction["issued_at_utc"].replace("Z","+00:00"))
+          origin = datetime(2026,11,8,15,tzinfo=UTC)
+          end = datetime(2026,11,8,19,15,tzinfo=UTC)
+          target_open = end - timedelta(minutes=5)
+          now = datetime.now(UTC)
+          if (
+              now.date() != origin.date()
+              or now <= end
+              or not origin <= issue <= stamp < end
+              or prediction["target_5m_open_utc"] != iso(target_open)
+              or prediction["target_5m_close_utc"] != iso(end)
+          ):
+              raise SystemExit("INVALID_TARGET_OR_TIME_GUARD")
+          source = fetch_candles(target_open, end, granularity=300)
+          observed_at = datetime.now(UTC)
+          if target_open not in source or observed_at <= end:
+              raise SystemExit("FUTURE_PRICE_NOT_YET_AVAILABLE")
+          actual = source[target_open]
+          reference = prediction["origin_reference_close_usd"]
+          prices = prediction["price_forecasts_usd"]
+          losses = {model:abs(math.log(price/actual)) for model,price in prices.items()}
+          direction = {
+              model: (None if abs(price-reference)<1e-10 or abs(actual-reference)<1e-10
+                      else (price>reference)==(actual>reference))
+              for model,price in prices.items()
+          }
+          baseline = losses["persistence"]
+          gain = (
+              (baseline-losses["volume_interaction"])/baseline*100
+              if baseline > 0 else None
+          )
+          result = {
+              "kind":"POST_TARGET_SCORE_OF_PRECOMMITTED_9AM_OFFGRID_RESEARCH_PILOT",
+              "origin_utc":prediction["origin_utc"],
+              "issued_at_utc":prediction["issued_at_utc"],
+              "confirmed_remote_before_target_utc":receipt["remote_confirmation_utc"],
+              "target_5m_bar_close_utc":prediction["target_5m_close_utc"],
+              "outcome_observed_at_utc":iso(observed_at),
+              "actual_btc_usd_close":actual,
+              "reference_close_usd":reference,
+              "price_forecasts_usd":prices,
+              "absolute_log_price_errors":losses,
+              "direction_correct_if_nonflat":direction,
+              "volume_interaction_gain_vs_persistence_pct":gain,
+              "one_observation_not_statistical_evidence_of_alpha":True,
+              "no_trades":True,
+          }
+          score_path.write_text(json.dumps(result,sort_keys=True,indent=2)+"\n",encoding="utf-8")
+          print(json.dumps(result,sort_keys=True))
+          PY
+          if [ -f "$w/research/btc4h_9am_pilot_score.json" ]; then
+            git -C "$w" add research/btc4h_9am_pilot_score.json
+            if ! git -C "$w" diff --cached --quiet; then
+              git -C "$w" commit -m "BTC4h actual 9am pilot target score after maturity"
+              git -C "$w" push origin "HEAD:refs/heads/$BRANCH"
+            fi
+          fi
+          echo "Nine AM pilot score: check $BRANCH for fixed immutable outcome." >> "$GITHUB_STEP_SUMMARY"
