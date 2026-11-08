@@ -13,6 +13,7 @@ import hashlib
 import json
 import math
 import os
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -34,6 +35,8 @@ RIDGE = 100.0
 HISTORY_DAYS = 10
 MIN_TRAINING = 30
 MODEL_NAMES = ("volume_interaction", "price_plus_volume", "price_only", "persistence")
+EARLIEST_PREFETCH_MINUTE = 8
+MAX_EARLY_WAIT_SECONDS = 120
 
 
 def utc(dt: datetime) -> datetime:
@@ -50,6 +53,12 @@ def origin_at(dt: datetime) -> datetime:
 def in_issue_window(at: datetime) -> bool:
     s = origin_at(at)
     return s + timedelta(minutes=10) <= at <= s + timedelta(minutes=15)
+
+
+def in_prefetch_window(at: datetime) -> bool:
+    """Fetch only in the current origin's S+8m..S+15m interval."""
+    s = origin_at(at)
+    return s + timedelta(minutes=EARLIEST_PREFETCH_MINUTE) <= at <= s + timedelta(minutes=15)
 
 
 def _digest(mapping: dict[datetime, Any]) -> str:
@@ -274,6 +283,7 @@ def run_once(
     report: Path,
     code_sha: str = "local-research",
     clock: Callable[[], datetime] | None = None,
+    sleeper: Callable[[float], None] | None = None,
 ) -> dict[str, Any]:
     """One invocation: issue in the on-time slot, then score matured older rows.
 
@@ -281,6 +291,7 @@ def run_once(
     External runner/commit times are not independent third-party attestation.
     """
     get_time = clock if clock is not None else lambda: datetime.now(UTC)
+    sleep_for = sleeper if sleeper is not None else time.sleep
     before = get_time()
     utc(before)
     existing = _read_jsonl(ledger)
@@ -289,10 +300,14 @@ def run_once(
         raise ValueError("duplicate issued forecast origin in persistent ledger")
     current_origin = iso(origin_at(before))
     issued: dict[str, Any] | None = None
-    status = "MISSED_ISSUE_WINDOW"
+    status = (
+        "NOT_YET_PREFETCH_WINDOW"
+        if before < origin_at(before) + timedelta(minutes=EARLIEST_PREFETCH_MINUTE)
+        else "MISSED_ISSUE_WINDOW"
+    )
     if (VERSION, current_origin) in keys:
         status = "ALREADY_ISSUED"
-    elif in_issue_window(before):
+    elif in_prefetch_window(before):
         origin = origin_at(before)
         hourly = fetch_public_hourly_close_volume(
             origin - timedelta(days=HISTORY_DAYS, hours=25), origin
@@ -304,21 +319,37 @@ def run_once(
             granularity=300,
         )
         target_read = get_time()
-        finished = get_time()
-        if not in_issue_window(finished) or origin_at(finished) != origin:
+        prepared_at = get_time()
+        # The first scheduled attempt may prefetch at S+8m. We wait only
+        # until S+10m and only for <=2 minutes. A missed deadline fails closed.
+        if prepared_at < origin + timedelta(minutes=10):
+            wait_seconds = (origin + timedelta(minutes=10) - prepared_at).total_seconds()
+            if not 0 < wait_seconds <= MAX_EARLY_WAIT_SECONDS:
+                raise ValueError("unexpected pre-issue wait duration")
+            sleep_for(wait_seconds)
+            prepared_at = get_time()
+        if not in_issue_window(prepared_at) or origin_at(prepared_at) != origin:
             status = "MISSED_ISSUE_WINDOW_AFTER_FETCH"
         else:
-            issued = calculate_issue(
-                issued_at=finished,
+            candidate = calculate_issue(
+                issued_at=prepared_at,
                 hourly_fetched_at=hourly_read,
                 target_fetched_at=target_read,
                 hourly=hourly,
                 closed_targets=targets,
                 code_sha=code_sha,
             )
-            _append(ledger, issued)
-            status = "ISSUED_BEFORE_TARGET"
-            existing.append(issued)
+            # Do NOT call a forecast "issued" at the pre-computation timestamp:
+            # the real publish clock must be sampled AFTER model calculation.
+            published_at = get_time()
+            if not in_issue_window(published_at) or origin_at(published_at) != origin:
+                status = "MISSED_ISSUE_WINDOW_AFTER_COMPUTE"
+            else:
+                candidate["issued_at_utc"] = iso(published_at)
+                _append(ledger, candidate)
+                issued = candidate
+                status = "ISSUED_BEFORE_TARGET"
+                existing.append(issued)
     previous_scores = _read_jsonl(score_ledger)
     scored_keys = [(r["version"], r["origin_utc"]) for r in previous_scores]
     if len(scored_keys) != len(set(scored_keys)):
@@ -358,6 +389,11 @@ def run_once(
         "total_issued": len(existing),
         "total_scored": len(scored_set),
         "overdue_targets_unavailable_in_api_window": overdue_unavailable,
+        "early_prefetch_started": bool(
+            origin_at(before) + timedelta(minutes=EARLIEST_PREFETCH_MINUTE)
+            <= before
+            < origin_at(before) + timedelta(minutes=10)
+        ),
         "real_forward_issue_proof_independent": False,
         "note": "Never backfill missed origins; GitHub schedule delivery is not guaranteed.",
     }
