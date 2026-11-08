@@ -19,7 +19,9 @@ if GIT is None or BASH is None:
     pytest.skip("requires local Git and Bash executables", allow_module_level=True)
 
 SCRIPT = Path(__file__).resolve().parents[1] / ".github/scripts/publish_btc4h_shadow.sh"
-CONFIRM_SCRIPT = Path(__file__).resolve().parents[1] / ".github/scripts/confirm_btc4h_publication.sh"
+CONFIRM_SCRIPT = (
+    Path(__file__).resolve().parents[1] / ".github/scripts/confirm_btc4h_publication.sh"
+)
 DATA_REF = "origin/data/btc4h-shadow-forward"
 
 
