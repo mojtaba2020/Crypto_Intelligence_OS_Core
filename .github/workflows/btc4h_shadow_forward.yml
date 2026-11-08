@@ -38,7 +38,7 @@ jobs:
           mkdir -p research .research
           if git ls-remote --exit-code --heads origin "refs/heads/$DATA_BRANCH" > /dev/null; then
             git fetch origin "refs/heads/$DATA_BRANCH:refs/remotes/origin/$DATA_BRANCH"
-            for file in btc4h_shadow_forecasts.jsonl btc4h_shadow_scores.jsonl btc4h_study_start_utc.txt; do
+            for file in btc4h_shadow_forecasts.jsonl btc4h_shadow_scores.jsonl btc4h_shadow_publication_receipts.jsonl btc4h_study_start_utc.txt; do
               if git cat-file -e "origin/$DATA_BRANCH:research/$file" 2>/dev/null; then
                 git show "origin/$DATA_BRANCH:research/$file" > "research/$file"
               fi
@@ -81,6 +81,9 @@ jobs:
       - name: Publish new forecast to Git BEFORE scoring any older targets
         if: steps.issue_run.outcome == 'success'
         run: bash .github/scripts/publish_btc4h_shadow.sh issue
+      - name: Confirm issued forecast in remote Git before target closes
+        if: steps.issue_run.outcome == 'success'
+        run: bash .github/scripts/confirm_btc4h_publication.sh
       - name: Score only previously issued and now-matured targets
         run: |
           python -m scripts.btc4h_shadow_forward \
@@ -96,6 +99,7 @@ jobs:
           python -m scripts.btc4h_shadow_audit \
             --ledger research/btc4h_shadow_forecasts.jsonl \
             --scores research/btc4h_shadow_scores.jsonl \
+            --receipts research/btc4h_shadow_publication_receipts.jsonl \
             --study-start "$(cat research/btc4h_study_start_utc.txt)" \
             --report .research/btc4h_shadow_audit_report.json
       - name: Validate append-only outputs and print run diagnostics
@@ -123,6 +127,8 @@ jobs:
               f"- Due scheduled origins / issued / missed: {audit['finalized_issue_slots']} / {audit['issued_in_finalized_slots']} / {audit['missed_finalized_slots']}",
               f"- Forecast issue coverage of due slots: {audit['issue_delivery_rate_pct']}%",
               f"- Matured not scored: {audit['unscored_matured_origins']}",
+              f"- Git remote issue receipts verified internally: {audit['confirmed_remote_receipts']}/{audit['issued_forecasts']}",
+              "- Receipt times use runner clock; no independent GitHub-server-time attestation.",
               f"- Real-issue candidate vs Persistence log-error gain: {audit['candidate_gain_vs_persistence_pct']}%",
               "- Two attempts per 4h origin; no guarantee either is on time.",
               "- Market receipt timestamps are runner observed, not independent source vintage.",
