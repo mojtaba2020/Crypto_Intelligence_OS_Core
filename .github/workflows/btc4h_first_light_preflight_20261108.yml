@@ -1,0 +1,112 @@
+# One-shot operational preflight for the UTC Nov 8 first-light experiment.
+# Runs immediately after this file is first added to main. NEVER issues a
+# timestamped BTC forecast, trades, rewrites data, or touches the live engine.
+name: BTC4h first-light Coinbase preflight 2026-11-08
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/btc4h_first_light_preflight_20261108.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coinbase-readiness:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout tested research code at locked commit
+        uses: actions/checkout@v7
+        with:
+          ref: "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9"
+          persist-credentials: false
+      - name: Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Install only research dependencies
+        run: python -m pip install -e .
+      - name: Fetch real Coinbase research inputs without issuing prediction
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .research
+          python - <<'PY'
+          import json
+          import time
+          from datetime import UTC, datetime, timedelta
+          from pathlib import Path
+
+          from scripts.alpha_coinbase_historical_replay import fetch_candles, iso
+          from scripts.alpha_volume_historical_replay import fetch_public_hourly_close_volume
+          from scripts.btc4h_shadow_forward import HISTORY_DAYS, _bars, origin_at
+
+          now = datetime.now(UTC)
+          if now.strftime("%Y-%m-%d") != "2026-11-08":
+              raise SystemExit("Preflight is for UTC 2026-11-08 only")
+          origin = origin_at(now)
+          start = time.monotonic()
+          hourly = fetch_public_hourly_close_volume(
+              origin - timedelta(days=HISTORY_DAYS, hours=25), origin
+          )
+          hourly_seconds = round(time.monotonic() - start, 2)
+          start_targets = time.monotonic()
+          target = fetch_candles(
+              origin - timedelta(days=HISTORY_DAYS) + timedelta(hours=4, minutes=10),
+              origin - timedelta(hours=8) + timedelta(hours=4, minutes=15),
+              granularity=300,
+          )
+          target_seconds = round(time.monotonic() - start_targets, 2)
+          bars = _bars(hourly, origin, datetime.now(UTC))
+          expected = 0
+          complete = 0
+          cursor = origin - timedelta(days=HISTORY_DAYS)
+          while cursor <= origin - timedelta(hours=8):
+              expected += 1
+              if (
+                  _bars(hourly, cursor, datetime.now(UTC)) is not None
+                  and cursor + timedelta(hours=4, minutes=10) in target
+              ):
+                  complete += 1
+              cursor += timedelta(hours=4)
+          report = {
+              "status": "PUBLIC_MARKET_INPUT_PREFLIGHT_NOT_A_FORECAST",
+              "as_of_utc": iso(datetime.now(UTC)),
+              "origin_utc": iso(origin),
+              "hourly_bars_downloaded": len(hourly),
+              "target_five_minute_bars_downloaded": len(target),
+              "hourly_fetch_seconds": hourly_seconds,
+              "target_fetch_seconds": target_seconds,
+              "current_25_hourly_inputs_available": bars is not None,
+              "candidate_training_origins": expected,
+              "complete_matured_training_origins": complete,
+              "minimum_matured_training_origins": 30,
+              "research_no_prediction_issued": True,
+              "source": "Public Coinbase Exchange BTC-USD candles",
+          }
+          Path(".research/btc4h_preflight_20261108.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(report, sort_keys=True))
+          with open(__import__("os").environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
+              f.write(f"## Coinbase 4h first-light dry-run\n"
+                      f"- Hourly bars: {len(hourly)}; 5m bars: {len(target)}\n"
+                      f"- Latest complete 25h training window: {bars is not None}\n"
+                      f"- Complete matured 4h training origins: {complete}/{expected}\n"
+                      f"- Fetch time: {hourly_seconds}s hourly + {target_seconds}s targets\n"
+                      f"- No actual forecast issued, no trades, no backdating\n")
+          if bars is None or complete < 30:
+              raise SystemExit("PREFLIGHT_FAILED: insufficient REAL Coinbase source coverage")
+          PY
+      - name: Upload non-predictive Coinbase readiness report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc4h-first-light-public-market-preflight
+          path: .research/btc4h_preflight_20261108.json
+          if-no-files-found: warn
+          retention-days: 7
