@@ -183,7 +183,9 @@ def audit_shadow_ledgers(
         ):
             if score.get(field) != expected[field]:
                 raise ValueError(f"stored score conflicts with original issuance: {field}")
-        if not math.isclose(score["actual_log_return"], expected["actual_log_return"], abs_tol=1e-12):
+        if not math.isclose(
+            score["actual_log_return"], expected["actual_log_return"], abs_tol=1e-12
+        ):
             raise ValueError("stored actual return conflicts with observed price")
         loss = score["absolute_log_price_errors"]
         if set(loss) != set(MODEL_NAMES):
@@ -292,7 +294,9 @@ def main() -> None:
     parser.add_argument("--scores", type=Path, required=True)
     parser.add_argument("--study-start", required=True)
     parser.add_argument("--report", type=Path, required=True)
-    parser.add_argument("--study-end", help="UTC aligned exclusive end; defaults to the next 4h boundary")
+    parser.add_argument(
+        "--study-end", help="UTC aligned exclusive end; defaults to the next 4h boundary"
+    )
     args = parser.parse_args()
     now = datetime.now(UTC)
     start = _parse_utc(args.study_start)
