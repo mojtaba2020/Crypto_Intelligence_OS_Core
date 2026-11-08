@@ -480,3 +480,35 @@ def test_unknown_phase_is_rejected_before_market_access(tmp_path, monkeypatch):
             report=tmp_path / "report.json",
             phase="backdate",
         )
+
+
+
+def test_corrupt_prior_score_cannot_erase_new_issue(tmp_path, monkeypatch):
+    origin, hourly, targets = _fixture()
+    monkeypatch.setattr(
+        shadow, "fetch_public_hourly_close_volume", lambda *_args: hourly
+    )
+    monkeypatch.setattr(
+        shadow, "fetch_candles", lambda *_args, **_kwargs: targets
+    )
+    ledger = tmp_path / "issued.jsonl"
+    scores = tmp_path / "corrupt_scores.jsonl"
+    scores.write_text("not-json\n", encoding="utf-8")
+    first = shadow.run_once(
+        ledger=ledger,
+        score_ledger=scores,
+        report=tmp_path / "issue.json",
+        phase="issue",
+        clock=lambda: origin + timedelta(minutes=11),
+    )
+    assert first["newly_issued"] == 1
+    assert len(shadow._read_jsonl(ledger)) == 1
+    with pytest.raises(json.JSONDecodeError):
+        shadow.run_once(
+            ledger=ledger,
+            score_ledger=scores,
+            report=tmp_path / "score.json",
+            phase="score",
+            clock=lambda: origin + timedelta(hours=8, minutes=20),
+        )
+    assert len(shadow._read_jsonl(ledger)) == 1
