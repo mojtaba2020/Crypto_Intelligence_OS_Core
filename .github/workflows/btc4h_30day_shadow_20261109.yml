@@ -1,7 +1,8 @@
 # Fixed 30-day BTC4h forward-only RESEARCH trial, 180 origins; no trading.
 # Start UTC 2026-11-09T08:00, stop ISSUING 2026-12-09T08:00; allow score-only grace until 20:45 UTC.
 # The 30-day protocol was Git-precommitted before any new issue.
-# Manual dispatch can score matured targets, but NEVER issue a new forecast.
+# Manual dispatch may attempt an issue ONLY during the original S+8..15m prefetch/issue window; engine enforces S+10..15m publication.
+# Outside that window manual dispatch only scores; no backfill and no change to the pinned model.
 # Operational amendment 2026-11-09: redundant scheduled attempts at +6,+8,+10,+12,+13,+14 to mitigate GitHub cron delays.
 # Original +4/+11 retained; model SHA, 180 origin slots, issue time guards and no-backfill remain unchanged.
 # This scheduling amendment must be disclosed in study reporting; GitHub cron has no on-time SLA.
@@ -109,7 +110,7 @@ jobs:
       - name: Publish fixed first-attempt study anchor BEFORE reading outcomes
         run: bash .github/scripts/publish_btc4h_shadow.sh anchor
       - name: Hold early startup until original S+08m permitted prefetch
-        if: needs.time-guard.outputs.issue_allowed == 'true' && github.event_name == 'schedule' && startsWith(github.event.schedule, '4,6,8,10,11,12,13,14 ')
+        if: needs.time-guard.outputs.issue_allowed == 'true' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && startsWith(github.event.schedule, '4,6,8,10,11,12,13,14 ')))
         shell: bash
         run: |
           set -euo pipefail
@@ -126,7 +127,7 @@ jobs:
               time.sleep(remaining)
           PY
       - name: Attempt ON-TIME forecast issue ONLY (no older scoring dependency)
-        if: needs.time-guard.outputs.issue_allowed == 'true' && github.event_name == 'schedule' && startsWith(github.event.schedule, '4,6,8,10,11,12,13,14 ')
+        if: needs.time-guard.outputs.issue_allowed == 'true' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && startsWith(github.event.schedule, '4,6,8,10,11,12,13,14 ')))
         id: issue_run
         continue-on-error: true
         run: |
@@ -188,7 +189,7 @@ jobs:
               f"- Git remote issue receipts verified internally: {audit['confirmed_remote_receipts']}/{audit['issued_forecasts']}",
               "- Receipt times use runner clock; no independent GitHub-server-time attestation.",
               f"- Real-issue candidate vs Persistence log-error gain: {audit['candidate_gain_vs_persistence_pct']}%",
-              "- Two attempts per 4h origin; no guarantee either is on time.",
+              "- Redundant scheduled attempts plus optional manual dispatch; no guarantee of on-time execution.",
               "- Market receipt timestamps are runner observed, not independent source vintage.",
           ]
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as output:
