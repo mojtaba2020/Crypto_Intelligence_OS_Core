@@ -5,6 +5,10 @@ name: BTC 4h 30-day true forward research — Nov 9 to Dec 9
 
 on:
   workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/btc4h_30day_shadow_20261109.yml"
   schedule:
     - cron: "4,11,20 0,4,8,12,16,20 * * *"
 
