@@ -1,0 +1,80 @@
+name: BTC4h flexible on-demand research (up to 4/day)
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: "issue new forecast or score matured forecasts"
+        required: true
+        type: choice
+        options:
+          - issue
+          - score
+permissions:
+  contents: write
+concurrency:
+  group: btc4h-flexible-single-writer
+  cancel-in-progress: false
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Restore independent flexible ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p research
+          if git ls-remote --exit-code --heads origin data/btc4h-flexible > /dev/null; then
+            git fetch origin refs/heads/data/btc4h-flexible:refs/remotes/origin/data/btc4h-flexible
+            for f in btc4h_flexible_forecasts.jsonl btc4h_flexible_scores.jsonl; do
+              if git cat-file -e "origin/data/btc4h-flexible:research/$f" 2>/dev/null; then
+                git show "origin/data/btc4h-flexible:research/$f" > "research/$f"
+              fi
+            done
+          fi
+      - run: python -m pip install -e .
+      - name: Compute forecast or score
+        run: python -m scripts.btc4h_flexible_on_demand --phase "${{ inputs.phase }}"
+      - name: Publish append-only evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          branch=data/btc4h-flexible
+          temp="$(mktemp -d)"
+          trap 'git worktree remove --force "$temp" >/dev/null 2>&1 || true' EXIT
+          if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
+            git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch"
+            git worktree add --detach "$temp" "origin/$branch"
+          else
+            git worktree add --detach "$temp" HEAD
+          fi
+          mkdir -p "$temp/research"
+          for f in btc4h_flexible_forecasts.jsonl btc4h_flexible_scores.jsonl; do
+            old="$temp/research/$f"
+            new="research/$f"
+            if [ -f "$new" ]; then
+              python - "$old" "$new" <<'PY'
+          import sys
+          from pathlib import Path
+          old,new=(Path(x) for x in sys.argv[1:])
+          a=old.read_bytes() if old.exists() else b''
+          b=new.read_bytes()
+          if not b.startswith(a) or not b.endswith(b'\n'):
+              raise SystemExit('Non-append-only change or incomplete record')
+          PY
+              cp "$new" "$old"
+            fi
+          done
+          git -C "$temp" add research/btc4h_flexible_forecasts.jsonl research/btc4h_flexible_scores.jsonl
+          if ! git -C "$temp" diff --cached --quiet; then
+            git -C "$temp" commit -m "Flexible BTC4h ${{ inputs.phase }} run $GITHUB_RUN_ID"
+            git -C "$temp" push origin "HEAD:refs/heads/$branch"
+          fi
