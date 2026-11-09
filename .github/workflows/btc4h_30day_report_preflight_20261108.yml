@@ -26,7 +26,7 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PYTEST'
-          import json, os, subprocess, sys, tempfile
+          import json, os, subprocess, sys, tempfile, hashlib
           from pathlib import Path
 
           source = Path(".github/workflows/btc4h_30day_shadow_20261109.yml").read_text(encoding="utf-8")
@@ -46,24 +46,36 @@ jobs:
           start = "2026-11-09T08:00:00Z"
           origin_before = "2026-11-08T20:00:00Z"
           def issue(origin,issued,ref,pred,target):
-              return {"origin_utc":origin,"issued_at_utc":issued,"origin_reference_close_usd":ref,
+              return {"version":"btc4h-volume-shadow-v1-ridge100","origin_utc":origin,"issued_at_utc":issued,"origin_reference_close_usd":ref,
                   "price_forecasts_usd":{"volume_interaction":pred,"price_plus_volume":pred+0.5,"price_only":pred+1,"persistence":ref},
                   "target_5m_close_utc":target}
           new = issue(start,"2026-11-09T08:11:22Z",100.0,97.0,"2026-11-09T12:15:00Z")
           old = issue(origin_before,"2026-11-08T20:11:22Z",1000.0,999.0,"2026-11-09T00:15:00Z")
-          outcome = {"origin_utc":start,"actual_close_usd":95.0,
+          outcome = {"version":new["version"],"origin_utc":start,"issued_at_utc":new["issued_at_utc"],
+              "target_5m_close_utc":new["target_5m_close_utc"],"actual_close_usd":95.0,
               "absolute_log_price_errors":{"persistence":0.05,"price_only":0.03,"price_plus_volume":0.025,"volume_interaction":0.02},
               "direction_correct_if_nonflat":{"volume_interaction":True}}
           protocol={"period_start_utc":start,"period_end_exclusive_utc":"2026-12-09T08:00:00Z"}
 
-          def run_case(name,with_outcome):
+          def receipt_for(row):
+              digest=hashlib.sha256((json.dumps(row,sort_keys=True,separators=(",",":"))+"\n").encode()).hexdigest()
+              return {"version":row["version"],"origin_utc":row["origin_utc"],
+                  "issued_at_utc":row["issued_at_utc"],"target_5m_close_utc":row["target_5m_close_utc"],
+                  "first_party_remote_confirmed_at_utc":"2026-11-09T08:11:25Z",
+                  "remote_issue_commit_sha":"a"*40,"forecast_canonical_line_sha256":digest,
+                  "remote_ref_was_fetched_and_compared":True,
+                  "independent_time_witness":False,"workflow_run_id":"777"}
+          def run_case(name,with_outcome,tamper_receipt=False,tamper_score=False):
               with tempfile.TemporaryDirectory(prefix="btc4h-report-test-") as tmp:
                   root=Path(tmp); d=root/".research"; d.mkdir()
                   (d/"btc4h_30d_protocol_20261109.json").write_text(json.dumps(protocol)+"\n")
                   (d/"btc4h_shadow_forecasts.jsonl").write_text("\n".join(map(json.dumps,[old,new]))+"\n")
-                  (d/"btc4h_shadow_publication_receipts.jsonl").write_text("\n".join(map(json.dumps,
-                      [{"origin_utc":origin_before},{"origin_utc":start}]))+"\n")
-                  (d/"btc4h_shadow_scores.jsonl").write_text(json.dumps(outcome)+"\n" if with_outcome else "")
+                  receipt=receipt_for(new)
+                  if tamper_receipt: receipt["forecast_canonical_line_sha256"]="0"*64
+                  (d/"btc4h_shadow_publication_receipts.jsonl").write_text(json.dumps(receipt)+"\n")
+                  score=dict(outcome)
+                  if tamper_score: score["issued_at_utc"]="2026-11-09T08:11:23Z"
+                  (d/"btc4h_shadow_scores.jsonl").write_text(json.dumps(score)+"\n" if with_outcome else "")
                   p=root/"actual_report_engine.py";p.write_text(simulated,encoding="utf-8")
                   env={**os.environ,"RUNNER_TEMP":tmp}
                   finished=subprocess.run([sys.executable,str(p)],cwd=tmp,env=env,check=True,capture_output=True,text=True)
@@ -72,14 +84,16 @@ jobs:
                   assert "نوبت‌های ازدست‌رفته: 1" in report, report
                   assert "زمان مبنا در هیوستون: 2026-11-09 06:00" in report, report
                   assert "پیش‌بینی معتبری ثبت نشده" in report, report
-                  assert "1/1" in report if with_outcome else "0/1" in report, report
-                  if with_outcome:
+                  trusted=with_outcome and not tamper_receipt and not tamper_score
+                  assert "پیش‌بینی با رسید معتبر: "+("0/1" if tamper_receipt else "1/1") in report, report
+                  assert ("نتایج ارزیابی‌شده معتبر: 1/1" if trusted else "نتایج ارزیابی‌شده معتبر: 0/1") in report, report
+                  if trusted:
                       assert "95.00" in report and "97.00" in report and "2.00" in report, report
                       assert "خطای روش ثابت‌ماندن قیمت (دلار) 5.00" in report, report
                       assert "جهت درست: 1/1" in report, report
                   else:
                       assert "هنوز نتیجه ثبت و ارزیابی نشده" in report, report
-                      assert "کندل‌های بالغ بدون ارزیابی: 1" in report, report
+                      assert "کندل‌های بالغ بدون ارزیابی معتبر: 1" in report, report
                   assert "پیش‌بینی‌های ثبت‌شده: 2/" not in report, "Nov 8 legacy must be excluded"
                   print("PASS",name,"(only local synthetic fixtures; no GitHub writes)")
           # Execute the REAL deployed time gate using a mocked UTC clock.
@@ -116,5 +130,7 @@ jobs:
           print("PASS six real time-gate boundaries, schedule-only forecasting, manual-score-only recovery")
           run_case("scored, accurate accounting",True)
           run_case("matured but score missing",False)
+          run_case("tampered remote receipt SHA256 is rejected",True,tamper_receipt=True)
+          run_case("mismatched score issue timestamp is rejected",True,tamper_score=True)
           print("PASS compilation of exact deployed inline Python report; 30d protocol filter; missed-slot evidence")
           PYTEST
