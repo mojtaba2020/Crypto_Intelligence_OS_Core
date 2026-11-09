@@ -1,0 +1,104 @@
+# Recovery of the matured 20:00 UTC origin published on Nov 8.
+# No forecasting, trading or backdating; score existing immutable issued row only.
+name: BTC 4h Nov 8 matured score recovery
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/btc4h_matured_score_recovery_20261109.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: btc4h-forward-ledger-single-writer
+  cancel-in-progress: false
+
+jobs:
+  score-published-issue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout pinned validated research engine
+        uses: actions/checkout@v7
+        with:
+          ref: "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9"
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Install project
+        run: python -m pip install -e .
+      - name: Restore original ledger and receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          BRANCH="data/btc4h-shadow-forward"
+          git fetch origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+          mkdir -p research .research
+          for file in btc4h_study_start_utc.txt btc4h_shadow_forecasts.jsonl btc4h_shadow_publication_receipts.jsonl btc4h_shadow_scores.jsonl; do
+            if git cat-file -e "origin/$BRANCH:research/$file" 2>/dev/null; then
+              git show "origin/$BRANCH:research/$file" > "research/$file"
+            fi
+          done
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from datetime import UTC,datetime
+
+          forecasts=[json.loads(x) for x in Path("research/btc4h_shadow_forecasts.jsonl").read_text().splitlines() if x.strip()]
+          receipts=[json.loads(x) for x in Path("research/btc4h_shadow_publication_receipts.jsonl").read_text().splitlines() if x.strip()]
+          if len(forecasts)!=1 or len(receipts)!=1:
+              raise SystemExit("Unexpected original issue or receipt count")
+          f,r=forecasts[0],receipts[0]
+          if f["origin_utc"]!="2026-11-08T20:00:00Z" or r["origin_utc"]!=f["origin_utc"] or r["issued_at_utc"]!=f["issued_at_utc"]:
+              raise SystemExit("Original issued record/receipt mismatch")
+          if Path("research/btc4h_study_start_utc.txt").read_text().strip()!="2026-11-08T16:00:00Z":
+              raise SystemExit("Study start not intact")
+          target=datetime.fromisoformat(f["target_5m_close_utc"].replace("Z","+00:00"))
+          if target.isoformat()!="2026-11-09T00:15:00+00:00" or datetime.now(UTC)<=target:
+              raise SystemExit("Future target not matured")
+          print("Verified original issue + receipt; no forecasting or backfill.")
+          PY
+      - name: Score only original matured issued prediction
+        run: |
+          python -m scripts.btc4h_shadow_forward \
+            --phase score \
+            --ledger research/btc4h_shadow_forecasts.jsonl \
+            --score-ledger research/btc4h_shadow_scores.jsonl \
+            --report .research/btc4h_matured_recovery_report.json \
+            --code-sha "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9"
+      - name: Audit issue coverage, receipt, scored target
+        run: |
+          python -m scripts.btc4h_shadow_audit \
+            --ledger research/btc4h_shadow_forecasts.jsonl \
+            --scores research/btc4h_shadow_scores.jsonl \
+            --receipts research/btc4h_shadow_publication_receipts.jsonl \
+            --study-start "$(cat research/btc4h_study_start_utc.txt)" \
+            --report .research/btc4h_matured_recovery_audit.json
+      - name: Publish append-only score and verify remote copy
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s research/btc4h_shadow_scores.jsonl
+          bash .github/scripts/publish_btc4h_shadow.sh score
+          BRANCH="data/btc4h-shadow-forward"
+          git fetch origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+          git show "origin/$BRANCH:research/btc4h_shadow_scores.jsonl" > .research/verified_published_scores.jsonl
+          cmp .research/verified_published_scores.jsonl research/btc4h_shadow_scores.jsonl
+          cat .research/verified_published_scores.jsonl
+          echo "Matured pre-issued 4h target score published to isolated data branch." >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive score diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc4h-matured-score-recovery
+          path: |
+            .research/btc4h_matured_recovery_report.json
+            .research/btc4h_matured_recovery_audit.json
+            .research/verified_published_scores.jsonl
+          if-no-files-found: warn
+          retention-days: 30
