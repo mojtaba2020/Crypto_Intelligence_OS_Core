@@ -1,0 +1,39 @@
+{
+  "kind": "PRECOMMITTED_30_DAY_BTC4H_FORWARD_RESEARCH_PROTOCOL",
+  "version": 1,
+  "predeclared_before_first_issue": true,
+  "period_start_utc": "2026-11-09T08:00:00Z",
+  "period_end_exclusive_utc": "2026-12-09T08:00:00Z",
+  "planned_issue_origins": 180,
+  "issue_origin_hours_utc": [
+    0,
+    4,
+    8,
+    12,
+    16,
+    20
+  ],
+  "issue_window_after_origin_minutes": [
+    10,
+    15
+  ],
+  "target_five_minute_close_offset_minutes": 255,
+  "score_attempt_after_origin_minutes": 20,
+  "fixed_code_commit_sha": "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9",
+  "models": [
+    "volume_interaction",
+    "price_plus_volume",
+    "price_only",
+    "persistence"
+  ],
+  "primary_model": "volume_interaction",
+  "baseline": "persistence",
+  "data_source": "Coinbase Exchange public BTC-USD candles",
+  "ledger_branch": "data/btc4h-shadow-forward",
+  "legacy_experiment_study_start": "2026-11-08T16:00:00Z",
+  "note": "Nov 8 earlier forecasts intentionally excluded from 30-day denominators; ledger remains append-only with shared provenance. A missed scheduled issue is a miss, not a backfill.",
+  "no_trading": true,
+  "no_prediction_backfill": true,
+  "first_party_receipt_not_independent": true,
+  "report_issue": "https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/issues/111"
+}
