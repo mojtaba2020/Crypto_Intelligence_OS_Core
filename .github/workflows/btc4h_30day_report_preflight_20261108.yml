@@ -1,0 +1,88 @@
+# One-shot, no market access and no reports sent: execute the exact 30d report
+# generator from the deployed workflow against synthetic precommitted test rows.
+name: BTC4h 30day report-only synthetic preflight
+
+on:
+  push:
+    branches: ["main"]
+    paths: [".github/workflows/btc4h_30day_report_preflight_20261108.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-report-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout deployed workflow (not research-model changes)
+        uses: actions/checkout@v7
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Parse and exercise deployed report against controlled fake data
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PYTEST'
+          import json, os, subprocess, sys, tempfile
+          from pathlib import Path
+
+          source = Path(".github/workflows/btc4h_30day_shadow_20261109.yml").read_text(encoding="utf-8")
+          begin = source.index("      - name: Four-hour public result report")
+          end = source.index("      - name: Summarize fixed 30-day trial controls",begin)
+          block = source[begin:end]
+          begin_code = "          python - <<'PY'\n"
+          end_code = "\n          PY\n"
+          assert block.count(begin_code) == 1 and block.count(end_code) == 1
+          raw = block.split(begin_code, 1)[1].split(end_code, 1)[0]
+          assert all(not line or line.startswith("          ") for line in raw.split("\n")), "Python indentation must be step-indent"
+          script = "\n".join(line[10:] for line in raw.split("\n")) + "\n"
+          compile(script, "<actual-production-30d-report>", "exec")
+          assert script.count("now=datetime.now(UTC)") == 1
+          simulated = script.replace("now=datetime.now(UTC)", "now=datetime(2026,11,9,12,35,tzinfo=UTC)")
+
+          start = "2026-11-09T08:00:00Z"
+          origin_before = "2026-11-08T20:00:00Z"
+          def issue(origin,issued,ref,pred,target):
+              return {"origin_utc":origin,"issued_at_utc":issued,"origin_reference_close_usd":ref,
+                  "price_forecasts_usd":{"volume_interaction":pred,"price_plus_volume":pred+0.5,"price_only":pred+1,"persistence":ref},
+                  "target_5m_close_utc":target}
+          new = issue(start,"2026-11-09T08:11:22Z",100.0,97.0,"2026-11-09T12:15:00Z")
+          old = issue(origin_before,"2026-11-08T20:11:22Z",1000.0,999.0,"2026-11-09T00:15:00Z")
+          outcome = {"origin_utc":start,"actual_close_usd":95.0,
+              "absolute_log_price_errors":{"persistence":0.05,"price_only":0.03,"price_plus_volume":0.025,"volume_interaction":0.02},
+              "direction_correct_if_nonflat":{"volume_interaction":True}}
+          protocol={"period_start_utc":start,"period_end_exclusive_utc":"2026-12-09T08:00:00Z"}
+
+          def run_case(name,with_outcome):
+              with tempfile.TemporaryDirectory(prefix="btc4h-report-test-") as tmp:
+                  root=Path(tmp); d=root/".research"; d.mkdir()
+                  (d/"btc4h_30d_protocol_20261109.json").write_text(json.dumps(protocol)+"\n")
+                  (d/"btc4h_shadow_forecasts.jsonl").write_text("\n".join(map(json.dumps,[old,new]))+"\n")
+                  (d/"btc4h_shadow_publication_receipts.jsonl").write_text("\n".join(map(json.dumps,
+                      [{"origin_utc":origin_before},{"origin_utc":start}]))+"\n")
+                  (d/"btc4h_shadow_scores.jsonl").write_text(json.dumps(outcome)+"\n" if with_outcome else "")
+                  p=root/"actual_report_engine.py";p.write_text(simulated,encoding="utf-8")
+                  env={**os.environ,"RUNNER_TEMP":tmp}
+                  finished=subprocess.run([sys.executable,str(p)],cwd=tmp,env=env,check=True,capture_output=True,text=True)
+                  report=(root/"btc4h_latest_report.md").read_text(encoding="utf-8")
+                  assert "پیش‌بینی‌های ثبت‌شده: 1/2" in report, report
+                  assert "نوبت‌های ازدست‌رفته: 1" in report, report
+                  assert "زمان مبنا در هیوستون: 2026-11-09 06:00" in report, report
+                  assert "پیش‌بینی معتبری ثبت نشده" in report, report
+                  assert "1/1" in report if with_outcome else "0/1" in report, report
+                  if with_outcome:
+                      assert "95.00" in report and "97.00" in report and "2.00" in report, report
+                      assert "خطای روش ثابت‌ماندن قیمت (دلار) 5.00" in report, report
+                      assert "جهت درست: 1/1" in report, report
+                  else:
+                      assert "هنوز نتیجه ثبت و ارزیابی نشده" in report, report
+                      assert "کندل‌های بالغ بدون ارزیابی: 1" in report, report
+                  assert "پیش‌بینی‌های ثبت‌شده: 2/" not in report, "Nov 8 legacy must be excluded"
+                  print("PASS",name,"(only local synthetic fixtures; no GitHub writes)")
+          run_case("scored, accurate accounting",True)
+          run_case("matured but score missing",False)
+          print("PASS compilation of exact deployed inline Python report; 30d protocol filter; missed-slot evidence")
+          PYTEST
