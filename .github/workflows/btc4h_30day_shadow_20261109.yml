@@ -1,0 +1,336 @@
+# Fixed 30-day BTC4h forward-only RESEARCH trial, 180 origins; no trading.
+# Start UTC 2026-11-09T08:00, stop issuing 2026-12-09T08:00, last score by 08:45 UTC.
+# The 30-day protocol was Git-precommitted before any new issue.
+name: BTC 4h 30-day true forward research — Nov 9 to Dec 9
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "4,11,20 0,4,8,12,16,20 * * *"
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: btc4h-forward-ledger-single-writer
+  cancel-in-progress: false
+
+jobs:
+  time-guard:
+    runs-on: ubuntu-latest
+    outputs:
+      eligible: ${{ steps.check.outputs.eligible }}
+      issue_allowed: ${{ steps.check.outputs.issue_allowed }}
+    steps:
+      - name: Gate 180 fixed future slots plus final target scoring
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+          now="$(date -u +%s)"
+          start="$(date -u -d '2026-11-09T08:00:00Z' +%s)"
+          stop="$(date -u -d '2026-12-09T08:00:00Z' +%s)"
+          final="$(date -u -d '2026-12-09T08:45:00Z' +%s)"
+          if (( now >= start && now < final )); then
+            echo "eligible=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "Outside 30-day trial time guard: no data collection." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if (( now >= start && now < stop )); then
+            echo "issue_allowed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "issue_allowed=false" >> "$GITHUB_OUTPUT"
+          fi
+  four-hour-research:
+    needs: time-guard
+    if: needs.time-guard.outputs.eligible == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BTC4H_PINNED_RESEARCH_SHA: "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9"
+    steps:
+      - name: Checkout locked PR-109 research engine; do not change main model
+        uses: actions/checkout@v7
+        with:
+          ref: "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9"
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Use Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Restore existing shadow ledger from dedicated data branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          DATA_BRANCH="data/btc4h-shadow-forward"
+          mkdir -p research .research
+          if git ls-remote --exit-code --heads origin "refs/heads/$DATA_BRANCH" > /dev/null; then
+            git fetch origin "refs/heads/$DATA_BRANCH:refs/remotes/origin/$DATA_BRANCH"
+            for file in btc4h_shadow_forecasts.jsonl btc4h_shadow_scores.jsonl btc4h_shadow_publication_receipts.jsonl btc4h_study_start_utc.txt; do
+              if git cat-file -e "origin/$DATA_BRANCH:research/$file" 2>/dev/null; then
+                git show "origin/$DATA_BRANCH:research/$file" > "research/$file"
+              fi
+            done
+            if [ ! -f research/btc4h_study_start_utc.txt ]; then
+              echo "FAIL CLOSED: existing study branch lacks its fixed start anchor" >&2
+              exit 1
+            fi
+          else
+            echo "No prior shadow ledger: initializing forward-only."
+          fi
+      - name: Fix study start at FIRST attempted runner, before seeing results
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f research/btc4h_study_start_utc.txt ]; then
+            python - <<'PY' > research/btc4h_study_start_utc.txt
+          from datetime import UTC, datetime
+
+          current = datetime.now(UTC)
+          start = current.replace(hour=(current.hour // 4) * 4, minute=0, second=0, microsecond=0)
+          print(start.isoformat().replace("+00:00", "Z"))
+          PY
+          fi
+          cat research/btc4h_study_start_utc.txt
+      - name: Install existing research engine
+        run: python -m pip install -e .
+      - name: Publish fixed first-attempt study anchor BEFORE reading outcomes
+        run: bash .github/scripts/publish_btc4h_shadow.sh anchor
+      - name: Hold early startup until original S+08m permitted prefetch
+        if: needs.time-guard.outputs.issue_allowed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import time
+          from datetime import UTC, datetime
+
+          now = datetime.now(UTC)
+          start = now.replace(hour=(now.hour // 4) * 4, minute=8, second=0, microsecond=0)
+          remaining = (start - datetime.now(UTC)).total_seconds()
+          if remaining > 300:
+              raise SystemExit("Unexpectedly early runner; refusing long sleep")
+          if remaining > 0:
+              time.sleep(remaining)
+          PY
+      - name: Attempt ON-TIME forecast issue ONLY (no older scoring dependency)
+        if: needs.time-guard.outputs.issue_allowed == 'true'
+        id: issue_run
+        continue-on-error: true
+        run: |
+          python -m scripts.btc4h_shadow_forward \
+            --phase issue \
+            --ledger research/btc4h_shadow_forecasts.jsonl \
+            --score-ledger research/btc4h_shadow_scores.jsonl \
+            --report .research/btc4h_shadow_issue_report.json \
+            --code-sha "$BTC4H_PINNED_RESEARCH_SHA"
+      - name: Publish new forecast to Git BEFORE scoring any older targets
+        if: steps.issue_run.outcome == 'success'
+        run: bash .github/scripts/publish_btc4h_shadow.sh issue
+      - name: Confirm issued forecast in remote Git before target closes
+        if: steps.issue_run.outcome == 'success'
+        run: bash .github/scripts/confirm_btc4h_publication.sh
+      - name: Score only previously issued and now-matured targets
+        run: |
+          python -m scripts.btc4h_shadow_forward \
+            --phase score \
+            --ledger research/btc4h_shadow_forecasts.jsonl \
+            --score-ledger research/btc4h_shadow_scores.jsonl \
+            --report .research/btc4h_shadow_score_report.json \
+            --code-sha "$BTC4H_PINNED_RESEARCH_SHA"
+      - name: Audit ALL scheduled slots and re-evaluate every stored score
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m scripts.btc4h_shadow_audit \
+            --ledger research/btc4h_shadow_forecasts.jsonl \
+            --scores research/btc4h_shadow_scores.jsonl \
+            --receipts research/btc4h_shadow_publication_receipts.jsonl \
+            --study-start "$(cat research/btc4h_study_start_utc.txt)" \
+            --report .research/btc4h_shadow_audit_report.json
+      - name: Validate append-only outputs and print run diagnostics
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          issue_path = Path(".research/btc4h_shadow_issue_report.json")
+          issue = json.loads(issue_path.read_text()) if issue_path.exists() else {}
+          scores = json.loads(Path(".research/btc4h_shadow_score_report.json").read_text())
+          audit = json.loads(Path(".research/btc4h_shadow_audit_report.json").read_text())
+          lines = [
+              "## BTC 4h true forward-only shadow study",
+              "",
+              "**No late-origin backfill, no live trading and no validated predictive alpha.**",
+              f"- On-time issuance status: {issue.get('research_status', 'ISSUE_PHASE_FAILED')}",
+              f"- Newly issued this run: {issue.get('newly_issued', 0)}",
+              f"- Started with S+8..10m early prefetch: {issue.get('early_prefetch_started', False)}",
+              f"- Newly matured scores: {scores['newly_scored']}",
+              f"- Total issued / scored: {scores['total_issued']} / {scores['total_scored']}",
+              f"- Overdue target bars unavailable: {scores['overdue_targets_unavailable_in_api_window']}",
+              f"- Due scheduled origins / issued / missed: {audit['finalized_issue_slots']} / {audit['issued_in_finalized_slots']} / {audit['missed_finalized_slots']}",
+              f"- Forecast issue coverage of due slots: {audit['issue_delivery_rate_pct']}%",
+              f"- Matured not scored: {audit['unscored_matured_origins']}",
+              f"- Git remote issue receipts verified internally: {audit['confirmed_remote_receipts']}/{audit['issued_forecasts']}",
+              "- Receipt times use runner clock; no independent GitHub-server-time attestation.",
+              f"- Real-issue candidate vs Persistence log-error gain: {audit['candidate_gain_vs_persistence_pct']}%",
+              "- Two attempts per 4h origin; no guarantee either is on time.",
+              "- Market receipt timestamps are runner observed, not independent source vintage.",
+          ]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as output:
+              output.write("\n".join(lines) + "\n")
+          PY
+      - name: Publish matured scores (forecasts already separately committed)
+        run: bash .github/scripts/publish_btc4h_shadow.sh score
+      - name: Surface failed issue attempt without discarding already-published scores
+        if: steps.issue_run.outcome == 'failure'
+        run: |
+          echo "On-time issue attempt failed; no forecast backfilled." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+      - name: Upload one-run report for audit of skipped slots too
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc4h-forward-shadow-run
+          path: |
+            .research/btc4h_shadow_issue_report.json
+            .research/btc4h_shadow_score_report.json
+            .research/btc4h_shadow_audit_report.json
+          if-no-files-found: warn
+          retention-days: 30
+
+
+      - name: Four-hour public result report (and missed-slot accounting)
+        if: always() && github.event_name == 'schedule' && github.event.schedule == '20 0,4,8,12,16,20 * * *'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BRANCH="data/btc4h-shadow-forward"
+          mkdir -p .research
+          git fetch origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+          for file in btc4h_shadow_forecasts.jsonl btc4h_shadow_scores.jsonl btc4h_shadow_publication_receipts.jsonl btc4h_30d_protocol_20261109.json; do
+            if git cat-file -e "origin/$BRANCH:research/$file" 2>/dev/null; then
+              git show "origin/$BRANCH:research/$file" > ".research/$file"
+            fi
+          done
+          python - <<'PY'
+          import json, math, os
+          from pathlib import Path
+          from datetime import UTC,datetime,timedelta
+          from zoneinfo import ZoneInfo
+
+          base=Path(".research")
+          def rows(name):
+              p=base/name
+              return [json.loads(x) for x in p.read_text(encoding="utf-8").splitlines() if x.strip()] if p.exists() else []
+          protocol=json.loads((base/"btc4h_30d_protocol_20261109.json").read_text())
+          if protocol["period_start_utc"]!="2026-11-09T08:00:00Z" or protocol["period_end_exclusive_utc"]!="2026-12-09T08:00:00Z":
+              raise SystemExit("Protocol time mismatch")
+          def when(value):
+              return datetime.fromisoformat(value.replace("Z","+00:00"))
+          start,end=when(protocol["period_start_utc"]),when(protocol["period_end_exclusive_utc"])
+          now=datetime.now(UTC)
+          def applicable(r):
+              return start<=when(r["origin_utc"])<end
+          forecasts={r["origin_utc"]:r for r in rows("btc4h_shadow_forecasts.jsonl") if applicable(r)}
+          scores={r["origin_utc"]:r for r in rows("btc4h_shadow_scores.jsonl") if applicable(r)}
+          receipts={r["origin_utc"]:r for r in rows("btc4h_shadow_publication_receipts.jsonl") if applicable(r)}
+          due=max(0,min(180,int((now-start-timedelta(minutes=15)).total_seconds()//14400)+1))
+          matured=max(0,min(180,int((now-start-timedelta(hours=4,minutes=15)).total_seconds()//14400)+1))
+          def key(dt):
+              return dt.isoformat().replace("+00:00","Z")
+          def local(dt):
+              return dt.astimezone(ZoneInfo("America/Chicago")).strftime("%Y-%m-%d %H:%M")
+          issue_origin=start+timedelta(hours=4*(due-1)) if due else None
+          target_origin=start+timedelta(hours=4*(matured-1)) if matured else None
+          current=forecasts.get(key(issue_origin)) if issue_origin else None
+          target_forecast=forecasts.get(key(target_origin)) if target_origin else None
+          target_score=scores.get(key(target_origin)) if target_origin else None
+          lines=["# BTC/USD — real four-hour research report",
+              "Runner-observed time (Houston): "+local(now),
+              "Frozen 30-day experiment: 180 scheduled slots, no trading, no post-hoc backfills.",
+              "",
+              "## Delivery",
+              "Issued: "+str(len(forecasts))+"/"+str(due)+" slots due; remote receipts: "+str(len(receipts))+
+              "; scores: "+str(len(scores))+"/"+str(matured)+" matured targets.",
+              "Missed issue windows: "+str(max(0,due-len(forecasts)))+
+              "; matured slots not scored: "+str(max(0,matured-len(scores)))+".",
+              ""]
+          if issue_origin:
+              lines += ["## Latest scheduled forecast",
+                  "Origin Houston: "+local(issue_origin)]
+              if current:
+                  p=current["price_forecasts_usd"]
+                  lines += ["Issued: "+local(when(current["issued_at_utc"]))+
+                      "; remote receipt: "+("verified in ledger" if current["origin_utc"] in receipts else "MISSING"),
+                      "Reference USD "+format(current["origin_reference_close_usd"],",.2f")+
+                      "; volume interaction USD "+format(p["volume_interaction"],",.2f"),
+                      "Price+volume USD "+format(p["price_plus_volume"],",.2f")+
+                      "; price-only USD "+format(p["price_only"],",.2f")+
+                      "; Persistence USD "+format(p["persistence"],",.2f"),
+                      "Target closes Houston: "+local(when(current["target_5m_close_utc"]))]
+              else:
+                  lines += ["NO FORECAST RECORDED: no backfilled value can count."]
+              lines += [""]
+          if target_origin:
+              lines += ["## Latest matured target","Target origin Houston: "+local(target_origin)]
+              if target_forecast and target_score:
+                  p=target_forecast["price_forecasts_usd"]
+                  actual=target_score["actual_close_usd"]
+                  errors=target_score["absolute_log_price_errors"]
+                  better=(errors["persistence"]-errors["volume_interaction"])/errors["persistence"]*100 if errors["persistence"]>0 else None
+                  direction=target_score["direction_correct_if_nonflat"]["volume_interaction"]
+                  lines += ["Actual USD "+format(actual,",.2f")+
+                      "; predicted USD "+format(p["volume_interaction"],",.2f"),
+                      "Model USD error "+format(abs(actual-p["volume_interaction"]),",.2f")+
+                      "; Persistence USD error "+format(abs(actual-p["persistence"]),",.2f"),
+                      "Direction: "+("correct" if direction is True else "incorrect" if direction is False else "not assessable")+
+                      "; log-error gain vs Persistence: "+(format(better,"+.2f")+"%" if better is not None else "not assessable")]
+              else:
+                  lines += ["NO VERIFIED SCORED OUTCOME yet: missing issue, delayed Coinbase data, or runner failure."]
+              lines += [""]
+          scored=list(scores.values())
+          if scored:
+              cand=math.fsum(r["absolute_log_price_errors"]["volume_interaction"] for r in scored)/len(scored)
+              baseerr=math.fsum(r["absolute_log_price_errors"]["persistence"] for r in scored)/len(scored)
+              assessed=[r["direction_correct_if_nonflat"]["volume_interaction"] for r in scored if r["direction_correct_if_nonflat"]["volume_interaction"] is not None]
+              lines+=["## Running totals","Scored: "+str(len(scored))+
+                  "; direction right: "+str(sum(x is True for x in assessed))+"/"+str(len(assessed))+
+                  "; mean log-error gain vs Persistence: "+(format((baseerr-cand)/baseerr*100,"+.2f")+"%" if baseerr>0 else "not assessable"),""]
+          lines += [
+              "[Original 30-day protocol](https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/blob/data/btc4h-shadow-forward/research/btc4h_30d_protocol_20261109.json)",
+              "[Immutable forecast ledger](https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/blob/data/btc4h-shadow-forward/research/btc4h_shadow_forecasts.jsonl)",
+              "[Scored actual outcomes](https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/blob/data/btc4h-shadow-forward/research/btc4h_shadow_scores.jsonl)",
+              "[Publication receipts](https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/blob/data/btc4h-shadow-forward/research/btc4h_shadow_publication_receipts.jsonl)",
+              "Two early Nov 8 experiments are excluded from the 180 future-slot denominator.",
+              "A small sample does not establish predictive alpha.",
+          ]
+          Path(os.environ["RUNNER_TEMP"],"btc4h_latest_report.md").write_text("\n".join(lines)+"\n",encoding="utf-8")
+          print("\n".join(lines))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          w="$(mktemp -d "${RUNNER_TEMP}/btc4h-report.XXXXXX")"
+          trap 'git worktree remove --force "$w" >/dev/null 2>&1 || true; rmdir "$w" >/dev/null 2>&1 || true' EXIT
+          git worktree add --detach "$w" "origin/$BRANCH"
+          cp "$RUNNER_TEMP/btc4h_latest_report.md" "$w/research/btc4h_latest_report.md"
+          git -C "$w" add research/btc4h_latest_report.md
+          if ! git -C "$w" diff --cached --quiet; then
+            git -C "$w" commit -m "Update four-hour prospective BTC4h result report" >/dev/null
+            git -C "$w" push origin "HEAD:refs/heads/$BRANCH"
+          fi
+          gh issue comment 111 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/btc4h_latest_report.md"
+
+      - name: Summarize fixed 30-day trial controls
+        if: always()
+        run: |
+          echo "Fixed 180 slots from 2026-11-09 08UTC to 2026-12-09 08UTC; scheduled feedback in GitHub issue 111." >> "$GITHUB_STEP_SUMMARY"
+          echo "Model source pinned to $BTC4H_PINNED_RESEARCH_SHA (unmerged research)." >> "$GITHUB_STEP_SUMMARY"
+          echo "First-party Git evidence only, NOT independently certified market alpha." >> "$GITHUB_STEP_SUMMARY"
