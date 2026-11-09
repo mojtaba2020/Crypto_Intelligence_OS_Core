@@ -2,17 +2,19 @@
 # Start UTC 2026-11-09T08:00, stop ISSUING 2026-12-09T08:00; allow score-only grace until 20:45 UTC.
 # The 30-day protocol was Git-precommitted before any new issue.
 # Manual dispatch can score matured targets, but NEVER issue a new forecast.
-# Only original scheduled +4/+11 issue attempts may publish predictions.
+# Operational amendment 2026-11-09: redundant scheduled attempts at +6,+8,+10,+12,+13,+14 to mitigate GitHub cron delays.
+# Original +4/+11 retained; model SHA, 180 origin slots, issue time guards and no-backfill remain unchanged.
+# This scheduling amendment must be disclosed in study reporting; GitHub cron has no on-time SLA.
 name: BTC 4h 30-day true forward research — Nov 9 to Dec 9
 
 on:
   workflow_dispatch:
   schedule:
-    # Issue attempts 4m and 11m after each 4h origin; score+report at +20m.
+    # Redundant issue attempts +4,+6,+8,+10,+11,+12,+13,+14m; score+report at +20m.
     # Restricted to the declared month/date window; UTC guard fixes the exact year/day/hour.
-    - cron: "4,11 0,4,8,12,16,20 9-30 11 *"
+    - cron: "4,6,8,10,11,12,13,14 0,4,8,12,16,20 9-30 11 *"
     - cron: "20 0,4,8,12,16,20 9-30 11 *"
-    - cron: "4,11 0,4,8,12,16,20 1-9 12 *"
+    - cron: "4,6,8,10,11,12,13,14 0,4,8,12,16,20 1-9 12 *"
     - cron: "20 0,4,8,12,16,20 1-9 12 *"
 
 permissions:
@@ -107,7 +109,7 @@ jobs:
       - name: Publish fixed first-attempt study anchor BEFORE reading outcomes
         run: bash .github/scripts/publish_btc4h_shadow.sh anchor
       - name: Hold early startup until original S+08m permitted prefetch
-        if: needs.time-guard.outputs.issue_allowed == 'true' && github.event_name == 'schedule' && startsWith(github.event.schedule, '4,11 ')
+        if: needs.time-guard.outputs.issue_allowed == 'true' && github.event_name == 'schedule' && startsWith(github.event.schedule, '4,6,8,10,11,12,13,14 ')
         shell: bash
         run: |
           set -euo pipefail
@@ -124,7 +126,7 @@ jobs:
               time.sleep(remaining)
           PY
       - name: Attempt ON-TIME forecast issue ONLY (no older scoring dependency)
-        if: needs.time-guard.outputs.issue_allowed == 'true' && github.event_name == 'schedule' && startsWith(github.event.schedule, '4,11 ')
+        if: needs.time-guard.outputs.issue_allowed == 'true' && github.event_name == 'schedule' && startsWith(github.event.schedule, '4,6,8,10,11,12,13,14 ')
         id: issue_run
         continue-on-error: true
         run: |
