@@ -82,6 +82,38 @@ jobs:
                       assert "کندل‌های بالغ بدون ارزیابی: 1" in report, report
                   assert "پیش‌بینی‌های ثبت‌شده: 2/" not in report, "Nov 8 legacy must be excluded"
                   print("PASS",name,"(only local synthetic fixtures; no GitHub writes)")
+          # Execute the REAL deployed time gate using a mocked UTC clock.
+          gate_start = source.index("      - name: Gate 180 fixed future slots plus final target scoring")
+          gate_end = source.index("  four-hour-research:", gate_start)
+          gate_block = source[gate_start:gate_end]
+          gate_begin = "        run: |\n"
+          assert gate_block.count(gate_begin) == 1, "expected exactly one source-controlled UTC time gate"
+          gate = gate_block.split(gate_begin,1)[1]
+          assert all(not line or line.startswith("          ") for line in gate.splitlines())
+          gate_shell = "\n".join(line[10:] for line in gate.splitlines())
+          from datetime import UTC,datetime
+          cases = [
+              ("2026-11-09T07:59:59Z",False,False),
+              ("2026-11-09T08:00:00Z",True,True),
+              ("2026-12-09T07:59:59Z",True,True),
+              ("2026-12-09T08:00:00Z",True,False),
+              ("2026-12-09T20:44:59Z",True,False),
+              ("2026-12-09T20:45:00Z",False,False),
+          ]
+          for at,expected_eligible,expected_issue in cases:
+              with tempfile.TemporaryDirectory(prefix="btc4h-timegate-test-") as tmp:
+                  output=Path(tmp,"GITHUB_OUTPUT")
+                  summary=Path(tmp,"GITHUB_STEP_SUMMARY")
+                  epoch=int(datetime.fromisoformat(at.replace("Z","+00:00")).timestamp())
+                  shim="date() { if [ \"$1\" = \"-u\" ] && [ \"$2\" = \"+%s\" ]; then echo \"$FAKE_CLOCK\"; else command date \"$@\"; fi; }\n"
+                  subprocess.run(["bash","-c",shim+gate_shell],check=True,env={**os.environ,"FAKE_CLOCK":str(epoch),"GITHUB_OUTPUT":str(output),"GITHUB_STEP_SUMMARY":str(summary)},capture_output=True,text=True)
+                  states=dict(line.split("=",1) for line in output.read_text().splitlines())
+                  assert states=={"eligible":str(expected_eligible).lower(),"issue_allowed":str(expected_issue).lower()},(at,states)
+          assert source.count("if: needs.time-guard.outputs.issue_allowed == 'true' && github.event_name == 'schedule' && startsWith(github.event.schedule, '4,11 ')")==2
+          assert "  push:\n" not in source.split("permissions:",1)[0], "unscheduled push must never mint real forward forecasts"
+          assert "  workflow_dispatch:\n" in source, "manual score-only recovery permitted"
+          assert "if: always() && github.event_name == 'schedule' && startsWith(github.event.schedule, '20 ')" in source, "reports only at planned +20 slots"
+          print("PASS six real time-gate boundaries, schedule-only forecasting, manual-score-only recovery")
           run_case("scored, accurate accounting",True)
           run_case("matured but score missing",False)
           print("PASS compilation of exact deployed inline Python report; 30d protocol filter; missed-slot evidence")
