@@ -253,64 +253,64 @@ jobs:
           current=forecasts.get(key(issue_origin)) if issue_origin else None
           target_forecast=forecasts.get(key(target_origin)) if target_origin else None
           target_score=scores.get(key(target_origin)) if target_origin else None
-          lines=["# BTC/USD — real four-hour research report",
-              "Runner-observed time (Houston): "+local(now),
-              "Frozen 30-day experiment: 180 scheduled slots, no trading, no post-hoc backfills.",
+          lines=["# گزارش واقعی چهار‌ساعته بیت‌کوین BTC/USD",
+              "زمان بررسی به وقت هیوستون: "+local(now),
+              "آزمایش ۳۰روزه با ۱۸۰ نوبت ثابت؛ بدون معامله و بدون پیش‌بینی عقب‌تاریخ‌دار.",
               "",
-              "## Delivery",
-              "Issued: "+str(len(forecasts))+"/"+str(due)+" slots due; remote receipts: "+str(len(receipts))+
-              "; scores: "+str(len(scores))+"/"+str(matured)+" matured targets.",
-              "Missed issue windows: "+str(max(0,due-len(forecasts)))+
-              "; matured slots not scored: "+str(max(0,matured-len(scores)))+".",
+              "## وضعیت ثبت و انتشار",
+              "پیش‌بینی‌های ثبت‌شده: "+str(len(forecasts))+"/"+str(due)+" نوبت رسیده؛ رسیدهای انتشار Git: "+str(len(receipts))+
+              "؛ نتایج ارزیابی‌شده: "+str(len(scores))+"/"+str(matured)+" کندل هدف بالغ‌شده.",
+              "نوبت‌های ازدست‌رفته: "+str(max(0,due-len(forecasts)))+
+              "؛ کندل‌های بالغ بدون ارزیابی: "+str(max(0,matured-len(scores)))+".",
               ""]
           if issue_origin:
-              lines += ["## Latest scheduled forecast",
-                  "Origin Houston: "+local(issue_origin)]
+              lines += ["## آخرین پیش‌بینی برنامه‌ریزی‌شده",
+                  "زمان مبنا در هیوستون: "+local(issue_origin)]
               if current:
                   p=current["price_forecasts_usd"]
-                  lines += ["Issued: "+local(when(current["issued_at_utc"]))+
-                      "; remote receipt: "+("verified in ledger" if current["origin_utc"] in receipts else "MISSING"),
-                      "Reference USD "+format(current["origin_reference_close_usd"],",.2f")+
-                      "; volume interaction USD "+format(p["volume_interaction"],",.2f"),
-                      "Price+volume USD "+format(p["price_plus_volume"],",.2f")+
-                      "; price-only USD "+format(p["price_only"],",.2f")+
-                      "; Persistence USD "+format(p["persistence"],",.2f"),
-                      "Target closes Houston: "+local(when(current["target_5m_close_utc"]))]
+                  lines += ["پیش‌بینی‌های ثبت‌شده: "+local(when(current["issued_at_utc"]))+
+                      "؛ رسید انتشار: "+("ثبت‌شده و قابل‌بررسی" if current["origin_utc"] in receipts else "مفقود"),
+                      "قیمت مرجع (دلار) "+format(current["origin_reference_close_usd"],",.2f")+
+                      "؛ پیش‌بینی مدل اصلی (دلار) "+format(p["volume_interaction"],",.2f"),
+                      "مدل قیمت و حجم (دلار) "+format(p["price_plus_volume"],",.2f")+
+                      "؛ مدل فقط قیمت (دلار) "+format(p["price_only"],",.2f")+
+                      "؛ مبنای ثابت‌ماندن قیمت (دلار) "+format(p["persistence"],",.2f"),
+                      "بسته‌شدن کندل هدف به وقت هیوستون: "+local(when(current["target_5m_close_utc"]))]
               else:
-                  lines += ["NO FORECAST RECORDED: no backfilled value can count."]
+                  lines += ["پیش‌بینی معتبری ثبت نشده؛ مقدار عقب‌تاریخ‌دار پذیرفته نمی‌شود."]
               lines += [""]
           if target_origin:
-              lines += ["## Latest matured target","Target origin Houston: "+local(target_origin)]
+              lines += ["## آخرین نتیجه واقعی","زمان مبنای نتیجه به وقت هیوستون: "+local(target_origin)]
               if target_forecast and target_score:
                   p=target_forecast["price_forecasts_usd"]
                   actual=target_score["actual_close_usd"]
                   errors=target_score["absolute_log_price_errors"]
                   better=(errors["persistence"]-errors["volume_interaction"])/errors["persistence"]*100 if errors["persistence"]>0 else None
                   direction=target_score["direction_correct_if_nonflat"]["volume_interaction"]
-                  lines += ["Actual USD "+format(actual,",.2f")+
-                      "; predicted USD "+format(p["volume_interaction"],",.2f"),
-                      "Model USD error "+format(abs(actual-p["volume_interaction"]),",.2f")+
-                      "; Persistence USD error "+format(abs(actual-p["persistence"]),",.2f"),
-                      "Direction: "+("correct" if direction is True else "incorrect" if direction is False else "not assessable")+
-                      "; log-error gain vs Persistence: "+(format(better,"+.2f")+"%" if better is not None else "not assessable")]
+                  lines += ["قیمت واقعی (دلار) "+format(actual,",.2f")+
+                      "؛ پیش‌بینی (دلار) "+format(p["volume_interaction"],",.2f"),
+                      "خطای مدل (دلار) "+format(abs(actual-p["volume_interaction"]),",.2f")+
+                      "؛ مبنای ثابت‌ماندن قیمت (دلار) error "+format(abs(actual-p["persistence"]),",.2f"),
+                      "جهت حرکت: "+("correct" if direction is True else "incorrect" if direction is False else "not assessable")+
+                      "؛ بهبود خطای لگاریتمی نسبت به مبنا: "+(format(better,"+.2f")+"%" if better is not None else "not assessable")]
               else:
-                  lines += ["NO VERIFIED SCORED OUTCOME yet: missing issue, delayed Coinbase data, or runner failure."]
+                  lines += ["هنوز نتیجه ثبت و ارزیابی نشده؛ ممکن است نوبت از دست رفته، داده دیر رسیده یا اجرا شکست خورده باشد."]
               lines += [""]
           scored=list(scores.values())
           if scored:
               cand=math.fsum(r["absolute_log_price_errors"]["volume_interaction"] for r in scored)/len(scored)
               baseerr=math.fsum(r["absolute_log_price_errors"]["persistence"] for r in scored)/len(scored)
               assessed=[r["direction_correct_if_nonflat"]["volume_interaction"] for r in scored if r["direction_correct_if_nonflat"]["volume_interaction"] is not None]
-              lines+=["## Running totals","Scored: "+str(len(scored))+
-                  "; direction right: "+str(sum(x is True for x in assessed))+"/"+str(len(assessed))+
-                  "; mean log-error gain vs Persistence: "+(format((baseerr-cand)/baseerr*100,"+.2f")+"%" if baseerr>0 else "not assessable"),""]
+              lines+=["## آمار تجمعی","تعداد ارزیابی‌ها: "+str(len(scored))+
+                  "؛ جهت درست: "+str(sum(x is True for x in assessed))+"/"+str(len(assessed))+
+                  "؛ بهبود میانگین خطای لگاریتمی: "+(format((baseerr-cand)/baseerr*100,"+.2f")+"%" if baseerr>0 else "not assessable"),""]
           lines += [
               "[Original 30-day protocol](https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/blob/data/btc4h-shadow-forward/research/btc4h_30d_protocol_20261109.json)",
               "[Immutable forecast ledger](https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/blob/data/btc4h-shadow-forward/research/btc4h_shadow_forecasts.jsonl)",
               "[Scored actual outcomes](https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/blob/data/btc4h-shadow-forward/research/btc4h_shadow_scores.jsonl)",
               "[Publication receipts](https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/blob/data/btc4h-shadow-forward/research/btc4h_shadow_publication_receipts.jsonl)",
-              "Two early Nov 8 experiments are excluded from the 180 future-slot denominator.",
-              "A small sample does not establish predictive alpha.",
+              "دو آزمایش ۸ نوامبر خارج از آمار ۱۸۰ نوبت آینده هستند.",
+              "نمونه کوچک، اثبات‌کننده قدرت پیش‌بینی پایدار نیست.",
           ]
           Path(os.environ["RUNNER_TEMP"],"btc4h_latest_report.md").write_text("\n".join(lines)+"\n",encoding="utf-8")
           print("\n".join(lines))
