@@ -18,7 +18,7 @@
     15
   ],
   "target_five_minute_close_offset_minutes": 255,
-  "score_attempt_after_origin_minutes": 20,
+  "score_attempt_after_origin_minutes": 260,
   "fixed_code_commit_sha": "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9",
   "models": [
     "volume_interaction",
@@ -35,5 +35,6 @@
   "no_trading": true,
   "no_prediction_backfill": true,
   "first_party_receipt_not_independent": true,
-  "report_issue": "https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/issues/111"
+  "report_issue": "https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core/issues/111",
+  "score_explanation": "The 4h15m target matures 255 minutes after its own origin; +260m is the scheduled scoring attempt on the following 4h origin's +20m run."
 }
