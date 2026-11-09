@@ -21,7 +21,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: 9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9
           fetch-depth: 0
+      - name: Restore flexible runner from dispatch commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show "$GITHUB_SHA:scripts/btc4h_flexible_on_demand.py" > scripts/btc4h_flexible_on_demand.py
+          test -s scripts/btc4h_flexible_on_demand.py
+          test -f scripts/alpha_coinbase_historical_replay.py
+          test -f scripts/alpha_volume_historical_replay.py
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
