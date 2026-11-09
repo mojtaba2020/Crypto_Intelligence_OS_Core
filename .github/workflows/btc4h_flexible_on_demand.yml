@@ -73,7 +73,7 @@ jobs:
               cp "$new" "$old"
             fi
           done
-          git -C "$temp" add research/btc4h_flexible_forecasts.jsonl research/btc4h_flexible_scores.jsonl
+          git -C "$temp" add -A -- research/
           if ! git -C "$temp" diff --cached --quiet; then
             git -C "$temp" commit -m "Flexible BTC4h ${{ inputs.phase }} run $GITHUB_RUN_ID"
             git -C "$temp" push origin "HEAD:refs/heads/$branch"
