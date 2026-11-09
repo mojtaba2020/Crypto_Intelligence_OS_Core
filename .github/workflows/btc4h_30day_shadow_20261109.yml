@@ -277,7 +277,7 @@ jobs:
                   "زمان مبنا در هیوستون: "+local(issue_origin)]
               if current:
                   p=current["price_forecasts_usd"]
-                  lines += ["پیش‌بینی‌های ثبت‌شده: "+local(when(current["issued_at_utc"]))+
+                  lines += ["زمان صدور پیش‌بینی: "+local(when(current["issued_at_utc"]))+
                       "؛ رسید انتشار: "+("ثبت‌شده و قابل‌بررسی" if current["origin_utc"] in receipts else "مفقود"),
                       "قیمت مرجع (دلار) "+format(current["origin_reference_close_usd"],",.2f")+
                       "؛ پیش‌بینی مدل اصلی (دلار) "+format(p["volume_interaction"],",.2f"),
@@ -299,7 +299,7 @@ jobs:
                   lines += ["قیمت واقعی (دلار) "+format(actual,",.2f")+
                       "؛ پیش‌بینی (دلار) "+format(p["volume_interaction"],",.2f"),
                       "خطای مدل (دلار) "+format(abs(actual-p["volume_interaction"]),",.2f")+
-                      "؛ مبنای ثابت‌ماندن قیمت (دلار) error "+format(abs(actual-p["persistence"]),",.2f"),
+                      "؛ خطای روش ثابت‌ماندن قیمت (دلار) "+format(abs(actual-p["persistence"]),",.2f"),
                       "جهت حرکت: "+("correct" if direction is True else "incorrect" if direction is False else "not assessable")+
                       "؛ بهبود خطای لگاریتمی نسبت به مبنا: "+(format(better,"+.2f")+"%" if better is not None else "not assessable")]
               else:
