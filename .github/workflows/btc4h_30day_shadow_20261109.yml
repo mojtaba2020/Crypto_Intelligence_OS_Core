@@ -228,7 +228,7 @@ jobs:
             fi
           done
           python - <<'PY'
-          import json, math, os
+          import json, math, os, hashlib
           from pathlib import Path
           from datetime import UTC,datetime,timedelta
           from zoneinfo import ZoneInfo
@@ -249,6 +249,40 @@ jobs:
           forecasts={r["origin_utc"]:r for r in rows("btc4h_shadow_forecasts.jsonl") if applicable(r)}
           scores={r["origin_utc"]:r for r in rows("btc4h_shadow_scores.jsonl") if applicable(r)}
           receipts={r["origin_utc"]:r for r in rows("btc4h_shadow_publication_receipts.jsonl") if applicable(r)}
+          def matching_remote_receipt(row):
+              receipt=receipts.get(row["origin_utc"])
+              if not receipt:
+                  return False
+              try:
+                  digest=hashlib.sha256((json.dumps(row,sort_keys=True,separators=(",",":"))+"\n").encode("utf-8")).hexdigest()
+                  confirmed_at=when(receipt["first_party_remote_confirmed_at_utc"])
+                  issued_at=when(row["issued_at_utc"])
+                  target_at=when(row["target_5m_close_utc"])
+                  sha=receipt["remote_issue_commit_sha"]
+                  return (
+                      receipt["version"]==row["version"]
+                      and receipt["origin_utc"]==row["origin_utc"]
+                      and receipt["issued_at_utc"]==row["issued_at_utc"]
+                      and receipt["target_5m_close_utc"]==row["target_5m_close_utc"]
+                      and receipt["forecast_canonical_line_sha256"]==digest
+                      and receipt["remote_ref_was_fetched_and_compared"] is True
+                      and receipt["independent_time_witness"] is False
+                      and isinstance(sha,str) and len(sha)==40 and all(c in "0123456789abcdef" for c in sha)
+                      and bool(receipt["workflow_run_id"])
+                      and issued_at<=confirmed_at<target_at
+                      and confirmed_at<=now
+                  )
+              except (KeyError,TypeError,ValueError):
+                  return False
+          verified_forecasts={key:row for key,row in forecasts.items() if matching_remote_receipt(row)}
+          def matching_score(key,score):
+              row=verified_forecasts.get(key)
+              return bool(row and score.get("version")==row.get("version")
+                          and score.get("issued_at_utc")==row.get("issued_at_utc")
+                          and score.get("target_5m_close_utc")==row.get("target_5m_close_utc")
+                          and "absolute_log_price_errors" in score
+                          and "direction_correct_if_nonflat" in score)
+          verified_scores={key:score for key,score in scores.items() if matching_score(key,score)}
           due=max(0,min(180,int((now-start-timedelta(minutes=15)).total_seconds()//14400)+1))
           matured=max(0,min(180,int((now-start-timedelta(hours=4,minutes=15)).total_seconds()//14400)+1))
           def key(dt):
@@ -259,16 +293,17 @@ jobs:
           target_origin=start+timedelta(hours=4*(matured-1)) if matured else None
           current=forecasts.get(key(issue_origin)) if issue_origin else None
           target_forecast=forecasts.get(key(target_origin)) if target_origin else None
-          target_score=scores.get(key(target_origin)) if target_origin else None
+          target_score=verified_scores.get(key(target_origin)) if target_origin else None
           lines=["# گزارش واقعی چهار‌ساعته بیت‌کوین BTC/USD",
               "زمان بررسی به وقت هیوستون: "+local(now),
               "آزمایش ۳۰روزه با ۱۸۰ نوبت ثابت؛ بدون معامله و بدون پیش‌بینی عقب‌تاریخ‌دار.",
               "",
               "## وضعیت ثبت و انتشار",
               "پیش‌بینی‌های ثبت‌شده: "+str(len(forecasts))+"/"+str(due)+" نوبت رسیده؛ رسیدهای انتشار Git: "+str(len(receipts))+
-              "؛ نتایج ارزیابی‌شده: "+str(len(scores))+"/"+str(matured)+" کندل هدف بالغ‌شده.",
+              "؛ پیش‌بینی با رسید معتبر: "+str(len(verified_forecasts))+"/"+str(len(forecasts))+
+              "؛ نتایج ارزیابی‌شده معتبر: "+str(len(verified_scores))+"/"+str(matured)+" کندل هدف بالغ‌شده.",
               "نوبت‌های ازدست‌رفته: "+str(max(0,due-len(forecasts)))+
-              "؛ کندل‌های بالغ بدون ارزیابی: "+str(max(0,matured-len(scores)))+".",
+              "؛ کندل‌های بالغ بدون ارزیابی معتبر: "+str(max(0,matured-len(verified_scores)))+".",
               ""]
           if issue_origin:
               lines += ["## آخرین پیش‌بینی برنامه‌ریزی‌شده",
@@ -276,7 +311,7 @@ jobs:
               if current:
                   p=current["price_forecasts_usd"]
                   lines += ["زمان صدور پیش‌بینی: "+local(when(current["issued_at_utc"]))+
-                      "؛ رسید انتشار: "+("ثبت‌شده و قابل‌بررسی" if current["origin_utc"] in receipts else "مفقود"),
+                      "؛ رسید انتشار: "+("تأییدشده با SHA256 و زمان انتشار" if current["origin_utc"] in verified_forecasts else "نامعتبر یا مفقود"),
                       "قیمت مرجع (دلار) "+format(current["origin_reference_close_usd"],",.2f")+
                       "؛ پیش‌بینی مدل اصلی (دلار) "+format(p["volume_interaction"],",.2f"),
                       "مدل قیمت و حجم (دلار) "+format(p["price_plus_volume"],",.2f")+
@@ -303,7 +338,7 @@ jobs:
               else:
                   lines += ["هنوز نتیجه ثبت و ارزیابی نشده؛ ممکن است نوبت از دست رفته، داده دیر رسیده یا اجرا شکست خورده باشد."]
               lines += [""]
-          scored=list(scores.values())
+          scored=list(verified_scores.values())
           if scored:
               cand=math.fsum(r["absolute_log_price_errors"]["volume_interaction"] for r in scored)/len(scored)
               baseerr=math.fsum(r["absolute_log_price_errors"]["persistence"] for r in scored)/len(scored)
