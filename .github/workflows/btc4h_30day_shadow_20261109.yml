@@ -10,7 +10,12 @@ on:
     paths:
       - ".github/workflows/btc4h_30day_shadow_20261109.yml"
   schedule:
-    - cron: "4,11,20 0,4,8,12,16,20 * * *"
+    # Issue attempts 4m and 11m after each 4h origin; score+report at +20m.
+    # Restricted to the declared month/date window; UTC guard fixes the exact year/day/hour.
+    - cron: "4,11 0,4,8,12,16,20 9-30 11 *"
+    - cron: "20 0,4,8,12,16,20 9-30 11 *"
+    - cron: "4,11 0,4,8,12,16,20 1-9 12 *"
+    - cron: "20 0,4,8,12,16,20 1-9 12 *"
 
 permissions:
   contents: write
@@ -210,7 +215,7 @@ jobs:
 
 
       - name: Four-hour public result report (and missed-slot accounting)
-        if: always() && github.event_name == 'schedule' && github.event.schedule == '20 0,4,8,12,16,20 * * *'
+        if: always() && github.event_name == 'schedule' && startsWith(github.event.schedule, '20 ')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
