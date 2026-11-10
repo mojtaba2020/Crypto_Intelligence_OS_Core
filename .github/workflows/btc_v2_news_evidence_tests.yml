@@ -7,8 +7,10 @@ on:
     paths:
       - 'scripts/btc_v2_news_evidence.py'
       - 'scripts/btc_v2_news_features.py'
+      - 'scripts/btc_v2_news_dataset.py'
       - 'tests/test_btc_v2_news_evidence.py'
       - 'tests/test_btc_v2_news_features.py'
+      - 'tests/test_btc_v2_news_dataset.py'
       - '.github/workflows/btc_v2_news_evidence_tests.yml'
   pull_request:
     paths:
