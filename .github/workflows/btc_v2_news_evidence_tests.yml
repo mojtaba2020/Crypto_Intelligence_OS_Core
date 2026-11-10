@@ -8,9 +8,12 @@ on:
       - 'scripts/btc_v2_news_evidence.py'
       - 'scripts/btc_v2_news_features.py'
       - 'scripts/btc_v2_news_dataset.py'
+      - 'scripts/btc_v2_source_registry.py'
+      - 'scripts/btc_v2_rss_collector.py'
       - 'tests/test_btc_v2_news_evidence.py'
       - 'tests/test_btc_v2_news_features.py'
       - 'tests/test_btc_v2_news_dataset.py'
+      - 'tests/test_btc_v2_rss_collector.py'
       - '.github/workflows/btc_v2_news_evidence_tests.yml'
   pull_request:
     paths:
@@ -34,4 +37,4 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Verify point-in-time evidence validator
-        run: python -m unittest discover -s tests -p 'test_btc_v2_news_*.py' -v
+        run: python -m unittest discover -s tests -p 'test_btc_v2_*.py' -v
