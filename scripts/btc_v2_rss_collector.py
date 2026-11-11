@@ -9,6 +9,7 @@ import argparse
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 import json
+from pathlib import Path
 from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
 
@@ -46,6 +47,36 @@ def collect_feed(xml_bytes: bytes, source: str, observed_at_utc: str) -> list[di
         except (ValueError, TypeError, EvidenceError):
             continue
     return results
+
+
+
+def append_new_evidence(path: Path, rows: list[dict]) -> int:
+    """Append unseen evidence IDs; reject corrupt existing lines, never rewrite history.
+
+    Use one writer per ledger. This function does not provide inter-process locking.
+    """
+    known = set()
+    if path.exists():
+        with path.open(encoding="utf-8") as stream:
+            for line in stream:
+                if not line.strip():
+                    continue
+                existing = json.loads(line)
+                evidence_id = existing.get("evidence_id")
+                if not isinstance(evidence_id, str) or not evidence_id:
+                    raise EvidenceError("invalid existing evidence ledger")
+                known.add(evidence_id)
+    new_rows = []
+    for row in rows:
+        evidence_id = row["evidence_id"]
+        if evidence_id not in known:
+            new_rows.append(row)
+            known.add(evidence_id)
+    if new_rows:
+        with path.open("a", encoding="utf-8") as stream:
+            for row in new_rows:
+                stream.write(json.dumps(row, sort_keys=True) + "\\n")
+    return len(new_rows)
 
 
 def main() -> None:
