@@ -28,7 +28,7 @@ class LedgerTests(unittest.TestCase):
     def test_corrupt_ledger_fails_closed(self):
         with TemporaryDirectory() as tmp:
             path = Path(tmp) / "events.jsonl"
-            path.write_text('{"title":"no id"}\\n')
+            path.write_text('{"title":"no id"}')
             with self.assertRaises(EvidenceError):
                 append_new_evidence(path, [{"evidence_id": "two"}])
 
