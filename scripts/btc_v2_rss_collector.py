@@ -91,10 +91,8 @@ def main() -> None:
         raise EvidenceError("feed too large")
     observed = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     rows = collect_feed(data, args.source, observed)
-    # Append-only; no overwriting an existing evidence ledger.
-    with open(args.output, "a", encoding="utf-8") as stream:
-        for row in rows:
-            stream.write(json.dumps(row, sort_keys=True) + "\n")
+    appended = append_new_evidence(Path(args.output), rows)
+    print(json.dumps({"source": args.source, "accepted": len(rows), "new": appended}))
 
 
 if __name__ == "__main__":
