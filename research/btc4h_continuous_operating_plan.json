@@ -11,11 +11,8 @@
     16,
     20
   ],
-  "issue_window_after_origin_minutes": [
-    10,
-    15
-  ],
-  "target_close_offset_minutes": 255,
+  "issue_window_after_origin_minutes": null,
+  "target_close_offset_minutes": null,
   "score_after_target_close": true,
   "model_source_commit": "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9",
   "models": [
@@ -29,12 +26,14 @@
   "no_backfill": true,
   "archive_30_day_study_unchanged": true,
   "new_separate_append_only_ledgers": true,
-  "execution": "dedicated always-on VPS scheduler required; not yet provisioned",
+  "execution": "GitHub Actions scheduled every four hours; no VPS required; actual start may be delayed",
   "publication": "GitHub append-only commit and receipt before target",
   "alerts": [
     "missed_issue_window",
     "failed_publication",
     "missing_score"
   ],
-  "success_gate": "one real on-time issued forecast and remote receipt plus later matured score"
+  "success_gate": "one real issued forecast and remote publication receipt, followed by independently timed future target score",
+  "issuance_rule": "Issue only at actual execution time with newly fetched data; no fixed S+10..15 window for the new continuous protocol; never backdate",
+  "note": "Existing 30-day engine has hard-coded S+10..15 issue window and cannot be reused unchanged for this protocol. New code/workflow and separate append-only ledgers required."
 }
