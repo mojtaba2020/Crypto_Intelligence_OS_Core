@@ -57,6 +57,18 @@ jobs:
       - name: Fail on issue execution error
         if: steps.issue.outcome == 'failure'
         run: exit 1
+      - name: Fail visibly if no fresh forecast was issued
+        if: steps.issue.outcome == 'success'
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          result = json.loads(Path(".research/continuous_issue.json").read_text())
+          if result.get("newly_issued") != 1 and result.get("research_status") != "ALREADY_ISSUED":
+              raise SystemExit("NO_NEW_FORECAST: " + str(result.get("research_status")))
+          print("Verified issuance status:", result.get("research_status"))
+          PY
       - name: Show actual issuance result
         if: always()
         shell: bash
