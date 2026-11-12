@@ -1,0 +1,40 @@
+{
+  "kind": "BTC4H_CONTINUOUS_RESEARCH_OPERATING_PLAN",
+  "status": "PLANNED_NOT_DEPLOYED",
+  "cadence_hours": 4,
+  "timezone": "UTC",
+  "origin_hours_utc": [
+    0,
+    4,
+    8,
+    12,
+    16,
+    20
+  ],
+  "issue_window_after_origin_minutes": [
+    10,
+    15
+  ],
+  "target_close_offset_minutes": 255,
+  "score_after_target_close": true,
+  "model_source_commit": "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9",
+  "models": [
+    "volume_interaction",
+    "price_plus_volume",
+    "price_only",
+    "persistence"
+  ],
+  "research_only": true,
+  "no_trading": true,
+  "no_backfill": true,
+  "archive_30_day_study_unchanged": true,
+  "new_separate_append_only_ledgers": true,
+  "execution": "dedicated always-on VPS scheduler required; not yet provisioned",
+  "publication": "GitHub append-only commit and receipt before target",
+  "alerts": [
+    "missed_issue_window",
+    "failed_publication",
+    "missing_score"
+  ],
+  "success_gate": "one real on-time issued forecast and remote receipt plus later matured score"
+}
