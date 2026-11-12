@@ -1,0 +1,65 @@
+name: BTC4h continuous forward research
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "12 0,4,8,12,16,20 * * *"
+permissions:
+  contents: write
+concurrency:
+  group: btc4h-continuous-single-writer
+  cancel-in-progress: false
+jobs:
+  continuous:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Restore independent continuous evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p research .research
+          branch=data/btc4h-continuous-forward
+          if git ls-remote --exit-code --heads origin "refs/heads/$branch" >/dev/null; then
+            git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch"
+            for file in btc4h_continuous_forecasts.jsonl btc4h_continuous_scores.jsonl btc4h_continuous_publication_receipts.jsonl btc4h_continuous_start_utc.txt; do
+              if git cat-file -e "origin/$branch:research/$file" 2>/dev/null; then
+                git show "origin/$branch:research/$file" > "research/$file"
+              fi
+            done
+          fi
+          touch research/btc4h_continuous_forecasts.jsonl research/btc4h_continuous_scores.jsonl research/btc4h_continuous_publication_receipts.jsonl
+          if [ ! -f research/btc4h_continuous_start_utc.txt ]; then
+            date -u +%Y-%m-%dT%H:%M:%SZ > research/btc4h_continuous_start_utc.txt
+          fi
+      - name: Install research package
+        run: python -m pip install -e .
+      - name: Publish independent start anchor
+        run: bash .github/scripts/publish_btc4h_continuous.sh anchor
+      - name: Issue a genuinely live BTC4h forecast
+        id: issue
+        continue-on-error: true
+        run: |
+          python -m scripts.btc4h_continuous_forward --phase issue --ledger research/btc4h_continuous_forecasts.jsonl --score-ledger research/btc4h_continuous_scores.jsonl --report .research/continuous_issue.json --code-sha 9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9
+      - name: Publish new forecast before scoring
+        if: steps.issue.outcome == 'success'
+        run: bash .github/scripts/publish_btc4h_continuous.sh issue
+      - name: Score previously issued mature forecasts
+        run: |
+          python -m scripts.btc4h_continuous_forward --phase score --ledger research/btc4h_continuous_forecasts.jsonl --score-ledger research/btc4h_continuous_scores.jsonl --report .research/continuous_score.json --code-sha 9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9
+      - name: Publish scores separately
+        run: bash .github/scripts/publish_btc4h_continuous.sh score
+      - name: Fail on issue execution error
+        if: steps.issue.outcome == 'failure'
+        run: exit 1
+      - name: Show actual issuance result
+        if: always()
+        shell: bash
+        run: |
+          cat .research/continuous_issue.json 2>/dev/null || true
+          cat .research/continuous_score.json 2>/dev/null || true
