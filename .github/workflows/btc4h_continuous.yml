@@ -1,4 +1,6 @@
 name: BTC4h continuous forward research
+# Separate rolling fallback study: NOT part of the frozen 180-slot formal 30d cohort.
+# Runtime uses immutable model dependencies from PR109 and separately pinned continuous adapter.
 on:
   workflow_dispatch:
   schedule:
@@ -12,10 +14,28 @@ jobs:
   continuous:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      BTC4H_BASE_SHA: "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9"
+      BTC4H_CONTINUOUS_ADAPTER_SHA: "d9f8e91a713f170026878434f8514082139f6951"
     steps:
       - uses: actions/checkout@v4
         with:
+          # Research dependencies remain immutable; never trust changing main for model code.
+          ref: "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9"
           fetch-depth: 0
+      - name: Overlay only frozen rolling adapter and its append-only publisher
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "$BTC4H_BASE_SHA:scripts/alpha_coinbase_historical_replay.py"
+          git cat-file -e "$BTC4H_BASE_SHA:scripts/alpha_interaction_candidate.py"
+          git cat-file -e "$BTC4H_BASE_SHA:scripts/alpha_volume_confirmation.py"
+          git cat-file -e "$BTC4H_BASE_SHA:scripts/alpha_volume_historical_replay.py"
+          for file in scripts/btc4h_continuous_forward.py .github/scripts/publish_btc4h_continuous.sh; do
+            git cat-file -e "$BTC4H_CONTINUOUS_ADAPTER_SHA:$file"
+            git show "$BTC4H_CONTINUOUS_ADAPTER_SHA:$file" > "$file"
+          done
+          python -m compileall -q scripts/btc4h_continuous_forward.py
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -39,19 +59,30 @@ jobs:
           fi
       - name: Install research package
         run: python -m pip install -e .
+      - name: Verify pinned model dependencies import before market access
+        run: |
+          python - <<'PY'
+          from scripts.btc4h_continuous_forward import (
+              VERSION, calculate_issue, calculate_score, origin_at
+          )
+          from datetime import UTC, datetime
+          assert VERSION == "btc4h-continuous-v1-ridge100"
+          assert origin_at(datetime(2026, 11, 14, 3, 40, tzinfo=UTC)) == datetime(2026, 11, 14, 0, 0, tzinfo=UTC)
+          print("PASS: frozen model dependencies + continuous adapter import successfully")
+          PY
       - name: Publish independent start anchor
         run: bash .github/scripts/publish_btc4h_continuous.sh anchor
       - name: Issue a genuinely live BTC4h forecast
         id: issue
         continue-on-error: true
         run: |
-          python -m scripts.btc4h_continuous_forward --phase issue --ledger research/btc4h_continuous_forecasts.jsonl --score-ledger research/btc4h_continuous_scores.jsonl --report .research/continuous_issue.json --code-sha 9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9
+          python -m scripts.btc4h_continuous_forward --phase issue --ledger research/btc4h_continuous_forecasts.jsonl --score-ledger research/btc4h_continuous_scores.jsonl --report .research/continuous_issue.json --code-sha "$BTC4H_CONTINUOUS_ADAPTER_SHA"
       - name: Publish new forecast before scoring
         if: steps.issue.outcome == 'success'
         run: bash .github/scripts/publish_btc4h_continuous.sh issue
       - name: Score previously issued mature forecasts
         run: |
-          python -m scripts.btc4h_continuous_forward --phase score --ledger research/btc4h_continuous_forecasts.jsonl --score-ledger research/btc4h_continuous_scores.jsonl --report .research/continuous_score.json --code-sha 9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9
+          python -m scripts.btc4h_continuous_forward --phase score --ledger research/btc4h_continuous_forecasts.jsonl --score-ledger research/btc4h_continuous_scores.jsonl --report .research/continuous_score.json --code-sha "$BTC4H_CONTINUOUS_ADAPTER_SHA"
       - name: Publish scores separately
         run: bash .github/scripts/publish_btc4h_continuous.sh score
       - name: Fail on issue execution error
