@@ -4,7 +4,10 @@ name: BTC4h continuous forward research
 on:
   workflow_dispatch:
   schedule:
-    - cron: "12 0,4,8,12,16,20 * * *"
+    # Two GitHub dispatch opportunities per four-hour origin, but only ONE forecast
+    # is allowed per origin by the immutable continuous engine ledger key.
+    # GitHub cron dispatch is best-effort and may still arrive late.
+    - cron: "12,42 0,4,8,12,16,20 * * *"
 permissions:
   contents: write
 concurrency:
