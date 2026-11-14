@@ -80,6 +80,59 @@ jobs:
       - name: Publish new forecast before scoring
         if: steps.issue.outcome == 'success'
         run: bash .github/scripts/publish_btc4h_continuous.sh issue
+      - name: Confirm newly issued continuous forecast against remote Git before target close
+        if: steps.issue.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(python -c 'import json; print(json.load(open(".research/continuous_issue.json"))["newly_issued"])')"
+          if [ "$status" != "1" ]; then
+            echo "No new continuous forecast this run; no receipt manufactured." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          BRANCH="data/btc4h-continuous-forward"
+          FILE="research/btc4h_continuous_forecasts.jsonl"
+          remote_sha="$(git ls-remote origin "refs/heads/$BRANCH" | awk '{print $1}')"
+          test "${#remote_sha}" -eq 40
+          git fetch origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+          test "$remote_sha" = "$(git rev-parse "refs/remotes/origin/$BRANCH")"
+          git show "$remote_sha:$FILE" > "$RUNNER_TEMP/btc4h-continuous-remote-ledger.jsonl"
+          cmp "$RUNNER_TEMP/btc4h-continuous-remote-ledger.jsonl" "$FILE"
+          export CONTINUOUS_REMOTE_SHA="$remote_sha"
+          python - <<'PY'
+          import hashlib,json,os
+          from datetime import UTC,datetime
+          from pathlib import Path
+          def at(s): return datetime.fromisoformat(s.replace("Z","+00:00"))
+          ledger=Path("research/btc4h_continuous_forecasts.jsonl")
+          receipts=Path("research/btc4h_continuous_publication_receipts.jsonl")
+          forecast=json.loads(ledger.read_text().splitlines()[-1])
+          prior=[json.loads(line) for line in receipts.read_text().splitlines() if line.strip()] if receipts.exists() else []
+          if any(x["origin_utc"]==forecast["origin_utc"] for x in prior):
+              raise SystemExit("DUPLICATE_CONTINUOUS_RECEIPT")
+          stamp=datetime.now(UTC)
+          if not at(forecast["issued_at_utc"]) <= stamp < at(forecast["target_5m_close_utc"]):
+              raise SystemExit("TOO_LATE_TO_CONFIRM: target closed or issue clock inconsistent")
+          digest=hashlib.sha256((json.dumps(forecast,sort_keys=True,separators=(",",":"))+"\n").encode()).hexdigest()
+          receipt={
+              "version":forecast["version"],
+              "origin_utc":forecast["origin_utc"],
+              "issued_at_utc":forecast["issued_at_utc"],
+              "target_5m_close_utc":forecast["target_5m_close_utc"],
+              "first_party_remote_confirmed_at_utc":stamp.isoformat().replace("+00:00","Z"),
+              "remote_issue_commit_sha":os.environ["CONTINUOUS_REMOTE_SHA"],
+              "forecast_canonical_line_sha256":digest,
+              "workflow_run_id":os.environ["GITHUB_RUN_ID"],
+              "remote_ref_was_fetched_and_compared":True,
+              "independent_time_witness":False
+          }
+          with receipts.open("a",encoding="utf-8") as output:
+              output.write(json.dumps(receipt,sort_keys=True,separators=(",",":"))+"\n")
+              output.flush()
+              os.fsync(output.fileno())
+          print("First-party remote publication confirmed before target. This is NOT an independent time witness.")
+          PY
+          bash .github/scripts/publish_btc4h_continuous.sh receipt
       - name: Score previously issued mature forecasts
         run: |
           python -m scripts.btc4h_continuous_forward --phase score --ledger research/btc4h_continuous_forecasts.jsonl --score-ledger research/btc4h_continuous_scores.jsonl --report .research/continuous_score.json --code-sha "$BTC4H_CONTINUOUS_ADAPTER_SHA"
