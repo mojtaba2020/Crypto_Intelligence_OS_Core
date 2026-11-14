@@ -1,0 +1,7 @@
+PASS: YAML parse of .github/workflows/btc4h_continuous.yml and ci.yml
+PASS: compile actual embedded Python in the rolling workflow
+PASS: bash -n .github/scripts/publish_btc4h_continuous.sh scripts/test_btc4h_delivery.sh
+PASS: git diff --check
+NOT VERIFIED: live v2 issuance, remote pre-target receipt, subsequent observed matured v2 score
+READ-ONLY MARKET CHECK FAILED: pinned client's api.exchange.coinbase.com destination denied by workspace proxy (403); api.coinbase.com is a different hostname.
+GitHub historical logs inspected: jobs 132264634647, 132268011265, 132432139065, 132320540929. These are not new v2 acceptance runs.

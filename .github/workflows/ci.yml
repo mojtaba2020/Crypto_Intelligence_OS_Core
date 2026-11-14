@@ -49,3 +49,8 @@ jobs:
 
       - name: Run complete quality gate
         run: python scripts/quality_gate.py
+
+      - name: Test rolling adapter with immutable research dependencies (offline)
+        run: |
+          git fetch origin 9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9
+          bash scripts/test_btc4h_delivery.sh

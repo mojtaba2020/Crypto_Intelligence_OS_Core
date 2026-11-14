@@ -27,16 +27,22 @@ from scripts.alpha_volume_confirmation import (
     volume_confirmation_features,
 )
 from scripts.alpha_volume_historical_replay import fetch_public_hourly_close_volume
+from scripts.btc4h_delivery_integrity import (
+    canonical_digest,
+    validate_score_match,
+    verify_stored_receipt,
+)
 
 from crypto_intelligence_os.hybrid_forecasting import _estimate, _fit
 
-VERSION = "btc4h-continuous-v1-ridge100"
+VERSION = "btc4h-continuous-v2-ridge100"
+LEGACY_VERSION = "btc4h-continuous-v1-ridge100"
 RIDGE = 100.0
 HISTORY_DAYS = 10
 MIN_TRAINING = 30
 MODEL_NAMES = ("volume_interaction", "price_plus_volume", "price_only", "persistence")
-EARLIEST_PREFETCH_MINUTE = 0
-MAX_EARLY_WAIT_SECONDS = 0
+EARLIEST_PREFETCH_MINUTE = 8
+MAX_EARLY_WAIT_SECONDS = 120
 
 
 def utc(dt: datetime) -> datetime:
@@ -52,13 +58,13 @@ def origin_at(dt: datetime) -> datetime:
 
 def in_issue_window(at: datetime) -> bool:
     s = origin_at(at)
-    return s <= at < s + timedelta(hours=4)
+    return s + timedelta(minutes=10) <= at < s + timedelta(minutes=15)
 
 
 def in_prefetch_window(at: datetime) -> bool:
     """Fetch only in the current origin's S+8m..S+15m interval."""
     s = origin_at(at)
-    return s <= at < s + timedelta(hours=4)
+    return s + timedelta(minutes=8) <= at < s + timedelta(minutes=15)
 
 
 def _digest(mapping: dict[datetime, Any]) -> str:
@@ -172,6 +178,9 @@ def calculate_issue(
         "version": VERSION,
         "origin_utc": iso(origin),
         "issued_at_utc": iso(issued_at),
+        "horizon_seconds": (origin + timedelta(hours=4, minutes=15) - issued_at).total_seconds(),
+        "horizon_type": "four_hour_240_to_245_minutes",
+        "model_dependencies_sha": "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9",
         "hourly_data_collected_at_utc": iso(hourly_fetched_at),
         "target_training_data_collected_at_utc": iso(target_fetched_at),
         "target_5m_bar_open_utc": iso(origin + timedelta(hours=4, minutes=10)),
@@ -198,7 +207,7 @@ def calculate_score(
 ) -> dict[str, Any]:
     """Score ONLY after the historic issued row's target bar has really closed."""
     utc(target_received_at)
-    if forecast["version"] != VERSION or not forecast.get("research_only"):
+    if forecast["version"] not in (VERSION, LEGACY_VERSION) or not forecast.get("research_only"):
         raise ValueError("invalid version or unsafe forecast ledger")
     issued = datetime.fromisoformat(forecast["issued_at_utc"].replace("Z", "+00:00"))
     origin = datetime.fromisoformat(forecast["origin_utc"].replace("Z", "+00:00"))
@@ -206,12 +215,18 @@ def calculate_score(
     target_close = datetime.fromisoformat(forecast["target_5m_close_utc"].replace("Z", "+00:00"))
     if (
         origin_at(issued) != origin
-        or not in_issue_window(issued)
+        or not (origin <= issued < origin + timedelta(hours=4))
         or target_open != origin + timedelta(hours=4, minutes=10)
         or target_close != target_open + timedelta(minutes=5)
         or not issued < target_close <= target_received_at
     ):
         raise ValueError("not a valid pre-target forward forecast")
+    if forecast["version"] == VERSION:
+        if (
+            not in_issue_window(issued)
+            or forecast.get("horizon_seconds") != (target_close - issued).total_seconds()
+        ):
+            raise ValueError("invalid genuine four-hour horizon")
     for key in ("hourly_data_collected_at_utc", "target_training_data_collected_at_utc"):
         when = datetime.fromisoformat(forecast[key].replace("Z", "+00:00"))
         if not origin <= when <= issued:
@@ -241,7 +256,9 @@ def calculate_score(
         for name in MODEL_NAMES
     }
     return {
-        "version": VERSION,
+        "version": forecast["version"],
+        "forecast_canonical_line_sha256": canonical_digest(forecast),
+        "horizon_seconds": (target_close - issued).total_seconds(),
         "origin_utc": forecast["origin_utc"],
         "issued_at_utc": forecast["issued_at_utc"],
         "target_5m_bar_open_utc": forecast["target_5m_bar_open_utc"],
@@ -285,6 +302,7 @@ def run_once(
     clock: Callable[[], datetime] | None = None,
     sleeper: Callable[[float], None] | None = None,
     phase: str = "both",
+    receipt_ledger: Path | None = None,
 ) -> dict[str, Any]:
     """One invocation: issue in the on-time slot, then score matured older rows.
 
@@ -299,19 +317,19 @@ def run_once(
     utc(before)
     existing = _read_jsonl(ledger)
     keys = [(r["version"], r["origin_utc"]) for r in existing]
-    if len(keys) != len(set(keys)):
+    if len(keys) != len({origin for _, origin in keys}):
         raise ValueError("duplicate issued forecast origin in persistent ledger")
     current_origin = iso(origin_at(before))
     issued: dict[str, Any] | None = None
     status = (
         "NOT_YET_PREFETCH_WINDOW"
         if before < origin_at(before) + timedelta(minutes=EARLIEST_PREFETCH_MINUTE)
-        else "MISSED_ISSUE_WINDOW"
+        else "missed_due_to_late_dispatch"
     )
     if phase == "score":
-        status = "SCORE_ONLY"
-    elif (VERSION, current_origin) in keys:
-        status = "ALREADY_ISSUED"
+        status = "score_pending"
+    elif any(origin == current_origin for _, origin in keys):
+        status = "already_issued"
     elif in_prefetch_window(before):
         origin = origin_at(before)
         hourly = fetch_public_hourly_close_volume(
@@ -327,14 +345,14 @@ def run_once(
         prepared_at = get_time()
         # The first scheduled attempt may prefetch at S+8m. We wait only
         # until S+10m and only for <=2 minutes. A missed deadline fails closed.
-        if False and prepared_at < origin + timedelta(minutes=10):
+        if prepared_at < origin + timedelta(minutes=10):
             wait_seconds = (origin + timedelta(minutes=10) - prepared_at).total_seconds()
             if not 0 < wait_seconds <= MAX_EARLY_WAIT_SECONDS:
                 raise ValueError("unexpected pre-issue wait duration")
             sleep_for(wait_seconds)
             prepared_at = get_time()
         if not in_issue_window(prepared_at) or origin_at(prepared_at) != origin:
-            status = "MISSED_ISSUE_WINDOW_AFTER_FETCH"
+            status = "missed_due_to_late_dispatch"
         else:
             candidate = calculate_issue(
                 issued_at=prepared_at,
@@ -348,20 +366,35 @@ def run_once(
             # the real publish clock must be sampled AFTER model calculation.
             published_at = get_time()
             if not in_issue_window(published_at) or origin_at(published_at) != origin:
-                status = "MISSED_ISSUE_WINDOW_AFTER_COMPUTE"
+                status = "missed_due_to_late_dispatch"
             else:
                 candidate["issued_at_utc"] = iso(published_at)
+                candidate["horizon_seconds"] = (
+                    origin + timedelta(hours=4, minutes=15) - published_at
+                ).total_seconds()
                 _append(ledger, candidate)
                 issued = candidate
-                status = "ISSUED_BEFORE_TARGET"
+                status = "issued"
                 existing.append(issued)
     # An old malformed score must NEVER block publication of a fresh issue.
     # The separate score phase will still fail closed on that corrupt ledger.
     previous_scores = _read_jsonl(score_ledger) if phase != "issue" else []
     scored_keys = [(r["version"], r["origin_utc"]) for r in previous_scores]
-    if len(scored_keys) != len(set(scored_keys)):
+    if len(scored_keys) != len({origin for _, origin in scored_keys}):
         raise ValueError("duplicate score origin")
     scored_set = set(scored_keys)
+    receipts = (
+        _read_jsonl(
+            receipt_ledger or ledger.with_name("btc4h_continuous_publication_receipts.jsonl")
+        )
+        if phase != "issue"
+        else []
+    )
+    for old_score in previous_scores:
+        matching = [r for r in existing if r["origin_utc"] == old_score["origin_utc"]]
+        if len(matching) != 1:
+            raise ValueError("stored score lacks exactly one issued forecast")
+        validate_score_match(matching[0], old_score)
     newly_scored = 0
     overdue_unavailable = 0
     for row in existing if phase != "issue" else ():
@@ -381,6 +414,10 @@ def run_once(
         received = get_time()
         if target_start not in price_by_time:
             continue
+        matches = [r for r in receipts if r.get("origin_utc") == row["origin_utc"]]
+        if len(matches) != 1:
+            raise ValueError("missing or duplicate publication receipt; score refused")
+        verify_stored_receipt(row, matches[0], ledger.as_posix())
         score = calculate_score(
             row, actual=price_by_time[target_start], target_received_at=received
         )
@@ -388,8 +425,11 @@ def run_once(
         newly_scored += 1
         scored_set.add(key)
 
+    if phase == "score" and newly_scored:
+        status = "score_matured"
     result = {
         "research_status": status,
+        "origin_utc": current_origin,
         "phase": phase,
         "observed_run_at_utc": iso(before),
         "newly_issued": 1 if issued else 0,
@@ -415,21 +455,31 @@ def main() -> None:
     parser.add_argument("--ledger", type=Path, required=True)
     parser.add_argument("--score-ledger", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--receipt-ledger", type=Path)
     parser.add_argument("--code-sha", default="local-research")
     parser.add_argument("--phase", choices=("issue", "score", "both"), default="both")
     args = parser.parse_args()
-    print(
-        json.dumps(
-            run_once(
-                ledger=args.ledger,
-                score_ledger=args.score_ledger,
-                report=args.report,
-                code_sha=args.code_sha,
-                phase=args.phase,
-            ),
-            sort_keys=True,
+    try:
+        result = run_once(
+            ledger=args.ledger,
+            score_ledger=args.score_ledger,
+            report=args.report,
+            code_sha=args.code_sha,
+            phase=args.phase,
+            receipt_ledger=args.receipt_ledger,
         )
-    )
+    except Exception as exc:
+        result = {
+            "research_status": "issue_failed" if args.phase != "score" else "score_failed",
+            "phase": args.phase,
+            "error": f"{type(exc).__name__}: {exc}",
+            "newly_issued": 0,
+            "observed_run_at_utc": iso(datetime.now(UTC)),
+        }
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(json.dumps(result, sort_keys=True) + "\n")
+        raise
+    print(json.dumps(result, sort_keys=True))
 
 
 if __name__ == "__main__":

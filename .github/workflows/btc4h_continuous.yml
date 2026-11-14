@@ -3,13 +3,21 @@ name: BTC4h continuous forward research
 # Runtime uses immutable model dependencies from PR109 and separately pinned continuous adapter.
 on:
   workflow_dispatch:
+    inputs:
+      phase:
+        type: choice
+        options: [score, issue]
+        default: score
+        description: "Score recovery by default; issue only during the real window"
   schedule:
-    # Two GitHub dispatch opportunities per four-hour origin, but only ONE forecast
+    # Bounded retries within the valid window, plus score-only +20. Only ONE forecast
     # is allowed per origin by the immutable continuous engine ledger key.
     # GitHub cron dispatch is best-effort and may still arrive late.
-    - cron: "12,42 0,4,8,12,16,20 * * *"
+    - cron: "8,10,12,14 0,4,8,12,16,20 * * *"
+    - cron: "20 0,4,8,12,16,20 * * *"
 permissions:
   contents: write
+  issues: write
 concurrency:
   group: btc4h-continuous-single-writer
   cancel-in-progress: false
@@ -19,7 +27,7 @@ jobs:
     timeout-minutes: 25
     env:
       BTC4H_BASE_SHA: "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9"
-      BTC4H_CONTINUOUS_ADAPTER_SHA: "d9f8e91a713f170026878434f8514082139f6951"
+      BTC4H_CONTINUOUS_ADAPTER_SHA: "${{ github.sha }}"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,7 +42,7 @@ jobs:
           git cat-file -e "$BTC4H_BASE_SHA:scripts/alpha_interaction_candidate.py"
           git cat-file -e "$BTC4H_BASE_SHA:scripts/alpha_volume_confirmation.py"
           git cat-file -e "$BTC4H_BASE_SHA:scripts/alpha_volume_historical_replay.py"
-          for file in scripts/btc4h_continuous_forward.py .github/scripts/publish_btc4h_continuous.sh; do
+          for file in scripts/btc4h_continuous_forward.py scripts/btc4h_delivery_integrity.py scripts/btc4h_delivery_report.py .github/scripts/publish_btc4h_continuous.sh; do
             git cat-file -e "$BTC4H_CONTINUOUS_ADAPTER_SHA:$file"
             git show "$BTC4H_CONTINUOUS_ADAPTER_SHA:$file" > "$file"
           done
@@ -69,7 +77,7 @@ jobs:
               VERSION, calculate_issue, calculate_score, origin_at
           )
           from datetime import UTC, datetime
-          assert VERSION == "btc4h-continuous-v1-ridge100"
+          assert VERSION == "btc4h-continuous-v2-ridge100"
           assert origin_at(datetime(2026, 11, 14, 3, 40, tzinfo=UTC)) == datetime(2026, 11, 14, 0, 0, tzinfo=UTC)
           print("PASS: frozen model dependencies + continuous adapter import successfully")
           PY
@@ -77,6 +85,7 @@ jobs:
         run: bash .github/scripts/publish_btc4h_continuous.sh anchor
       - name: Issue a genuinely live BTC4h forecast
         id: issue
+        if: github.event.inputs.phase == 'issue' || (github.event_name == 'schedule' && !startsWith(github.event.schedule, '20 '))
         continue-on-error: true
         run: |
           python -m scripts.btc4h_continuous_forward --phase issue --ledger research/btc4h_continuous_forecasts.jsonl --score-ledger research/btc4h_continuous_scores.jsonl --report .research/continuous_issue.json --code-sha "$BTC4H_CONTINUOUS_ADAPTER_SHA"
@@ -103,44 +112,61 @@ jobs:
           cmp "$RUNNER_TEMP/btc4h-continuous-remote-ledger.jsonl" "$FILE"
           export CONTINUOUS_REMOTE_SHA="$remote_sha"
           python - <<'PY'
-          import hashlib,json,os
+          import json,os
           from datetime import UTC,datetime
           from pathlib import Path
-          def at(s): return datetime.fromisoformat(s.replace("Z","+00:00"))
+          from scripts.btc4h_delivery_integrity import make_receipt
           ledger=Path("research/btc4h_continuous_forecasts.jsonl")
           receipts=Path("research/btc4h_continuous_publication_receipts.jsonl")
           forecast=json.loads(ledger.read_text().splitlines()[-1])
-          prior=[json.loads(line) for line in receipts.read_text().splitlines() if line.strip()] if receipts.exists() else []
+          prior=[json.loads(line) for line in receipts.read_text().splitlines() if line.strip()]
           if any(x["origin_utc"]==forecast["origin_utc"] for x in prior):
               raise SystemExit("DUPLICATE_CONTINUOUS_RECEIPT")
-          stamp=datetime.now(UTC)
-          if not at(forecast["issued_at_utc"]) <= stamp < at(forecast["target_5m_close_utc"]):
-              raise SystemExit("TOO_LATE_TO_CONFIRM: target closed or issue clock inconsistent")
-          digest=hashlib.sha256((json.dumps(forecast,sort_keys=True,separators=(",",":"))+"\n").encode()).hexdigest()
-          receipt={
-              "version":forecast["version"],
-              "origin_utc":forecast["origin_utc"],
-              "issued_at_utc":forecast["issued_at_utc"],
-              "target_5m_close_utc":forecast["target_5m_close_utc"],
-              "first_party_remote_confirmed_at_utc":stamp.isoformat().replace("+00:00","Z"),
-              "remote_issue_commit_sha":os.environ["CONTINUOUS_REMOTE_SHA"],
-              "forecast_canonical_line_sha256":digest,
-              "workflow_run_id":os.environ["GITHUB_RUN_ID"],
-              "remote_ref_was_fetched_and_compared":True,
-              "independent_time_witness":False
-          }
+          receipt=make_receipt(
+              forecast, remote_sha=os.environ["CONTINUOUS_REMOTE_SHA"],
+              remote_content=Path(os.environ["RUNNER_TEMP"],"btc4h-continuous-remote-ledger.jsonl").read_bytes(),
+              confirmed_at=datetime.now(UTC), run_id=os.environ["GITHUB_RUN_ID"])
           with receipts.open("a",encoding="utf-8") as output:
               output.write(json.dumps(receipt,sort_keys=True,separators=(",",":"))+"\n")
               output.flush()
               os.fsync(output.fileno())
-          print("First-party remote publication confirmed before target. This is NOT an independent time witness.")
           PY
           bash .github/scripts/publish_btc4h_continuous.sh receipt
       - name: Score previously issued mature forecasts
+        id: score
+        if: always()
         run: |
           python -m scripts.btc4h_continuous_forward --phase score --ledger research/btc4h_continuous_forecasts.jsonl --score-ledger research/btc4h_continuous_scores.jsonl --report .research/continuous_score.json --code-sha "$BTC4H_CONTINUOUS_ADAPTER_SHA"
       - name: Publish scores separately
+        if: always() && steps.score.outcome == 'success'
         run: bash .github/scripts/publish_btc4h_continuous.sh score
+      - name: Publish Persian rolling and formal status even after a failed issue
+        id: report
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin refs/heads/data/btc4h-shadow-forward:refs/remotes/origin/data/btc4h-shadow-forward
+          mkdir -p .research/formal
+          for file in btc4h_shadow_forecasts.jsonl btc4h_shadow_scores.jsonl btc4h_shadow_publication_receipts.jsonl btc4h_30d_protocol_20261109.json; do
+            git show "origin/data/btc4h-shadow-forward:research/$file" > ".research/formal/$file"
+          done
+          python -m scripts.btc4h_delivery_report --run-id "$GITHUB_RUN_ID" --output research/btc4h_continuous_latest_report.md
+          cat research/btc4h_continuous_latest_report.md >> "$GITHUB_STEP_SUMMARY"
+          bash .github/scripts/publish_btc4h_continuous.sh report
+          if [ "${{ github.event.schedule }}" = "20 0,4,8,12,16,20 * * *" ] || [ "${{ github.event_name }}" = workflow_dispatch ]; then
+            gh issue comment 111 --repo "$GITHUB_REPOSITORY" --body-file research/btc4h_continuous_latest_report.md
+          fi
+      - name: Upload diagnostics (synthetic checks are not live issuance)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc4h-delivery-${{ github.run_id }}
+          path: |
+            .research/continuous_*.json
+            research/btc4h_continuous_latest_report.md
       - name: Fail on issue execution error
         if: steps.issue.outcome == 'failure'
         run: exit 1
@@ -148,14 +174,24 @@ jobs:
         if: steps.issue.outcome == 'success'
         shell: bash
         run: |
+          git fetch origin refs/heads/data/btc4h-continuous-forward:refs/remotes/origin/data/btc4h-continuous-forward
+          git show origin/data/btc4h-continuous-forward:research/btc4h_continuous_publication_receipts.jsonl > "$RUNNER_TEMP/persisted-receipts.jsonl"
+          cmp "$RUNNER_TEMP/persisted-receipts.jsonl" research/btc4h_continuous_publication_receipts.jsonl
           python - <<'PY'
           import json
           from pathlib import Path
           result = json.loads(Path(".research/continuous_issue.json").read_text())
-          if result.get("newly_issued") != 1 and result.get("research_status") != "ALREADY_ISSUED":
-              raise SystemExit("NO_NEW_FORECAST: " + str(result.get("research_status")))
-          print("Verified issuance status:", result.get("research_status"))
+          from scripts.btc4h_delivery_integrity import require_issue_delivery
+          forecasts=[json.loads(s) for s in Path("research/btc4h_continuous_forecasts.jsonl").read_text().splitlines() if s.strip()]
+          receipts=[json.loads(s) for s in Path("research/btc4h_continuous_publication_receipts.jsonl").read_text().splitlines() if s.strip()]
+          status=require_issue_delivery(result,forecasts,receipts,"research/btc4h_continuous_forecasts.jsonl")
+          print("Verified issuance status:",status,"; newly issued:",result["newly_issued"])
           PY
+      - name: Surface score and report failures
+        if: always() && (steps.score.outcome == 'failure' || steps.report.outcome == 'failure')
+        run: |
+          echo "score_failed or report_failed: inspect job steps" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
       - name: Show actual issuance result
         if: always()
         shell: bash
