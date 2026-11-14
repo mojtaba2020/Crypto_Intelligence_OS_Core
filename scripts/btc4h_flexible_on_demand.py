@@ -9,7 +9,6 @@ import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from crypto_intelligence_os.hybrid_forecasting import _estimate, _fit
 from scripts.alpha_coinbase_historical_replay import fetch_candles, iso
 from scripts.alpha_interaction_candidate import _independent_interaction_projection
 from scripts.alpha_volume_confirmation import (
@@ -18,6 +17,7 @@ from scripts.alpha_volume_confirmation import (
     volume_confirmation_features,
 )
 from scripts.alpha_volume_historical_replay import fetch_public_hourly_close_volume
+from crypto_intelligence_os.hybrid_forecasting import _estimate, _fit
 
 MODELS = ("volume_interaction", "price_plus_volume", "price_only", "persistence")
 VERSION = "btc4h-flexible-v1-ridge100"
