@@ -1,0 +1,42 @@
+# No market API requests, no forecasts, no publication, no orders.
+# One-shot deployment smoke test for pinned BTC4h continuous runtime.
+name: BTC4h continuous pinned-dependencies preflight
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/btc4h_continuous_pin_preflight_20261113.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9"
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Materialize both pinned source revisions and verify import
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=d9f8e91a713f170026878434f8514082139f6951
+          for file in scripts/btc4h_continuous_forward.py .github/scripts/publish_btc4h_continuous.sh; do
+            git show "$SRC:$file" > "$file"
+          done
+          python -m pip install -e .
+          python - <<'PY'
+          from datetime import UTC, datetime
+          from scripts.btc4h_continuous_forward import VERSION, origin_at, in_issue_window, calculate_issue, calculate_score
+          assert VERSION == "btc4h-continuous-v1-ridge100"
+          assert origin_at(datetime(2026,11,14,3,40,tzinfo=UTC)) == datetime(2026,11,14,0,tzinfo=UTC)
+          assert in_issue_window(datetime(2026,11,14,3,40,tzinfo=UTC))
+          print("PASS: frozen continuous engine imports + 4h origin logic, no market access")
+          PY
