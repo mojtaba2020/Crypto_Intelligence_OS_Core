@@ -1,0 +1,12 @@
+# Cloudflare Workers Free. Staged inert until a separately reviewed cutover.
+name = "btc4h-free-scheduler-preflight"
+main = "src/index.mjs"
+compatibility_date = "2026-11-15"
+
+[triggers]
+crons = ["8,10,12,14,20 0,4,8,12,16,20 * * *"]
+
+[vars]
+BTC4H_CF_ENABLED = "false"
+BTC4H_SCHEDULE_CUTOVER_CONFIRMED = "false"
+# Add BTC4H_GITHUB_ACTIONS_TOKEN via encrypted Cloudflare secret, NEVER here.
