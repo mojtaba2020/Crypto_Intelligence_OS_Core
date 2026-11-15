@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import worker, { CRON, RAW_WORKFLOW, DISPATCH_URL, dispatchOnce, slotFor } from '../src/index.mjs';
+import worker, { CRON, RAW_WORKFLOW, DISPATCH_URL, TOKEN_CHECK_URL, dispatchOnce, slotFor } from '../src/index.mjs';
 
 const t = (iso, cron = CRON) => ({ cron, scheduledTime: Date.parse(iso) });
 const env = {
@@ -25,6 +25,41 @@ test('disabled by default never touches the network', async () => {
     clock: () => Date.parse('2026-11-16T08:08:10Z'), fetcher: () => { throw Error('network forbidden'); },
   });
   assert.deepEqual(result, { status: 'disabled', dispatches: 0 });
+});
+
+test('opt-in read-only token preflight only GETs the workflow and never dispatches', async () => {
+  const calls = [];
+  const safe = { ...env, BTC4H_CF_ENABLED: 'false', BTC4H_SCHEDULE_CUTOVER_CONFIRMED: 'false',
+    BTC4H_TOKEN_PREFLIGHT: 'true' };
+  const result = await dispatchOnce(t('2026-11-16T08:08:00Z'), safe, {
+    fetcher: async (url, opts) => {
+      calls.push({url,opts});
+      return response(200, '{}');
+    },
+  });
+  assert.deepEqual(result, { status: 'token_read_accepted', github_status: 200, dispatches: 0 });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, TOKEN_CHECK_URL);
+  assert.equal(calls[0].opts.method, 'GET');
+  assert.equal(calls[0].opts.headers.Authorization, 'Bearer fake-token-not-a-secret');
+});
+
+test('token preflight refuses incorrect credentials or either live cutover gate', async () => {
+  const preflight = { ...env, BTC4H_CF_ENABLED: 'false',
+    BTC4H_SCHEDULE_CUTOVER_CONFIRMED: 'false', BTC4H_TOKEN_PREFLIGHT: 'true' };
+  const t0 = t('2026-11-16T08:08:00Z');
+  await assert.rejects(dispatchOnce(t0, { ...preflight, BTC4H_GITHUB_ACTIONS_TOKEN: '' }, {
+    fetcher: () => { throw Error('network forbidden'); },
+  }), /missing or malformed/);
+  await assert.rejects(dispatchOnce(t0, preflight, {
+    fetcher: async () => response(401, ''),
+  }), /token preflight HTTP 401/);
+  await assert.rejects(dispatchOnce(t0, { ...preflight, BTC4H_CF_ENABLED: 'true' }, {
+    fetcher: () => { throw Error('network forbidden'); },
+  }), /read-only preflight forbidden/);
+  await assert.rejects(dispatchOnce(t0, { ...preflight, BTC4H_SCHEDULE_CUTOVER_CONFIRMED: 'true' }, {
+    fetcher: () => { throw Error('network forbidden'); },
+  }), /read-only preflight forbidden/);
 });
 
 test('requires independent cutover acknowledgement and a secret token', async () => {
