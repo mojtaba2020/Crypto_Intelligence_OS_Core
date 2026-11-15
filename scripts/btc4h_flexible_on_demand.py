@@ -24,12 +24,12 @@ MODELS = ("volume_interaction", "price_plus_volume", "price_only", "persistence"
 VERSION = "btc4h-flexible-v1-ridge100"
 HISTORY_DAYS = 10
 
+
 def read(path):
     return (
-        [json.loads(x) for x in path.read_text().splitlines() if x.strip()]
-        if path.exists()
-        else []
+        [json.loads(x) for x in path.read_text().splitlines() if x.strip()] if path.exists() else []
     )
+
 
 def append(path, row):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -38,8 +38,9 @@ def append(path, row):
         f.flush()
         os.fsync(f.fileno())
 
+
 def features(hourly, origin, fetched):
-    starts = [origin - timedelta(hours=25-i) for i in range(25)]
+    starts = [origin - timedelta(hours=25 - i) for i in range(25)]
     if any(t not in hourly for t in starts):
         return None
     bars = tuple(
@@ -52,6 +53,7 @@ def features(hourly, origin, fetched):
         for t in starts
     )
     return volume_confirmation_features(bars, issued_at_utc=fetched), bars[-1].close_usd
+
 
 def issue(ledger):
     start = datetime.now(UTC)
@@ -77,8 +79,8 @@ def issue(ledger):
     )
     fetched_targets = datetime.now(UTC)
     training = []
-    for i in range(HISTORY_DAYS*6):
-        prior = origin - timedelta(days=HISTORY_DAYS) + timedelta(hours=4*i)
+    for i in range(HISTORY_DAYS * 6):
+        prior = origin - timedelta(days=HISTORY_DAYS) + timedelta(hours=4 * i)
         if prior > origin - timedelta(hours=8):
             break
         result = features(hourly, prior, fetched)
@@ -86,21 +88,24 @@ def issue(ledger):
         if result is None or target not in targets or target + timedelta(minutes=5) > start:
             continue
         x, ref = result
-        training.append((x, math.log(targets[target]/ref)))
+        training.append((x, math.log(targets[target] / ref)))
     if len(training) < 30:
         raise RuntimeError("Insufficient mature training examples; no forecast")
     projection, enabled = _independent_interaction_projection(training)
-    full = [((m,v,_interaction_residual(m,v,z,projection,enabled)),y) for (m,v,z),y in training]
-    additive = [((m,v),y) for (m,v,z),y in training]
-    momentum = [((m,),y) for (m,v,z),y in training]
-    (m,v,z), reference = current
+    full = [
+        ((m, v, _interaction_residual(m, v, z, projection, enabled)), y)
+        for (m, v, z), y in training
+    ]
+    additive = [((m, v), y) for (m, v, z), y in training]
+    momentum = [((m,), y) for (m, v, z), y in training]
+    (m, v, z), reference = current
     returns = {
         "volume_interaction": _estimate(
             *_fit(full, ridge=100.0),
             (m, v, _interaction_residual(m, v, z, projection, enabled)),
         ),
-        "price_plus_volume": _estimate(*_fit(additive,ridge=100.0),(m,v)),
-        "price_only": _estimate(*_fit(momentum,ridge=100.0),(m,)),
+        "price_plus_volume": _estimate(*_fit(additive, ridge=100.0), (m, v)),
+        "price_only": _estimate(*_fit(momentum, ridge=100.0), (m,)),
         "persistence": 0.0,
     }
     if any(not math.isfinite(x) or abs(x) >= 0.5 for x in returns.values()):
@@ -127,25 +132,26 @@ def issue(ledger):
     )
     if len([x for x in read(ledger) if x["issued_at_utc"][:10] == iso(issued)[:10]]) >= 4:
         raise RuntimeError("Four forecasts already issued today (UTC)")
-    append(ledger,row)
-    print(json.dumps(dict(status="issued",forecast=row),sort_keys=True))
+    append(ledger, row)
+    print(json.dumps(dict(status="issued", forecast=row), sort_keys=True))
 
-def score(ledger,scores):
-    existing=read(scores)
-    done={r["issued_at_utc"] for r in existing}
-    now=datetime.now(UTC)
+
+def score(ledger, scores):
+    existing = read(scores)
+    done = {r["issued_at_utc"] for r in existing}
+    now = datetime.now(UTC)
     for row in read(ledger):
         if row["issued_at_utc"] in done:
             continue
-        close=datetime.fromisoformat(row["target_5m_close_utc"].replace("Z","+00:00"))
-        if close>now or now-close>timedelta(days=39):
+        close = datetime.fromisoformat(row["target_5m_close_utc"].replace("Z", "+00:00"))
+        if close > now or now - close > timedelta(days=39):
             continue
-        opened=datetime.fromisoformat(row["target_5m_bar_open_utc"].replace("Z","+00:00"))
-        candles=fetch_candles(opened,close,granularity=300)
+        opened = datetime.fromisoformat(row["target_5m_bar_open_utc"].replace("Z", "+00:00"))
+        candles = fetch_candles(opened, close, granularity=300)
         if opened not in candles:
             continue
-        actual=candles[opened]
-        ref=row["reference_usd"]
+        actual = candles[opened]
+        ref = row["reference_usd"]
         append(
             scores,
             dict(
@@ -156,19 +162,19 @@ def score(ledger,scores):
                     k: abs(v - actual) for k, v in row["price_forecasts_usd"].items()
                 },
                 direction_correct={
-                    k: None if abs(v - ref) < 1e-9 or actual == ref
-                    else (v > ref) == (actual > ref)
+                    k: None if abs(v - ref) < 1e-9 or actual == ref else (v > ref) == (actual > ref)
                     for k, v in row["price_forecasts_usd"].items()
                 },
                 scored_at_utc=iso(datetime.now(UTC)),
             ),
         )
-        print("scored",row["issued_at_utc"])
+        print("scored", row["issued_at_utc"])
 
-if __name__=="__main__":
-    p=argparse.ArgumentParser()
-    p.add_argument("--phase",choices=["issue","score"],required=True)
-    p.add_argument("--ledger",type=Path,default=Path("research/btc4h_flexible_forecasts.jsonl"))
-    p.add_argument("--scores",type=Path,default=Path("research/btc4h_flexible_scores.jsonl"))
-    args=p.parse_args()
-    (issue(args.ledger) if args.phase=="issue" else score(args.ledger,args.scores))
+
+if __name__ == "__main__":
+    p = argparse.ArgumentParser()
+    p.add_argument("--phase", choices=["issue", "score"], required=True)
+    p.add_argument("--ledger", type=Path, default=Path("research/btc4h_flexible_forecasts.jsonl"))
+    p.add_argument("--scores", type=Path, default=Path("research/btc4h_flexible_scores.jsonl"))
+    args = p.parse_args()
+    (issue(args.ledger) if args.phase == "issue" else score(args.ledger, args.scores))

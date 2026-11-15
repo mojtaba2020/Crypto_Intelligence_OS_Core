@@ -6,7 +6,7 @@ set -euo pipefail
 
 phase="${1:-}"
 case "$phase" in
-  anchor|issue|receipt|score) ;;
+  anchor|issue|receipt|score|report) ;;
   *) echo "usage: publish_btc4h_shadow.sh {anchor|issue|receipt|score}" >&2; exit 2 ;;
 esac
 data_branch="data/btc4h-continuous-forward"
@@ -63,6 +63,7 @@ for name in (anchor, forecast, receipts, scores):
         if proposed and not proposed.endswith(b"\n"):
             raise SystemExit(f"truncated JSONL record in {name}")
         if proposed:
+            origins = set()
             for line in proposed.splitlines():
                 try:
                     row = json.loads(line)
@@ -70,6 +71,10 @@ for name in (anchor, forecast, receipts, scores):
                     raise SystemExit(f"invalid JSONL row in {name}: {exc}") from exc
                 if not isinstance(row, dict):
                     raise SystemExit(f"nonobject JSONL row in {name}")
+                origin = row.get("origin_utc")
+                if not origin or origin in origins:
+                    raise SystemExit(f"missing or duplicate origin in {name}")
+                origins.add(origin)
         if name == forecast and phase != "issue" and historical != proposed:
             raise SystemExit("forecast ledger changed outside issue phase")
         if name == scores and phase != "score" and historical != proposed:
@@ -83,6 +88,9 @@ for name in (anchor, forecast, receipts, scores):
         old.write_bytes(proposed)
 PY
 
+if [ "$phase" = report ]; then
+  cp "$source_dir/btc4h_continuous_latest_report.md" "$work_tree/research/btc4h_continuous_latest_report.md"
+fi
 git -C "$work_tree" add -A -- research/
 if ! git -C "$work_tree" diff --cached --quiet; then
   git -C "$work_tree" commit -m "BTC4h $phase evidence; run ${GITHUB_RUN_ID:-local}" >/dev/null
