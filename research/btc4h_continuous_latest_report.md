@@ -1,12 +1,12 @@
 # گزارش وضعیت واقعی BTC/USD
 
-Run ID: 43749271031؛ UTC: 2026-11-15T18:53:33.255210+00:00
+Run ID: 43777421128؛ UTC: 2026-11-15T23:55:55.937579+00:00
 
-اعتبار heartbeat تا UTC: 2026-11-15T23:23:33.255210+00:00
+اعتبار heartbeat تا UTC: 2026-11-16T04:25:55.937579+00:00
 
 ## آزمایش رسمی منجمد — بدون تغییر
 
-نوبت موعدرسیده: 39؛ انتشار تأییدشده: 2؛ چهارساعت معتبر: 2؛ ازدست‌رفته: 37
+نوبت موعدرسیده: 40؛ انتشار تأییدشده: 2؛ چهارساعت معتبر: 2؛ ازدست‌رفته: 38
 
 آخرین صدور UTC: 2026-11-12T12:14:00.295362Z؛ افق واقعی: 241.00 دقیقه.
 
@@ -18,7 +18,7 @@ Run ID: 43749271031؛ UTC: 2026-11-15T18:53:33.255210+00:00
 
 ## مسیر rolling — مستقل از آزمایش رسمی
 
-نوبت موعدرسیده: 20؛ انتشار تأییدشده: 3؛ چهارساعت معتبر: 0؛ ازدست‌رفته: 20
+نوبت موعدرسیده: 21؛ انتشار تأییدشده: 3؛ چهارساعت معتبر: 0؛ ازدست‌رفته: 21
 
 آخرین صدور UTC: 2026-11-14T23:52:02.922450Z؛ افق واقعی: 22.95 دقیقه.
 
@@ -32,15 +32,29 @@ Run ID: 43749271031؛ UTC: 2026-11-15T18:53:33.255210+00:00
 
 GitHub cron تضمین زمان ندارد؛ missed_due_to_late_dispatch موفقیت صدور نیست.
 
-issue: اجرا نشده یا issue_failed
+issue: {
+  "early_prefetch_started": false,
+  "newly_issued": 0,
+  "newly_scored": 0,
+  "note": "Never backfill missed origins; GitHub schedule delivery is not guaranteed.",
+  "observed_run_at_utc": "2026-11-15T23:55:54.459028Z",
+  "origin_utc": "2026-11-15T20:00:00Z",
+  "overdue_targets_unavailable_in_api_window": 0,
+  "phase": "issue",
+  "real_forward_issue_proof_independent": false,
+  "research_status": "missed_due_to_late_dispatch",
+  "total_issued": 3,
+  "total_scored": 0
+}
+
 
 score: {
   "early_prefetch_started": false,
   "newly_issued": 0,
   "newly_scored": 0,
   "note": "Never backfill missed origins; GitHub schedule delivery is not guaranteed.",
-  "observed_run_at_utc": "2026-11-15T18:53:32.104004Z",
-  "origin_utc": "2026-11-15T16:00:00Z",
+  "observed_run_at_utc": "2026-11-15T23:55:55.154661Z",
+  "origin_utc": "2026-11-15T20:00:00Z",
   "overdue_targets_unavailable_in_api_window": 0,
   "phase": "score",
   "real_forward_issue_proof_independent": false,
