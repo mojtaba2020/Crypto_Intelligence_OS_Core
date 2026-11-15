@@ -18,6 +18,7 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
+GIT = shutil.which("git") or "/usr/bin/git"
 REPO_URL = "https://github.com/mojtaba2020/Crypto_Intelligence_OS_Core.git"
 PINNED_MODEL_SHA = "9de38d2c30c892d6e7ef3d65a0ee5a6507f77dc9"
 ROLLING_DATA_BRANCH = "data/btc4h-continuous-forward"
@@ -43,7 +44,7 @@ FORMAL_FILES = (
 
 
 def command(*args: str, cwd: Path | None = None, capture: bool = False) -> str:
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603 - fixed Git/Python tooling with argument arrays
         args,
         cwd=cwd,
         text=True,
@@ -95,16 +96,16 @@ def restore_data(work: Path) -> None:
     for filename in RESEARCH_FILES:
         target = research / filename
         blob = f"origin/{ROLLING_DATA_BRANCH}:research/{filename}"
-        existing = subprocess.run(
-            ["git", "cat-file", "-e", blob],
+        existing = subprocess.run(  # noqa: S603 - fixed Git/Python tooling with argument arrays
+            [GIT, "cat-file", "-e", blob],
             cwd=work,
             check=False,
             capture_output=True,
         )
         if existing.returncode == 0:
             target.write_bytes(
-                subprocess.run(
-                    ["git", "show", blob],
+                subprocess.run(  # noqa: S603 - fixed Git/Python tooling with argument arrays
+                    [GIT, "show", blob],
                     cwd=work,
                     check=True,
                     capture_output=True,
@@ -158,8 +159,8 @@ def receipt_for_new_issue(work: Path, run_id: str) -> None:
         f"{branch_ref}:refs/remotes/origin/{ROLLING_DATA_BRANCH}",
         cwd=work,
     )
-    remote_content = subprocess.run(
-        ["git", "show", f"{remote_sha}:research/btc4h_continuous_forecasts.jsonl"],
+    remote_content = subprocess.run(  # noqa: S603 - fixed Git/Python tooling with argument arrays
+        [GIT, "show", f"{remote_sha}:research/btc4h_continuous_forecasts.jsonl"],
         cwd=work,
         check=True,
         capture_output=True,
@@ -220,8 +221,8 @@ def publish_status(work: Path, run_id: str) -> None:
     formal = work / ".research/formal"
     formal.mkdir(parents=True, exist_ok=True)
     for filename in FORMAL_FILES:
-        raw = subprocess.run(
-            ["git", "show", f"origin/{FORMAL_DATA_BRANCH}:research/{filename}"],
+        raw = subprocess.run(  # noqa: S603 - fixed Git/Python tooling with argument arrays
+            [GIT, "show", f"origin/{FORMAL_DATA_BRANCH}:research/{filename}"],
             cwd=work,
             capture_output=True,
             check=True,
