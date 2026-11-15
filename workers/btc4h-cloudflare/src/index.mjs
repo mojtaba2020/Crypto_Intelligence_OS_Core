@@ -60,7 +60,7 @@ export async function verifyTokenReadOnly(env, fetcher = fetch) {
     fail('read-only preflight forbidden when cutover gates are enabled');
   }
   const token = env?.BTC4H_GITHUB_ACTIONS_TOKEN;
-  if (!token || !/^\\S+$/.test(token)) fail('missing or malformed GitHub Actions token');
+  if (!token || !/^\S+$/.test(token)) fail('missing or malformed GitHub Actions token');
   const result = await fetcher(TOKEN_CHECK_URL, {
     method: 'GET',
     headers: {
