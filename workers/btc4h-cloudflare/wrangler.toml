@@ -6,6 +6,15 @@ compatibility_date = "2026-11-15"
 [triggers]
 crons = ["8,10,12,14,20 0,4,8,12,16,20 * * *"]
 
+# Capture scheduled invocation logs to confirm disabled Cron execution.
+# Does NOT enable GitHub dispatch or alter any forecasting logic.
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = true
+head_sampling_rate = 1
+
 [vars]
 BTC4H_CF_ENABLED = "false"
 BTC4H_SCHEDULE_CUTOVER_CONFIRMED = "false"
