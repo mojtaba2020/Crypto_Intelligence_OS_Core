@@ -12,6 +12,8 @@ from typing import Any
 
 
 def at(value: str) -> datetime:
+    if not isinstance(value, str):
+        raise ValueError("receipt timestamp must be an ISO8601 UTC string")
     stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if stamp.tzinfo is None or stamp.utcoffset() != UTC.utcoffset(stamp):
         raise ValueError("receipt timestamps must be aware UTC")
@@ -32,7 +34,8 @@ def validate_receipt(forecast: dict[str, Any], receipt: dict[str, Any]) -> None:
             raise ValueError(f"receipt mismatch: {key}")
     if receipt.get("forecast_canonical_line_sha256") != canonical_digest(forecast):
         raise ValueError("receipt canonical SHA256 mismatch")
-    if not re.fullmatch(r"[0-9a-f]{40}", receipt.get("remote_issue_commit_sha", "")):
+    commit_sha = receipt.get("remote_issue_commit_sha")
+    if not isinstance(commit_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", commit_sha):
         raise ValueError("invalid remote commit SHA")
     if receipt.get("remote_ref_was_fetched_and_compared") is not True:
         raise ValueError("remote Git was not verified")
