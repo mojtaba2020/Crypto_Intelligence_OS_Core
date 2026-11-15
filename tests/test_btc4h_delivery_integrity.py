@@ -291,9 +291,7 @@ def test_malformed_receipt_types_are_rejected_without_crashing_health_report(
     (tmp_path / f"{prefix}_forecasts.jsonl").write_bytes(canonical_line(row))
     corrupt = receipt(row)
     corrupt.update(corruption)
-    (tmp_path / f"{prefix}_publication_receipts.jsonl").write_bytes(
-        canonical_line(corrupt)
-    )
+    (tmp_path / f"{prefix}_publication_receipts.jsonl").write_bytes(canonical_line(corrupt))
     with pytest.raises(ValueError):
         validate_receipt(row, corrupt)
 
