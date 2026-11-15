@@ -189,9 +189,7 @@ def verify_issued(work: Path, result: dict) -> None:
 
     forecasts = [
         json.loads(line)
-        for line in (work / "research/btc4h_continuous_forecasts.jsonl")
-        .read_text()
-        .splitlines()
+        for line in (work / "research/btc4h_continuous_forecasts.jsonl").read_text().splitlines()
         if line.strip()
     ]
     receipts = [
@@ -249,9 +247,7 @@ def main() -> int:
     ensure_no_competing_schedule(source)
     token = os.getenv("BTC4H_GITHUB_WRITE_TOKEN", "")
     if not token:
-        raise RuntimeError(
-            "BTC4H_GITHUB_WRITE_TOKEN missing; no publication permitted"
-        )
+        raise RuntimeError("BTC4H_GITHUB_WRITE_TOKEN missing; no publication permitted")
     now = datetime.now(UTC)
     phase = phase_for(now)
     configure_git_auth(token)
