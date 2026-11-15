@@ -57,6 +57,34 @@ It cannot publish forecast data or modify other services.
 
 **Status: experimental Cloudflare Worker/GitHub Builds connected by owner; first deployment not yet verified.**
 
+## Optional credential preflight (requires explicit owner toggle)
+
+The token is now stored as an encrypted **runtime secret**, but Cloudflare's
+successful deployment does not verify that GitHub will accept the token.
+
+For one controlled scheduled test only, the owner can add a **runtime Variable**
+named `BTC4H_TOKEN_PREFLIGHT` with value `true` in Cloudflare
+Settings -> Runtime variables and secrets -> Production, *after the updated
+code has deployed*. The Worker then sends **one authenticated GET** to GitHub's
+Actions workflow metadata endpoint on each Cron invocation during the test.
+It sends **zero** POST / workflow_dispatch requests. A successful result logs:
+
+    {"status":"token_read_accepted","github_status":200,"dispatches":0}
+
+A 401, 403, missing secret, or network error fails closed; do not enable live
+dispatch. This only proves the credential was accepted for a **read** operation,
+not that workflow dispatch or forecast delivery would succeed.
+
+The test can run once during the next scheduled Cron period; **remove this
+temporary runtime Variable immediately after** observing the result. When the
+Variable is absent or anything other than `true`, disabled Workers perform
+zero network calls, as before.
+
+Keep `BTC4H_CF_ENABLED=false` and
+`BTC4H_SCHEDULE_CUTOVER_CONFIRMED=false` throughout. Do NOT modify the
+existing GitHub main `schedule:` or merge this experimental branch.
+The preflight cannot run when either cutover gate is true.
+
 ## Connected-account deployment preflight (2026-11-15)
 
 A Cloudflare Worker named `btc4h-free-scheduler-preflight` was created
