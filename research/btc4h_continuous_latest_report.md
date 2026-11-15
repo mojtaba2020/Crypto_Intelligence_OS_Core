@@ -1,8 +1,8 @@
 # گزارش وضعیت واقعی BTC/USD
 
-Run ID: 43711059514؛ UTC: 2026-11-15T11:53:16.012114+00:00
+Run ID: 43711462670؛ UTC: 2026-11-15T11:58:36.665695+00:00
 
-اعتبار heartbeat تا UTC: 2026-11-15T16:23:16.012114+00:00
+اعتبار heartbeat تا UTC: 2026-11-15T16:28:36.665695+00:00
 
 ## آزمایش رسمی منجمد — بدون تغییر
 
@@ -32,28 +32,14 @@ Run ID: 43711059514؛ UTC: 2026-11-15T11:53:16.012114+00:00
 
 GitHub cron تضمین زمان ندارد؛ missed_due_to_late_dispatch موفقیت صدور نیست.
 
-issue: {
-  "early_prefetch_started": false,
-  "newly_issued": 0,
-  "newly_scored": 0,
-  "note": "Never backfill missed origins; GitHub schedule delivery is not guaranteed.",
-  "observed_run_at_utc": "2026-11-15T11:53:13.958825Z",
-  "origin_utc": "2026-11-15T08:00:00Z",
-  "overdue_targets_unavailable_in_api_window": 0,
-  "phase": "issue",
-  "real_forward_issue_proof_independent": false,
-  "research_status": "missed_due_to_late_dispatch",
-  "total_issued": 3,
-  "total_scored": 0
-}
-
+issue: اجرا نشده یا issue_failed
 
 score: {
   "early_prefetch_started": false,
   "newly_issued": 0,
   "newly_scored": 0,
   "note": "Never backfill missed origins; GitHub schedule delivery is not guaranteed.",
-  "observed_run_at_utc": "2026-11-15T11:53:14.819169Z",
+  "observed_run_at_utc": "2026-11-15T11:58:35.994153Z",
   "origin_utc": "2026-11-15T08:00:00Z",
   "overdue_targets_unavailable_in_api_window": 0,
   "phase": "score",
