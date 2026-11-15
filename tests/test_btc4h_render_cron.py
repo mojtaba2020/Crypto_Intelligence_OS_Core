@@ -9,9 +9,7 @@ from scripts import btc4h_render_cron as render
 def test_disabled_by_default_does_not_access_network_or_change_evidence(monkeypatch):
     monkeypatch.delenv("BTC4H_RENDER_ENABLED", raising=False)
     monkeypatch.delenv("BTC4H_GITHUB_WRITE_TOKEN", raising=False)
-    monkeypatch.setattr(
-        render, "command", lambda *args, **kwargs: pytest.fail("network accessed")
-    )
+    monkeypatch.setattr(render, "command", lambda *args, **kwargs: pytest.fail("network accessed"))
     assert render.main() == 0
 
 
@@ -49,8 +47,6 @@ def test_missing_github_token_stops_before_network(monkeypatch, tmp_path):
     monkeypatch.delenv("BTC4H_GITHUB_WRITE_TOKEN", raising=False)
     monkeypatch.setattr(render, "__file__", str(fake_file))
     monkeypatch.setattr(render, "ensure_no_competing_schedule", lambda root: None)
-    monkeypatch.setattr(
-        render, "command", lambda *args, **kwargs: pytest.fail("network accessed")
-    )
+    monkeypatch.setattr(render, "command", lambda *args, **kwargs: pytest.fail("network accessed"))
     with pytest.raises(RuntimeError, match="BTC4H_GITHUB_WRITE_TOKEN missing"):
         render.main()
