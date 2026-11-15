@@ -8,6 +8,7 @@ export const REPO = 'mojtaba2020/Crypto_Intelligence_OS_Core';
 export const WORKFLOW = 'btc4h_continuous.yml';
 export const RAW_WORKFLOW = `https://raw.githubusercontent.com/${REPO}/main/.github/workflows/${WORKFLOW}`;
 export const DISPATCH_URL = `https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}/dispatches`;
+export const TOKEN_CHECK_URL = `https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}`;
 
 function fail(message) {
   throw new Error(`BTC4H_CF_FAIL_CLOSED: ${message}`);
@@ -52,7 +53,29 @@ async function checkedResponse(response, label) {
   return response;
 }
 
+// Explicit, read-only credential check for a single controlled test period.
+// Never calls workflow_dispatch, prints a token, or changes forecast state.
+export async function verifyTokenReadOnly(env, fetcher = fetch) {
+  if (env?.BTC4H_CF_ENABLED === 'true' || env?.BTC4H_SCHEDULE_CUTOVER_CONFIRMED === 'true') {
+    fail('read-only preflight forbidden when cutover gates are enabled');
+  }
+  const token = env?.BTC4H_GITHUB_ACTIONS_TOKEN;
+  if (!token || !/^\\S+$/.test(token)) fail('missing or malformed GitHub Actions token');
+  const result = await fetcher(TOKEN_CHECK_URL, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/vnd.github+json',
+      'Authorization': `Bearer ${token}`,
+      'User-Agent': 'btc4h-free-cron-token-preflight',
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
+  });
+  if (!result || result.status !== 200) fail(`GitHub read-only token preflight HTTP ${result?.status ?? 'unknown'}`);
+  return { status: 'token_read_accepted', github_status: 200, dispatches: 0 };
+}
+
 export async function dispatchOnce(controller, env, { clock = Date.now, fetcher = fetch } = {}) {
+  if (env?.BTC4H_TOKEN_PREFLIGHT === 'true') return verifyTokenReadOnly(env, fetcher);
   if (env?.BTC4H_CF_ENABLED !== 'true') return { status: 'disabled', dispatches: 0 };
   if (env.BTC4H_SCHEDULE_CUTOVER_CONFIRMED !== 'true') fail('cutover not confirmed');
   if (!env.BTC4H_GITHUB_ACTIONS_TOKEN || !/^\S+$/.test(env.BTC4H_GITHUB_ACTIONS_TOKEN)) {
