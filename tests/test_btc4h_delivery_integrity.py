@@ -271,3 +271,35 @@ def test_already_issued_without_receipt_is_failure():
             [],
             "test.jsonl",
         )
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    [
+        {"remote_issue_commit_sha": 12345},
+        {"first_party_remote_confirmed_at_utc": 12345},
+        {"first_party_remote_confirmed_at_utc": None},
+    ],
+)
+def test_malformed_receipt_types_are_rejected_without_crashing_health_report(
+    tmp_path, row, corruption
+):
+    from scripts import btc4h_delivery_report as report
+
+    row["version"] = "btc4h-continuous-v2-ridge100"
+    prefix = "btc4h_continuous"
+    (tmp_path / f"{prefix}_forecasts.jsonl").write_bytes(canonical_line(row))
+    corrupt = receipt(row)
+    corrupt.update(corruption)
+    (tmp_path / f"{prefix}_publication_receipts.jsonl").write_bytes(
+        canonical_line(corrupt)
+    )
+    with pytest.raises(ValueError):
+        validate_receipt(row, corrupt)
+
+    start = datetime(2026, 11, 15, 8, tzinfo=UTC)
+    now = datetime(2026, 11, 15, 13, tzinfo=UTC)
+    output = "\n".join(report.track(tmp_path, prefix, now, start))
+    assert "انتشار تأییدشده: 0" in output
+    assert "رسید Git: نامعتبر/مفقود" in output
+    assert "score_pending" in output
