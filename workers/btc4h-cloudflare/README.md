@@ -55,7 +55,25 @@ It cannot publish forecast data or modify other services.
   startup, a valid >=240-minute forecast horizon, remote publication receipt, and
   later realized score. Restore GitHub schedule on rollback, never overlap writers.
 
-**Status: code + offline preflight only; Cloudflare not provisioned.**
+**Status: experimental Cloudflare Worker/GitHub Builds connected by owner; first deployment not yet verified.**
+
+## Connected-account deployment preflight (2026-11-15)
+
+A Cloudflare Worker named `btc4h-free-scheduler-preflight` was created
+manually, and its Builds settings were connected to the experimental branch
+`experiment/cloudflare-btc4h-free-dispatch-20261115`. The visible settings
+showed root directory `/`, empty build command, and deploy command:
+
+    npx wrangler deploy --config workers/btc4h-cloudflare/wrangler.toml
+
+This harmless documentation change starts the first Cloudflare build through
+the connected repository, if its Git integration is active. Verify the
+Cloudflare **Deployments / Builds** status explicitly; a GitHub commit is not
+proof of Cloudflare deployment. The Worker remains gated by
+`BTC4H_CF_ENABLED=false` and
+`BTC4H_SCHEDULE_CUTOVER_CONFIRMED=false`, with no GitHub token configured.
+Never remove these gates or touch the existing GitHub workflow schedule as
+part of this preflight.
 
 Official docs:
 - https://developers.cloudflare.com/workers/configuration/cron-triggers/
