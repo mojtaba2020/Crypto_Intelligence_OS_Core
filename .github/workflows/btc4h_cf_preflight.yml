@@ -1,0 +1,20 @@
+name: BTC4h Cloudflare gateway offline preflight
+on:
+  pull_request:
+    paths:
+      - 'workers/btc4h-cloudflare/**'
+      - '.github/workflows/btc4h_cf_preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify disabled gateway and mocked dispatch logic only
+        run: node --test workers/btc4h-cloudflare/test/index.test.mjs
