@@ -1,7 +1,6 @@
 """Offline preflight tests for the separately gated Render BTC4h scheduler."""
 
 from datetime import UTC, datetime
-from pathlib import Path
 
 import pytest
 from scripts import btc4h_render_cron as render
