@@ -30,7 +30,16 @@ def track(root, prefix, now, start, *, limit=None, remote_root="research"):
             continue
         try:
             verify_stored_receipt(row, matches[0], f"{remote_root}/{prefix}_forecasts.jsonl")
-        except (ValueError, KeyError, OSError, RuntimeError, subprocess.CalledProcessError):
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            RuntimeError,
+            subprocess.CalledProcessError,
+        ):
+            # One malformed receipt is unverified evidence, not a reason to
+            # suppress the whole run's missed-slot and heartbeat report.
             continue
         accepted.append(row)
     due = max(0, int((now - start - timedelta(minutes=15)).total_seconds() // 14400) + 1)
