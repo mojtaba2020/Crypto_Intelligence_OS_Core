@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import unittest
 from datetime import UTC, datetime, timedelta
+from typing import ClassVar
 
 from scripts.btc4h_challenger_tournament import (
     ALL_MODELS,
@@ -43,7 +44,7 @@ def example(index: int) -> dict:
 
 
 class FakeEstimator:
-    seen_training_sizes: list[int] = []
+    seen_training_sizes: ClassVar[list[int]] = []
 
     def fit(self, x: list[list[float]], y: list[float]) -> None:
         self.seen_training_sizes.append(len(y))
@@ -95,7 +96,9 @@ class ChallengerTests(unittest.TestCase):
         self.assertEqual(report["expected_slots_between_bounds"], 35)
 
     def test_evaluation_cost_cap(self):
-        report = evaluate([example(i) for i in range(110)], model_factory=lambda name: FakeEstimator())
+        report = evaluate(
+            [example(i) for i in range(110)], model_factory=lambda name: FakeEstimator()
+        )
         self.assertEqual(report["evaluated_rows"], MAX_EVAL)
         self.assertEqual(len(FakeEstimator.seen_training_sizes), 5 * MAX_EVAL)
 
