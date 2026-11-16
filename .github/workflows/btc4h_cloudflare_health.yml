@@ -1,8 +1,8 @@
 name: BTC4h Cloudflare remote readiness attestation
 on:
-  push:
+  pull_request:
     branches:
-      - experiment/cloudflare-btc4h-free-dispatch-20261115
+      - main
     paths:
       - 'workers/btc4h-cloudflare/**'
       - '.github/workflows/btc4h_cloudflare_health.yml'
