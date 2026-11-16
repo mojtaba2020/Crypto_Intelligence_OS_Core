@@ -181,7 +181,7 @@ test('health attestation exposes only gate readiness, without contacting GitHub'
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
     service: 'btc4h-free-scheduler-preflight',
-    version: 'cutover-health-v1',
+    version: 'cutover-cron-jitter-v2',
     armed: true, dispatches: 0,
   });
   const disabled = await worker.fetch({url,method:'GET'},
