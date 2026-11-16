@@ -53,9 +53,7 @@ class Example:
 
 
 def _stamp(value: Any) -> datetime:
-    if not isinstance(value, str) or not (
-        value.endswith("Z") or value.endswith("+00:00")
-    ):
+    if not isinstance(value, str) or not (value.endswith("Z") or value.endswith("+00:00")):
         raise ValueError("timestamps must be explicit UTC ISO-8601 strings")
     try:
         result = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -224,12 +222,8 @@ def evaluate(rows: list[dict[str, Any]], *, model_factory: Any = None) -> dict[s
             ),
             "direction_correct": sum(accuracy),
             "direction_evaluable": len(accuracy),
-            "direction_accuracy_conditional": (
-                statistics.mean(accuracy) if accuracy else None
-            ),
-            "correct_over_all_evaluated": (
-                sum(accuracy) / len(values) if values else None
-            ),
+            "direction_accuracy_conditional": (statistics.mean(accuracy) if accuracy else None),
+            "correct_over_all_evaluated": (sum(accuracy) / len(values) if values else None),
         }
     return {
         "status": "DESCRIPTIVE_ONLY_NO_PROMOTION" if evaluated else "INSUFFICIENT_MATURE_DATA",
@@ -244,10 +238,7 @@ def evaluate(rows: list[dict[str, Any]], *, model_factory: Any = None) -> dict[s
         "evaluated_rows": len(evaluated),
         "evaluated_origins": evaluated,
         "models": details,
-        "note": (
-            "No prospective claim, untouched OOS, independent as-of proof "
-            "or trading authority."
-        ),
+        "note": "No live proof, independent as-of evidence, model promotion or trading.",
     }
 
 
