@@ -29,7 +29,7 @@ def summarize_news(events: list[dict], cutoff_utc: str, lookback_hours: int = 24
     topic_counts = {key: 0 for key in sorted(ALLOWED_TOPICS)}
     stance_counts = {key: 0 for key in sorted(ALLOWED_STANCES)}
     included = 0
-    for original, row in zip(events, validated):
+    for original, row in zip(events, validated, strict=True):
         observed = utc(row["first_seen_at_utc"])
         if observed < cutoff - timedelta(hours=lookback_hours):
             continue
