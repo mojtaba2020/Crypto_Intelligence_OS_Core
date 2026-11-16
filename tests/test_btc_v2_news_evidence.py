@@ -1,13 +1,18 @@
 import unittest
-from scripts.btc_v2_news_evidence import EvidenceError, validate_event, validate_batch
+
+from scripts.btc_v2_news_evidence import EvidenceError, validate_batch, validate_event
 
 
 class EvidenceTests(unittest.TestCase):
     def setUp(self):
-        self.event = dict(source="example", url="https://example.org/article/1",
-            title="Sample", published_at_utc="2026-11-09T14:00:00Z",
+        self.event = dict(
+            source="example",
+            url="https://example.org/article/1",
+            title="Sample",
+            published_at_utc="2026-11-09T14:00:00Z",
             first_seen_at_utc="2026-11-09T14:01:00Z",
-            fetched_at_utc="2026-11-09T14:02:00Z")
+            fetched_at_utc="2026-11-09T14:02:00Z",
+        )
         self.cutoff = "2026-11-09T14:03:00Z"
 
     def test_valid(self):

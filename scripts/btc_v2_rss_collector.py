@@ -3,15 +3,16 @@
 Uses actual fetch time for first_seen_at_utc, even for historical articles.
 Publisher timestamps are untrusted and every record must pass evidence checks.
 """
+
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
 import json
+import xml.etree.ElementTree as ET
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from urllib.request import Request, urlopen
-import xml.etree.ElementTree as ET
 
 from scripts.btc_v2_news_evidence import EvidenceError, validate_event
 from scripts.btc_v2_source_registry import SOURCES
@@ -36,9 +37,11 @@ def collect_feed(xml_bytes: bytes, source: str, observed_at_utc: str) -> list[di
             date = parsedate_to_datetime(pub)
             if date.tzinfo is None:
                 continue
-            published = date.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            published = date.astimezone(UTC).isoformat().replace("+00:00", "Z")
             event = {
-                "source": source, "url": link, "title": title,
+                "source": source,
+                "url": link,
+                "title": title,
                 "published_at_utc": published,
                 "first_seen_at_utc": observed_at_utc,
                 "fetched_at_utc": observed_at_utc,
@@ -47,7 +50,6 @@ def collect_feed(xml_bytes: bytes, source: str, observed_at_utc: str) -> list[di
         except (ValueError, TypeError, EvidenceError):
             continue
     return results
-
 
 
 def append_new_evidence(path: Path, rows: list[dict]) -> int:
@@ -101,17 +103,21 @@ def append_new_evidence(path: Path, rows: list[dict]) -> int:
             stream.flush()
     return len(new_lines)
 
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", choices=sorted(SOURCES), required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
-    request = Request(SOURCES[args.source]["url"], headers={"User-Agent": "BTC-V2-research/0.1 (contact: repository issue)"})
+    request = Request(
+        SOURCES[args.source]["url"],
+        headers={"User-Agent": "BTC-V2-research/0.1 (contact: repository issue)"},
+    )
     with urlopen(request, timeout=20) as response:
         data = response.read(2_000_001)
     if len(data) > 2_000_000:
         raise EvidenceError("feed too large")
-    observed = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    observed = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     rows = collect_feed(data, args.source, observed)
     appended = append_new_evidence(Path(args.output), rows)
     print(json.dumps({"source": args.source, "accepted": len(rows), "new": appended}))

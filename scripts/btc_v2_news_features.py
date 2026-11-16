@@ -4,17 +4,25 @@ No network calls, sentiment inference, or claims about price direction.
 Labels are supplied by an upstream audited classifier and remain untrusted
 until their classification timestamps pass the same cutoff checks.
 """
+
 from __future__ import annotations
 
 from datetime import timedelta
+
 from scripts.btc_v2_news_evidence import EvidenceError, utc, validate_batch
 
-ALLOWED_TOPICS = frozenset({"macro", "etf", "regulation", "security", "onchain", "derivatives", "other"})
+ALLOWED_TOPICS = frozenset(
+    {"macro", "etf", "regulation", "security", "onchain", "derivatives", "other"}
+)
 ALLOWED_STANCES = frozenset({"positive", "negative", "neutral", "unknown"})
 
 
 def summarize_news(events: list[dict], cutoff_utc: str, lookback_hours: int = 24) -> dict:
-    if not isinstance(lookback_hours, int) or isinstance(lookback_hours, bool) or not 1 <= lookback_hours <= 168:
+    if (
+        not isinstance(lookback_hours, int)
+        or isinstance(lookback_hours, bool)
+        or not 1 <= lookback_hours <= 168
+    ):
         raise EvidenceError("lookback_hours must be integer 1..168")
     cutoff = utc(cutoff_utc)
     validated = validate_batch(events, cutoff_utc)

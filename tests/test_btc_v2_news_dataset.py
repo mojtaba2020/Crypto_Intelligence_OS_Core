@@ -1,4 +1,5 @@
 import unittest
+
 from scripts.btc_v2_news_dataset import build_dataset
 from scripts.btc_v2_news_evidence import EvidenceError
 
@@ -16,10 +17,12 @@ class DatasetTests(unittest.TestCase):
 
     def test_reject_out_of_order_cutoffs(self):
         with self.assertRaises(EvidenceError):
-            build_dataset([
-                {"cutoff_utc": "2026-11-09T15:00:00Z", "events": []},
-                {"cutoff_utc": "2026-11-09T14:00:00Z", "events": []},
-            ])
+            build_dataset(
+                [
+                    {"cutoff_utc": "2026-11-09T15:00:00Z", "events": []},
+                    {"cutoff_utc": "2026-11-09T14:00:00Z", "events": []},
+                ]
+            )
 
     def test_reject_invalid_events_shape(self):
         with self.assertRaises(EvidenceError):

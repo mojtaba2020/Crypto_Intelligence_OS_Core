@@ -4,12 +4,13 @@ This module does not fetch news, score sentiment, or make price forecasts.
 It accepts externally collected metadata as untrusted data and rejects
 observations that could not have been known at the forecast cutoff.
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from urllib.parse import urlsplit
 import hashlib
 import json
+from datetime import UTC, datetime
+from urllib.parse import urlsplit
 
 
 class EvidenceError(ValueError):
@@ -25,7 +26,7 @@ def utc(value: str) -> datetime:
         raise EvidenceError("invalid timestamp") from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise EvidenceError("timestamp must have timezone")
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)
 
 
 def validate_event(event: dict, cutoff_utc: str) -> dict:
@@ -33,8 +34,7 @@ def validate_event(event: dict, cutoff_utc: str) -> dict:
     if not isinstance(event, dict):
         raise EvidenceError("event must be object")
     cutoff = utc(cutoff_utc)
-    required = ("source", "url", "title", "published_at_utc",
-                "first_seen_at_utc", "fetched_at_utc")
+    required = ("source", "url", "title", "published_at_utc", "first_seen_at_utc", "fetched_at_utc")
     for field in required:
         if not isinstance(event.get(field), str) or not event[field].strip():
             raise EvidenceError("missing " + field)
@@ -54,11 +54,16 @@ def validate_event(event: dict, cutoff_utc: str) -> dict:
         if revised > cutoff:
             raise EvidenceError("revised after forecast cutoff")
     canonical = {field: event[field].strip() for field in ("source", "url", "title")}
-    canonical.update({key: value.isoformat().replace("+00:00", "Z") for key, value in times.items()})
+    canonical.update(
+        {key: value.isoformat().replace("+00:00", "Z") for key, value in times.items()}
+    )
     canonical["cutoff_utc"] = cutoff.isoformat().replace("+00:00", "Z")
     canonical["evidence_id"] = hashlib.sha256(
-        json.dumps({key: canonical[key] for key in ("source", "url", "published_at_utc")},
-                   sort_keys=True, separators=(",", ":")).encode()
+        json.dumps(
+            {key: canonical[key] for key in ("source", "url", "published_at_utc")},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
     ).hexdigest()
     return canonical
 

@@ -3,11 +3,13 @@
 Input: JSONL records with cutoff_utc and events array. Does not fetch external
 sources or create synthetic news. Fails atomically if any record is invalid.
 """
+
 from __future__ import annotations
 
 import argparse
 import json
 from pathlib import Path
+
 from scripts.btc_v2_news_evidence import EvidenceError, utc
 from scripts.btc_v2_news_features import summarize_news
 

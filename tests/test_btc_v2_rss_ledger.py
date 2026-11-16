@@ -23,9 +23,7 @@ class LedgerTests(unittest.TestCase):
             path = Path(tmp) / "events.jsonl"
             append_new_evidence(path, [{"evidence_id": "one"}])
             original = path.read_bytes()
-            count = append_new_evidence(
-                path, [{"evidence_id": "one"}, {"evidence_id": "two"}]
-            )
+            count = append_new_evidence(path, [{"evidence_id": "one"}, {"evidence_id": "two"}])
             self.assertEqual(count, 1)
             self.assertTrue(path.read_bytes().startswith(original))
             ids = [json.loads(line)["evidence_id"] for line in path.read_text().splitlines()]
