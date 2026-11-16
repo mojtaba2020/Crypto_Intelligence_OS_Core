@@ -19,14 +19,18 @@ export function slotFor(controller, nowMs) {
   const scheduledMs = Number(controller?.scheduledTime);
   if (!Number.isSafeInteger(scheduledMs)) fail('invalid Cloudflare scheduledTime');
   if (!Number.isSafeInteger(nowMs)) fail('invalid runtime clock');
-  const scheduled = new Date(scheduledMs);
+  // Cloudflare scheduledTime can include a small post-minute offset even
+  // when the Cron expression targets an exact minute. Only permit a bounded
+  // 0..30s offset within that same minute, then anchor the issuance deadline
+  // to the original HH:MM:00 slot (not to the delayed timestamp).
+  const scheduledOffsetMs = ((scheduledMs % 60_000) + 60_000) % 60_000;
+  if (scheduledOffsetMs > 30_000) fail('scheduled UTC timestamp too far from cron minute');
+  const originSlotMs = scheduledMs - scheduledOffsetMs;
+  const scheduled = new Date(originSlotMs);
   const current = new Date(nowMs);
   if (Number.isNaN(scheduled.getTime()) || Number.isNaN(current.getTime())) fail('invalid clock');
   const hour = scheduled.getUTCHours();
   const minute = scheduled.getUTCMinutes();
-  if (scheduled.getUTCSeconds() !== 0 || scheduled.getUTCMilliseconds() !== 0) {
-    fail('scheduled UTC time not minute-aligned');
-  }
   if (hour % 4 !== 0) fail('not a four-hour UTC origin');
   let phase;
   let maxLagMs;
@@ -39,7 +43,7 @@ export function slotFor(controller, nowMs) {
   } else {
     fail('unexpected trigger minute');
   }
-  if (nowMs < scheduledMs || nowMs >= scheduledMs + maxLagMs) fail('late/stale cron dispatch');
+  if (nowMs < scheduledMs || nowMs >= originSlotMs + maxLagMs) fail('late/stale cron dispatch');
   if (current.getUTCHours() !== hour || current.getUTCDate() !== scheduled.getUTCDate() ||
       current.getUTCMonth() !== scheduled.getUTCMonth() || current.getUTCFullYear() !== scheduled.getUTCFullYear()) {
     fail('dispatch crossed origin calendar boundary');
