@@ -9,12 +9,6 @@ on:
         options: [score, issue]
         default: score
         description: "Score recovery by default; issue only during the real window"
-  schedule:
-    # Bounded retries within the valid window, plus score-only +20. Only ONE forecast
-    # is allowed per origin by the immutable continuous engine ledger key.
-    # GitHub cron dispatch is best-effort and may still arrive late.
-    - cron: "8,10,12,14 0,4,8,12,16,20 * * *"
-    - cron: "20 0,4,8,12,16,20 * * *"
 permissions:
   contents: write
   issues: write
