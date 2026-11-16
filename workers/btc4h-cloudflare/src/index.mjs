@@ -127,7 +127,7 @@ export default {
     if (request.method === 'GET' && url.pathname === '/__health') {
       return new Response(JSON.stringify({
         service: 'btc4h-free-scheduler-preflight',
-        version: 'cutover-health-v1',
+        version: 'cutover-cron-jitter-v2',
         armed: env?.BTC4H_CF_ENABLED === 'true' &&
           env?.BTC4H_SCHEDULE_CUTOVER_CONFIRMED === 'true',
         dispatches: 0,
