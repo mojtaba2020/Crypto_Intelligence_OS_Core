@@ -1,0 +1,21 @@
+# Cloudflare Workers Free. Coordinated cutover candidate. Live main workflow schedule presence blocks dispatch even when gates are true.
+name = "btc4h-free-scheduler-perflight"
+main = "src/index.mjs"
+compatibility_date = "2026-11-15"
+
+[triggers]
+crons = ["8,10,12,14,20 0,4,8,12,16,20 * * *"]
+
+# Capture scheduled invocation logs to confirm disabled Cron execution.
+# Explicit cutover gates below; dispatch fails closed while GitHub main schedule exists.
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = true
+head_sampling_rate = 1
+
+[vars]
+BTC4H_CF_ENABLED = "true"
+BTC4H_SCHEDULE_CUTOVER_CONFIRMED = "true"
+# Add BTC4H_GITHUB_ACTIONS_TOKEN via encrypted Cloudflare secret, NEVER here.
