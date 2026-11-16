@@ -1,12 +1,12 @@
 # گزارش وضعیت واقعی BTC/USD
 
-Run ID: 43777652287؛ UTC: 2026-11-15T23:58:42.774983+00:00
+Run ID: 43904118980؛ UTC: 2026-11-16T16:10:05.528479+00:00
 
-اعتبار heartbeat تا UTC: 2026-11-16T04:28:42.774983+00:00
+اعتبار heartbeat تا UTC: 2026-11-16T20:40:05.528479+00:00
 
 ## آزمایش رسمی منجمد — بدون تغییر
 
-نوبت موعدرسیده: 40؛ انتشار تأییدشده: 2؛ چهارساعت معتبر: 2؛ ازدست‌رفته: 38
+نوبت موعدرسیده: 44؛ انتشار تأییدشده: 2؛ چهارساعت معتبر: 2؛ ازدست‌رفته: 42
 
 آخرین صدور UTC: 2026-11-12T12:14:00.295362Z؛ افق واقعی: 241.00 دقیقه.
 
@@ -18,34 +18,50 @@ Run ID: 43777652287؛ UTC: 2026-11-15T23:58:42.774983+00:00
 
 ## مسیر rolling — مستقل از آزمایش رسمی
 
-نوبت موعدرسیده: 21؛ انتشار تأییدشده: 3؛ چهارساعت معتبر: 0؛ ازدست‌رفته: 21
+نوبت موعدرسیده: 25؛ انتشار تأییدشده: 4؛ چهارساعت معتبر: 1؛ ازدست‌رفته: 25
 
-آخرین صدور UTC: 2026-11-14T23:52:02.922450Z؛ افق واقعی: 22.95 دقیقه.
+آخرین صدور UTC: 2026-11-16T16:10:00.018568Z؛ افق واقعی: 245.00 دقیقه.
 
-نوع: کوتاه‌تر/متفاوت؛ خارج از شرط چهار ساعت
+نوع: چهارساعته
 
 رسید Git: تأییدشده، صرفاً شخص اول
 
-نتیجه ثبت‌شده: 64384.98 دلار؛ خطای مدل: 1072.00؛ خطای Persistence: 1289.54 دلار.
+score_pending: نتیجه معتبر ثبت نشده؛ نتیجه حدس زده نمی‌شود.
+
+آخرین نتیجه قبلی: origin=2026-11-14T20:00:00Z؛ افق=22.95 دقیقه؛ واقعی=64384.98 دلار؛ خطای لگاریتمی مدل=0.016513؛ Persistence=0.019831.
 
 نمونه کوچک است؛ برتری مدل اثبات نشده. رسید Git گواه زمانی مستقل نیست.
 
 GitHub cron تضمین زمان ندارد؛ missed_due_to_late_dispatch موفقیت صدور نیست.
 
-issue: اجرا نشده یا issue_failed
+issue: {
+  "early_prefetch_started": true,
+  "newly_issued": 1,
+  "newly_scored": 0,
+  "note": "Never backfill missed origins; GitHub schedule delivery is not guaranteed.",
+  "observed_run_at_utc": "2026-11-16T16:08:44.891029Z",
+  "origin_utc": "2026-11-16T16:00:00Z",
+  "overdue_targets_unavailable_in_api_window": 0,
+  "phase": "issue",
+  "real_forward_issue_proof_independent": false,
+  "research_status": "issued",
+  "total_issued": 4,
+  "total_scored": 0
+}
+
 
 score: {
   "early_prefetch_started": false,
   "newly_issued": 0,
   "newly_scored": 0,
   "note": "Never backfill missed origins; GitHub schedule delivery is not guaranteed.",
-  "observed_run_at_utc": "2026-11-15T23:58:41.646717Z",
-  "origin_utc": "2026-11-15T20:00:00Z",
+  "observed_run_at_utc": "2026-11-16T16:10:04.528723Z",
+  "origin_utc": "2026-11-16T16:00:00Z",
   "overdue_targets_unavailable_in_api_window": 0,
   "phase": "score",
   "real_forward_issue_proof_independent": false,
   "research_status": "score_pending",
-  "total_issued": 3,
+  "total_issued": 4,
   "total_scored": 3
 }
 
