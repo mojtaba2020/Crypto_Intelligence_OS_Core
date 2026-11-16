@@ -82,7 +82,7 @@ jobs:
       - run: |
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev,research]"
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: challenger-v3-prepared-data
           path: artifacts
@@ -106,7 +106,7 @@ jobs:
     needs: tournament
     runs-on: ubuntu-slim
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: challenger-v3-*-evidence
           path: artifacts/v3-agent-evidence
