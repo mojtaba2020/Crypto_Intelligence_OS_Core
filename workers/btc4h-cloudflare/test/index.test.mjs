@@ -139,6 +139,22 @@ test('remote inspection failure and dispatch failures do not claim success', asy
 });
 
 test('public HTTP endpoints cannot manually trigger dispatch', async () => {
-  const result = await worker.fetch();
+  const result = await worker.fetch({url:'https://example.workers.dev/dispatch',method:'GET'}, env);
   assert.equal(result.status, 404);
+  assert.equal((await worker.fetch({url:'https://example.workers.dev/__health',method:'POST'}, env)).status, 404);
+});
+
+test('health attestation exposes only gate readiness, without contacting GitHub', async () => {
+  const url = 'https://example.workers.dev/__health';
+  const response = await worker.fetch({url,method:'GET'}, env);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    service: 'btc4h-free-scheduler-preflight',
+    version: 'cutover-health-v1',
+    armed: true, dispatches: 0,
+  });
+  const disabled = await worker.fetch({url,method:'GET'},
+    {...env,BTC4H_CF_ENABLED:'false'});
+  assert.equal((await disabled.json()).armed, false);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
 });
