@@ -117,7 +117,21 @@ export default {
     const outcome = await dispatchOnce(controller, env);
     console.log(JSON.stringify(outcome));
   },
-  async fetch() {
+  async fetch(request, env) {
+    // Read-only deployment attestation. No secret, GitHub call, or dispatch route.
+    const url = new URL(request.url);
+    if (request.method === 'GET' && url.pathname === '/__health') {
+      return new Response(JSON.stringify({
+        service: 'btc4h-free-scheduler-preflight',
+        version: 'cutover-health-v1',
+        armed: env?.BTC4H_CF_ENABLED === 'true' &&
+          env?.BTC4H_SCHEDULE_CUTOVER_CONFIRMED === 'true',
+        dispatches: 0,
+      }), {
+        headers: { 'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store' },
+      });
+    }
     return new Response('Not found', { status: 404 });
   },
 };
