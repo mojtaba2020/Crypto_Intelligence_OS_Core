@@ -18,7 +18,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          URL='https://btc4h-free-scheduler-preflight.moji-nature.workers.dev/__health'
+          URL='https://btc4h-free-scheduler-perflight.moji-nature.workers.dev/__health'
           for attempt in $(seq 1 24); do
             if curl --fail --silent --show-error --max-time 10 -H 'Cache-Control: no-cache' "$URL" -o "$RUNNER_TEMP/btc4h-health.json"; then
               if python - "$RUNNER_TEMP/btc4h-health.json" <<'PY'
