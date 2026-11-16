@@ -10,7 +10,7 @@ def feed(url: str, published: str = "Mon, 09 Nov 2026 12:00:00 GMT") -> bytes:
         f"<link>{url}</link>"
         f"<pubDate>{published}</pubDate>"
         "</item></channel></rss>"
-    ).encode("utf-8")
+    ).encode()
 
 
 class RSSCollectorTests(unittest.TestCase):
