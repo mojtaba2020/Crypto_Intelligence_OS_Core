@@ -1,0 +1,1 @@
+{"schema_version":"alpha-public-get-canary-v1","experimental_status":"SYNTHETIC_ONLY_NO_RUN","resource_id":"PR99-CANARY-20261025-4D91","target_horizon":"SYNTHETIC_NOT_A_PRICE","variants":["interaction","additive_ablation","linearized_placebo","persistence"],"payload_marker":"PUBLIC_GET_EXACT_BYTES_TEST_DO_NOT_SCORE","source_data":"NONE","model_predictions":"NONE"}
