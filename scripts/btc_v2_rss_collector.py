@@ -51,33 +51,55 @@ def collect_feed(xml_bytes: bytes, source: str, observed_at_utc: str) -> list[di
 
 
 def append_new_evidence(path: Path, rows: list[dict]) -> int:
-    """Append unseen evidence IDs; reject corrupt existing lines, never rewrite history.
+    """Append one valid JSON record per line, without rewriting history.
 
-    Use one writer per ledger. This function does not provide inter-process locking.
+    A corrupt previous ledger or an invalid incoming batch blocks all writes.
+    The caller must supply a single writer; inter-process locking is separate.
     """
+    if not isinstance(rows, list):
+        raise EvidenceError("incoming evidence must be a list")
     known = set()
     if path.exists():
         with path.open(encoding="utf-8") as stream:
-            for line in stream:
-                if not line.strip():
-                    continue
-                existing = json.loads(line)
+            for number, line in enumerate(stream, 1):
+                if not line.endswith("\n"):
+                    raise EvidenceError(f"unterminated existing ledger line {number}")
+                try:
+                    existing = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    raise EvidenceError(f"invalid existing ledger JSON at line {number}") from exc
+                if not isinstance(existing, dict):
+                    raise EvidenceError("existing ledger row must be object")
                 evidence_id = existing.get("evidence_id")
-                if not isinstance(evidence_id, str) or not evidence_id:
-                    raise EvidenceError("invalid existing evidence ledger")
+                if (
+                    not isinstance(evidence_id, str)
+                    or not evidence_id.strip()
+                    or evidence_id in known
+                ):
+                    raise EvidenceError("invalid or duplicate existing evidence ID")
                 known.add(evidence_id)
-    new_rows = []
-    for row in rows:
-        evidence_id = row["evidence_id"]
-        if evidence_id not in known:
-            new_rows.append(row)
-            known.add(evidence_id)
-    if new_rows:
-        with path.open("a", encoding="utf-8") as stream:
-            for row in new_rows:
-                stream.write(json.dumps(row, sort_keys=True) + "\\n")
-    return len(new_rows)
 
+    new_lines = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise EvidenceError("incoming evidence must be object")
+        evidence_id = row.get("evidence_id")
+        if not isinstance(evidence_id, str) or not evidence_id.strip():
+            raise EvidenceError("invalid incoming evidence ID")
+        if evidence_id in known:
+            continue
+        try:
+            encoded = json.dumps(row, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise EvidenceError("non-serializable incoming evidence") from exc
+        new_lines.append(encoded + "\n")
+        known.add(evidence_id)
+
+    if new_lines:
+        with path.open("a", encoding="utf-8") as stream:
+            stream.writelines(new_lines)
+            stream.flush()
+    return len(new_lines)
 
 def main() -> None:
     parser = argparse.ArgumentParser()
