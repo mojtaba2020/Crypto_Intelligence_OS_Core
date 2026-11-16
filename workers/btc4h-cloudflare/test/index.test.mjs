@@ -84,6 +84,37 @@ test('all 5 intended UTC phase slots are valid, other slots fail closed', () => 
     /unknown cron/);
 });
 
+test('real Cloudflare millisecond/second schedule jitter is normalized to minute slot', async () => {
+  // Cloudflare's platform event metadata can report 11.315s after a minute.
+  // Never grant an additional 11.315s of deadline merely because of jitter.
+  const base = Date.parse('2026-11-16T12:08:00Z');
+  const controller = { cron: CRON, scheduledTime: base + 11_315 };
+  const slot = slotFor(controller, base + 12_000);
+  assert.equal(slot.phase, 'issue');
+  assert.equal(slot.scheduled_utc, '2026-11-16T12:08:00.000Z');
+  assert.equal(slot.actual_utc, '2026-11-16T12:08:12.000Z');
+  const calls = [];
+  const result = await dispatchOnce(controller, env, {
+    clock: () => base + 12_000, fetcher: networkStub(calls),
+  });
+  assert.equal(result.status, 'accepted_by_github');
+  assert.equal(result.scheduled_utc, '2026-11-16T12:08:00.000Z');
+  assert.equal(calls.filter(c => c.url === DISPATCH_URL).length, 1);
+});
+
+test('jitter acceptance never extends deadline, allows late or invented slots, or duplicates', () => {
+  const base = Date.parse('2026-11-16T12:08:00Z');
+  assert.throws(() => slotFor({cron:CRON,scheduledTime:base + 30_001},base + 31_000),
+    /timestamp too far/);
+  assert.throws(() => slotFor({cron:CRON,scheduledTime:base + 11_315},base + 120_000),
+    /late\/stale/);
+  assert.throws(() => slotFor({cron:CRON,scheduledTime:base + 11_315},base + 11_314),
+    /late\/stale/);
+  const fake = Date.parse('2026-11-16T12:09:00Z');
+  assert.throws(() => slotFor({cron:CRON,scheduledTime:fake + 11_315},fake + 12_000),
+    /unexpected trigger minute/);
+});
+
 test('late issue attempts cannot masquerade as four-hour forecasts', () => {
   assert.throws(() => slotFor(t('2026-11-16T08:14:00Z'), Date.parse('2026-11-16T08:15:00Z')),
     /late\/stale/);
