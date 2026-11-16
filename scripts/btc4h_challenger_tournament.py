@@ -244,7 +244,10 @@ def evaluate(rows: list[dict[str, Any]], *, model_factory: Any = None) -> dict[s
         "evaluated_rows": len(evaluated),
         "evaluated_origins": evaluated,
         "models": details,
-        "note": "No prospective claim, untouched OOS, independent as-of proof or trading authority.",
+        "note": (
+            "No prospective claim, untouched OOS, independent as-of proof "
+            "or trading authority."
+        ),
     }
 
 
