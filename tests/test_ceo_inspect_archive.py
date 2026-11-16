@@ -91,3 +91,20 @@ def test_ceo_inspector_rejects_fictitious_success(tmp_path: Path) -> None:
     report_path.write_text(json.dumps(report))
     with pytest.raises(ValueError, match="Unexpected, failed"):
         inspect_archive(db_path, report_path)
+
+
+def test_ceo_inspector_accepts_visibility_neutral_report(tmp_path: Path) -> None:
+    db_path, report_path = create_fixture(tmp_path)
+    report = json.loads(report_path.read_text())
+    report["persistence"] = "GITHUB_DATA_BRANCH"
+    report_path.write_text(json.dumps(report))
+    assert inspect_archive(db_path, report_path)["archive_total_count"] == 2
+
+
+def test_ceo_inspector_rejects_unsupported_storage_claim(tmp_path: Path) -> None:
+    db_path, report_path = create_fixture(tmp_path)
+    report = json.loads(report_path.read_text())
+    report["persistence"] = "TRUST_ME_PRIVATE"
+    report_path.write_text(json.dumps(report))
+    with pytest.raises(ValueError, match="Unexpected, failed"):
+        inspect_archive(db_path, report_path)

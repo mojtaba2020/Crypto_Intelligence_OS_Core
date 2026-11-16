@@ -1,6 +1,7 @@
 """SQLite archive for validated, immutable-first-observation BTC/USD daily bars.
 
-The database is a private research artifact, not a live exchange or trading database.
+The database is a repository-scoped artifact, not a live exchange or trading database.
+Its access permissions follow actual repository visibility, not branch names.
 """
 
 from __future__ import annotations

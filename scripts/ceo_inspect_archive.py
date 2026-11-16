@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only audit of the actual private BTC/USD archive for the CEO mission console."""
+"""Read-only audit of the actual repository-hosted BTC/USD archive for the CEO mission console."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ def inspect_archive(db_path: Path, report_path: Path) -> dict[str, str | int]:
     report: dict[str, Any] = json.loads(report_path.read_text(encoding="utf-8"))
     if (
         report.get("status") != "COMPLETED"
-        or report.get("persistence") != "PRIVATE_GITHUB_DATA_BRANCH"
+        or report.get("persistence") not in {"GITHUB_DATA_BRANCH", "PRIVATE_GITHUB_DATA_BRANCH"}
         or report.get("instrument") != COINBASE_BTC_USD.instrument_id
         or report.get("source") != COINBASE_SOURCE_ID
     ):
@@ -80,7 +80,7 @@ def main() -> int:
     source_url = f"https://github.com/{REPO}/tree/{DATA_BRANCH}/data"
     run_url = f"https://github.com/{REPO}/actions/runs/{run_id}"
     report = (
-        "## CEO Mission Control — private BTC/USD archive inspection\n\n"
+        "## CEO Mission Control — repository-hosted BTC/USD archive inspection\n\n"
         "**Mission: COMPLETED (real deterministic read-only worker)**\n\n"
         "| Verified archive metric | Actual value |\n|:--|:--|\n"
         f"| Total consecutive daily candles | {facts['archive_total_count']} |\n"
@@ -90,7 +90,7 @@ def main() -> int:
         f"| Previous ingestion run ID | {facts['last_ingestion_run_id']} |\n\n"
         f"**SQLite checksum (SHA-256):** `{facts['sqlite_sha256']}`\n\n"
         f"[Inspect current mission and live job states]({run_url}) · "
-        f"[Browse persisted data in private branch]({source_url})\n\n"
+        f"[Browse persisted data branch (repo visibility applies)]({source_url})\n\n"
         "**No autonomous AI agents are deployed.** This mission only audits the "
         "existing BTC/USD database; it does not trade or change stored data.\n"
     )
