@@ -1,5 +1,5 @@
 # Cloudflare Workers Free. Coordinated cutover candidate. Live main workflow schedule presence blocks dispatch even when gates are true.
-name = "btc4h-free-scheduler-preflight"
+name = "btc4h-free-scheduler-perflight"
 main = "src/index.mjs"
 compatibility_date = "2026-11-15"
 
