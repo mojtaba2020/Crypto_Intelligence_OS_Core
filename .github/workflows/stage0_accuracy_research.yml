@@ -66,7 +66,7 @@ jobs:
           cat .research/stage0_accuracy_summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload research report and data
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: stage0-accuracy-research
           path: .research/
