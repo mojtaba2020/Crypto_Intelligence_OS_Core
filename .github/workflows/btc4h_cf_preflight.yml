@@ -36,7 +36,7 @@ jobs:
           import json,sys
           d=json.load(open(sys.argv[1]))
           assert d.get("service") == "btc4h-free-scheduler-preflight"
-          assert d.get("version") == "cutover-health-v1"
+          assert d.get("version") == "cutover-cron-jitter-v2"
           assert d.get("armed") is True
           assert d.get("dispatches") == 0
           print("PASS: Deployed Cloudflare Worker armed and read-only health emitted zero dispatches")
