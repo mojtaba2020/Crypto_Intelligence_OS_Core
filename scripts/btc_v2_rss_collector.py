@@ -12,17 +12,59 @@ import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from scripts.btc_v2_news_evidence import EvidenceError, validate_event
 from scripts.btc_v2_source_registry import SOURCES
 
 
+def _approved_https_url(url: str, source: str) -> bool:
+    """Only accept HTTPS links belonging to the source's registered publisher domain."""
+    if source not in SOURCES:
+        return False
+    expected = urlsplit(SOURCES[source]["url"]).hostname
+    if not expected:
+        return False
+    apex = expected.removeprefix("www.")
+    try:
+        parts = urlsplit(url)
+        return (
+            parts.scheme == "https"
+            and bool(parts.hostname)
+            and (parts.hostname == apex or parts.hostname.endswith("." + apex))
+            and not parts.username
+            and not parts.password
+            and parts.port in (None, 443)
+        )
+    except ValueError:
+        return False
+
+
+class _PublisherHTTPSRedirect(HTTPRedirectHandler):
+    def __init__(self, source: str) -> None:
+        self.source = source
+        super().__init__()
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not _approved_https_url(newurl, self.source):
+            raise EvidenceError("RSS redirect left trusted HTTPS publisher domain")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def collect_feed(xml_bytes: bytes, source: str, observed_at_utc: str) -> list[dict]:
     if source not in SOURCES:
         raise EvidenceError("unapproved source")
+    if not isinstance(xml_bytes, bytes) or len(xml_bytes) > 2_000_000:
+        raise EvidenceError("invalid or oversized RSS bytes")
     try:
-        root = ET.fromstring(xml_bytes)
+        xml_text = xml_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise EvidenceError("RSS must be UTF-8") from exc
+    if "<!DOCTYPE" in xml_text.upper() or "<!ENTITY" in xml_text.upper():
+        raise EvidenceError("DTD or entity declarations forbidden in RSS")
+    try:
+        root = ET.fromstring(xml_text)  # noqa: S314 - bounded UTF-8; DTD and entities rejected.
     except ET.ParseError as exc:
         raise EvidenceError("invalid RSS XML") from exc
     items = root.findall(".//item")
@@ -31,7 +73,7 @@ def collect_feed(xml_bytes: bytes, source: str, observed_at_utc: str) -> list[di
         title = (item.findtext("title") or "").strip()
         link = (item.findtext("link") or "").strip()
         pub = (item.findtext("pubDate") or "").strip()
-        if not (title and link and pub):
+        if not (title and link and pub) or not _approved_https_url(link, source):
             continue
         try:
             date = parsedate_to_datetime(pub)
@@ -109,11 +151,15 @@ def main() -> None:
     parser.add_argument("--source", choices=sorted(SOURCES), required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
-    request = Request(
-        SOURCES[args.source]["url"],
+    source_url = SOURCES[args.source]["url"]
+    if not _approved_https_url(source_url, args.source):
+        raise EvidenceError("unapproved RSS feed URL")
+    request = Request(  # noqa: S310 - strictly registry-pinned HTTPS publisher URL.
+        source_url,
         headers={"User-Agent": "BTC-V2-research/0.1 (contact: repository issue)"},
     )
-    with urlopen(request, timeout=20) as response:
+    opener = build_opener(_PublisherHTTPSRedirect(args.source))
+    with opener.open(request, timeout=20) as response:
         data = response.read(2_000_001)
     if len(data) > 2_000_000:
         raise EvidenceError("feed too large")
