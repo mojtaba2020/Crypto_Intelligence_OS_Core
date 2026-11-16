@@ -1,0 +1,40 @@
+name: BTC V2 one-shot branch-only formatting
+on:
+  push:
+    branches:
+      - feature/btc-v2-news-evidence
+    paths:
+      - '.github/workflows/btc_v2_one_shot_format.yml'
+permissions:
+  contents: write
+jobs:
+  format-v2-only:
+    if: github.repository == 'mojtaba2020/Crypto_Intelligence_OS_Core'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/btc-v2-news-evidence
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Format only isolated BTC V2 scripts/tests and push one branch-local commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install 'ruff>=0.16.7,<1'
+          files=(scripts/btc_v2_*.py tests/test_btc_v2_*.py)
+          python -m ruff check --fix --exit-zero "${files[@]}"
+          python -m ruff format "${files[@]}"
+          python -m ruff check --fix --exit-zero "${files[@]}"
+          python -m ruff format "${files[@]}"
+          git diff --check
+          git add -- "${files[@]}"
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'style(v2): apply Ruff safe fixes and formatting to isolated news pipeline'
+            git push origin HEAD:feature/btc-v2-news-evidence
+          fi
