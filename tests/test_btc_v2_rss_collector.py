@@ -25,9 +25,7 @@ class RSSCollectorTests(unittest.TestCase):
             "https://www.federalreserve.gov/a",
             published="Wed, 11 Nov 2026 12:00:00 GMT",
         )
-        self.assertEqual(
-            collect_feed(xml, "federal_reserve", "2026-11-10T12:00:00Z"), []
-        )
+        self.assertEqual(collect_feed(xml, "federal_reserve", "2026-11-10T12:00:00Z"), [])
 
     def test_missing_pubdate_is_rejected(self):
         xml = (
@@ -35,9 +33,7 @@ class RSSCollectorTests(unittest.TestCase):
             b"<link>https://www.federalreserve.gov/a</link>"
             b"</item></channel></rss>"
         )
-        self.assertEqual(
-            collect_feed(xml, "federal_reserve", "2026-11-10T12:00:00Z"), []
-        )
+        self.assertEqual(collect_feed(xml, "federal_reserve", "2026-11-10T12:00:00Z"), [])
 
     def test_offdomain_and_spoofed_publisher_links_are_not_news(self):
         for url in (
@@ -72,9 +68,7 @@ class RSSCollectorTests(unittest.TestCase):
     def test_redirect_off_publisher_domain_is_blocked(self):
         handler = _PublisherHTTPSRedirect("federal_reserve")
         with self.assertRaisesRegex(EvidenceError, "redirect"):
-            handler.redirect_request(
-                None, None, 302, "redirect", {}, "https://evil.example/path"
-            )
+            handler.redirect_request(None, None, 302, "redirect", {}, "https://evil.example/path")
 
 
 if __name__ == "__main__":
