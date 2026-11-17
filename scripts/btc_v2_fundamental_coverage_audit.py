@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections import defaultdict
 from pathlib import Path
+from datetime import datetime
 
 from scripts.btc_v2_fundamental_features import (
     MAX_EVENTS,
@@ -53,7 +53,7 @@ def audit_coverage(payload: dict) -> dict:
         raise EvidenceError("coverage audit input exceeds bounded limits")
 
     seen_keys: set[tuple[str, str]] = set()
-    previous_by_horizon: dict[str, object] = {}
+    previous_by_horizon: dict[str, datetime] = {}
     totals = {h: 0 for h in sorted(HORIZONS)}
     count_any = {h: 0 for h in sorted(HORIZONS)}
     counts = {h: {m: 0 for m in sorted(METRICS)} for h in sorted(HORIZONS)}
