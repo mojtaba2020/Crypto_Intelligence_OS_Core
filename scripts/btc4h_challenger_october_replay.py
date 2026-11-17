@@ -137,19 +137,20 @@ def build_rows(
                 before = math.fsum(row[1] for row in bars[1:21])
                 shock = math.log(recent / (before / 5.0))
                 if not all(
-                    math.isfinite(x) and abs(x) <= 20
-                    for x in (momentum, shock, momentum * shock)
+                    math.isfinite(x) and abs(x) <= 20 for x in (momentum, shock, momentum * shock)
                 ):
                     raise ValueError("nonfinite or extreme retrospective features")
                 reference = bars[-1][0]
                 actual = five_minute[target_open][0]
-                rows.append({
-                    "origin": origin,
-                    "target_close": target_open + timedelta(minutes=5),
-                    "x": [momentum, shock, momentum * shock],
-                    "reference": reference,
-                    "actual": actual,
-                })
+                rows.append(
+                    {
+                        "origin": origin,
+                        "target_close": target_open + timedelta(minutes=5),
+                        "x": [momentum, shock, momentum * shock],
+                        "reference": reference,
+                        "actual": actual,
+                    }
+                )
         origin += timedelta(hours=4)
     return rows, counters
 
@@ -239,25 +240,27 @@ def main() -> None:
     retrieved_at = datetime.now(UTC)
     rows, rejects = build_rows(hourly, targets)
     report = evaluate_retrospective(rows)
-    report.update({
-        "retrieved_at_utc": iso(retrieved_at),
-        "source": "Coinbase Exchange BTC-USD public historical 1h and 5m candles",
-        "source_available_then": "UNVERIFIABLE_HISTORY_RETRIEVED_TODAY",
-        "source_hourly_sha256": digest(hourly),
-        "source_5min_sha256": digest(targets),
-        "public_hourly_candles": len(hourly),
-        "public_five_minute_candles": len(targets),
-        "window_start_utc": iso(START),
-        "window_end_exclusive_utc": iso(END),
-        "expected_four_hour_slots": int((END - START) / timedelta(hours=4)),
-        "complete_slots": len(rows),
-        "incomplete_slots": rejects,
-        "note": (
-            "This exposed interval has already influenced earlier development. "
-            "The API cannot prove its historical original publication time or revisions. "
-            "Numerical exploration only: NO ALPHA and NO model promotion."
-        ),
-    })
+    report.update(
+        {
+            "retrieved_at_utc": iso(retrieved_at),
+            "source": "Coinbase Exchange BTC-USD public historical 1h and 5m candles",
+            "source_available_then": "UNVERIFIABLE_HISTORY_RETRIEVED_TODAY",
+            "source_hourly_sha256": digest(hourly),
+            "source_5min_sha256": digest(targets),
+            "public_hourly_candles": len(hourly),
+            "public_five_minute_candles": len(targets),
+            "window_start_utc": iso(START),
+            "window_end_exclusive_utc": iso(END),
+            "expected_four_hour_slots": int((END - START) / timedelta(hours=4)),
+            "complete_slots": len(rows),
+            "incomplete_slots": rejects,
+            "note": (
+                "This exposed interval has already influenced earlier development. "
+                "The API cannot prove its historical original publication time or revisions. "
+                "Numerical exploration only: NO ALPHA and NO model promotion."
+            ),
+        }
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2, sort_keys=True))
