@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 from scripts.btc_v2_fundamental_features import (
     MAX_EVENTS,
