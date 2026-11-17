@@ -1,0 +1,86 @@
+# One off, user-authorized exposed historical October 2026 experiment.
+# NEVER a live BTC forecast, proof of backdated first observation, or model promotion.
+name: BTC4h five-model October 2026 retrospective one-shot
+
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - '.github/workflows/btc4h_challenger_october_one_shot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  exposed-dev-only:
+    if: github.event.pull_request.number == 123 && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - name: Checkout proposed research head only
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install fixed research dependency range (no data provider or secrets)
+        run: |
+          python -m pip install -e .
+          python -m pip install 'scikit-learn>=1.5,<1.9'
+      - name: Offline integrity and anti-leak tests
+        run: |
+          python -m unittest tests.test_btc4h_challenger_tournament -v
+          python -m unittest tests.test_btc4h_challenger_october_replay -v
+      - name: Fetch already-exposed public Coinbase October history and fit five candidates
+        run: |
+          python -m scripts.btc4h_challenger_october_replay \
+            --output btc4h_five_challengers_october_retro.json
+      - name: Publish no-promotion descriptive metrics
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          report = json.loads(Path("btc4h_five_challengers_october_retro.json").read_text())
+          rows = [
+              "## BTC 4-hour five-model tournament — EXPOSED OCTOBER REPLAY ONLY",
+              "",
+              "**NOT prospective, NOT authentic historical as-of custody, NO model winner, NO ALPHA.**",
+              "This same period has been viewed in previous research. No orders or live forecasting.",
+              "",
+              f"Window (UTC): {report['window_start_utc']} .. {report['window_end_exclusive_utc']}",
+              f"Retrieved at UTC: {report['retrieved_at_utc']}",
+              f"Expected / complete 4h origins: {report['expected_four_hour_slots']} / {report['complete_slots']}",
+              f"Walk-forward scoring origins: {report['evaluation_count']}",
+              "",
+              "| Model | Mean abs log error | Paired gain vs Persistence | Correct direction |",
+              "|---|---:|---:|---:|",
+          ]
+          for name, result in report["model_metrics"].items():
+              rows.append(
+                  f"| {name} | {result['mean_absolute_log_error']:.8f} | "
+                  f"{result['paired_mean_gain_vs_persistence']:+.8f} | "
+                  f"{result['correct_direction']}/{result['nonflat_evaluable_direction']} |"
+              )
+          rows.extend([
+              "",
+              f"Public hourly digest: {report['source_hourly_sha256']}",
+              f"Public 5-minute digest: {report['source_5min_sha256']}",
+              "",
+              "**NO FREEZE, NO PROMOTION, NO TRADING. All historic availability timestamps unverified.**",
+          ])
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as file:
+              file.write("\n".join(rows) + "\n")
+          print("\n".join(rows))
+          PY
+      - name: Archive aggregate evidence, no bulk candle redistribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc4h-five-model-oct2026-retrospective-json
+          path: btc4h_five_challengers_october_retro.json
+          retention-days: 14
+          if-no-files-found: error
