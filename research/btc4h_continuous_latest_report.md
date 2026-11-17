@@ -1,8 +1,8 @@
 # گزارش وضعیت واقعی BTC/USD
 
-Run ID: 44045858438؛ UTC: 2026-11-17T08:20:29.031974+00:00
+Run ID: 44080316431؛ UTC: 2026-11-17T12:10:06.514839+00:00
 
-اعتبار heartbeat تا UTC: 2026-11-17T12:50:29.031974+00:00
+اعتبار heartbeat تا UTC: 2026-11-17T16:40:06.514839+00:00
 
 ## آزمایش رسمی منجمد — بدون تغییر
 
@@ -18,9 +18,9 @@ Run ID: 44045858438؛ UTC: 2026-11-17T08:20:29.031974+00:00
 
 ## مسیر rolling — مستقل از آزمایش رسمی
 
-نوبت موعدرسیده: 30؛ انتشار تأییدشده: 8؛ چهارساعت معتبر: 5؛ ازدست‌رفته: 25
+نوبت موعدرسیده: 30؛ انتشار تأییدشده: 9؛ چهارساعت معتبر: 6؛ ازدست‌رفته: 25
 
-آخرین صدور UTC: 2026-11-17T08:10:00.018369Z؛ افق واقعی: 245.00 دقیقه.
+آخرین صدور UTC: 2026-11-17T12:10:00.015521Z؛ افق واقعی: 245.00 دقیقه.
 
 نوع: چهارساعته
 
@@ -34,20 +34,34 @@ score_pending: نتیجه معتبر ثبت نشده؛ نتیجه حدس زده 
 
 GitHub cron تضمین زمان ندارد؛ missed_due_to_late_dispatch موفقیت صدور نیست.
 
-issue: اجرا نشده یا issue_failed
+issue: {
+  "early_prefetch_started": true,
+  "newly_issued": 1,
+  "newly_scored": 0,
+  "note": "Never backfill missed origins; GitHub schedule delivery is not guaranteed.",
+  "observed_run_at_utc": "2026-11-17T12:08:25.834517Z",
+  "origin_utc": "2026-11-17T12:00:00Z",
+  "overdue_targets_unavailable_in_api_window": 0,
+  "phase": "issue",
+  "real_forward_issue_proof_independent": false,
+  "research_status": "issued",
+  "total_issued": 9,
+  "total_scored": 0
+}
+
 
 score: {
   "early_prefetch_started": false,
   "newly_issued": 0,
-  "newly_scored": 1,
+  "newly_scored": 0,
   "note": "Never backfill missed origins; GitHub schedule delivery is not guaranteed.",
-  "observed_run_at_utc": "2026-11-17T08:20:27.166718Z",
-  "origin_utc": "2026-11-17T08:00:00Z",
+  "observed_run_at_utc": "2026-11-17T12:10:05.382413Z",
+  "origin_utc": "2026-11-17T12:00:00Z",
   "overdue_targets_unavailable_in_api_window": 0,
   "phase": "score",
   "real_forward_issue_proof_independent": false,
-  "research_status": "score_matured",
-  "total_issued": 8,
+  "research_status": "score_pending",
+  "total_issued": 9,
   "total_scored": 7
 }
 
