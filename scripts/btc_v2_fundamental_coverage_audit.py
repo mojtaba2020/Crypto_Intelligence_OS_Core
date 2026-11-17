@@ -21,10 +21,19 @@ from scripts.btc_v2_news_evidence import EvidenceError, utc
 
 HORIZONS = frozenset(
     (
-        "1h", "2h", "3h", "4h", "12h",
-        "1d", "2d", "3d",
-        "1w", "2w", "3w",
-        "1mo", "3mo",
+        "1h",
+        "2h",
+        "3h",
+        "4h",
+        "12h",
+        "1d",
+        "2d",
+        "3d",
+        "1w",
+        "2w",
+        "3w",
+        "1mo",
+        "3mo",
     )
 )
 MAX_ORIGINS = 500
