@@ -22,6 +22,25 @@ On that command ChatGPT must, **during its current answer**:
 
 **Important:** The command authorizes an attempt **in the chat turn**, not 24/7 background execution, automatic Codex access, unrestricted spending, trades, model promotion or deployment.
 
+## A.1. Mandatory four-channel operator cycle (founder directive 2026-11-21)
+
+**Every `قله: ادامه` must inspect and report four execution channels: ChatGPT, Codex, task-specific agents, and GitHub.** It must attempt real permitted delegation when a connected executor exists; naming a role, describing a prompt, or passing CI must never be reported as an agent or Codex execution.
+
+1. **ChatGPT / Orchestrator — always active in this turn:** inspect the current GitHub mission, independent gate evidence, recent PR/issue/CI state, and the USD $10 *combined* paid experiment ceiling. Choose one bounded, measurable task; specify the acceptance test and protected-data stop conditions. Do the permitted work now.
+2. **Codex / Coding executor — check actual availability on every turn:** if a callable Codex executor is genuinely available with an authorized repository and cost/scope, give it a precise code-review/implementation brief with target branch, file paths, acceptance tests, prohibitions, and required commit/PR/test evidence; inspect its response. If not available, report `NOT CONNECTED / NOT INVOKED`, create the task brief for a later valid handoff, and use ChatGPT+GitHub editing where appropriate. A GitHub workflow or ChatGPT-written code is **not** Codex.
+3. **Specialist agents — assess all eight functional roles but engage only useful ones:** assign explicit bounded tasks to Data/Provenance, Fundamentals, Model Research, Statistics, Audit, Devil's Advocate, Execution/Reporting as warranted. Execute an *actual* agent tool/job only after confirming connection, permissions, exact scope, costs and a reliable stop. Record agent name/ID, invocation/job ID, evidence and outcome. The repository's `Agent Fleet Pilot (dry run)` validates task planning and **is not a live specialist-agent execution**; merely drafting role-based analysis by ChatGPT is `ChatGPT analysis`, not an independent agent. When there is no callable agent, mark `NOT AVAILABLE / NOT INVOKED` and keep the exact task queued, not fabricated as completed.
+4. **GitHub / Evidence and delivery — always inspect, write when permitted:** read current branch/head, source, checks, PR and issues. Record a concrete commit, artifact, review or issue/PR update for the one selected action, check the resulting CI/logs, and give exact URLs. A job that was queued/cancelled is not a PASS; a green software workflow is not price-alpha validation. Do not dispatch a manual or paid workflow merely to satisfy the four-channel checklist.
+5. **After-action four-actor ledger, mandatory in every report:** show a short status line **for each** of `ChatGPT`, `Codex`, `Agents (by role)`, and `GitHub/CI` with `EXECUTED / BLOCKED / NOT INVOKED / PENDING`, the actual work done, evidence ID/link or `none`, and the reason when blocked. Distinguish tool-executed work from assigned instructions.
+6. **Next owner-by-owner orders:** give a specific next instruction and measurable acceptance criterion for **ChatGPT, Codex, relevant agent roles, and GitHub**. State the execution order and dependency; a future instruction is **not** an already dispatched background job. If a role cannot execute, identify the missing executor/permission rather than promising autonomous work.
+7. **Safety and spending:** respect the frozen study, locked OOS, independent witnessing, no trades, and the combined USD $10 paid-agent/API/GPU cap; if actual cumulative spend or provider cutoff cannot be verified, initiate **no new paid execution**. Do not force all agents or Codex to run simply to fill the report. Do not claim 24/7 background coordination without an actual scheduler.
+
+**Required compact reporting layout:**
+- Current Phase/Stage/E-step and one immediate measurable objective.
+- **Actor ledger:** ChatGPT | Codex | named Agents | GitHub/CI, each with real status, evidence and result.
+- Scientific interpretation / independent-custody gate / protected-data status.
+- Verified paid spend in this turn, cumulative known-vs-unknown, USD $10 ceiling.
+- **Next dispatch order:** numbered per-actor assignments, dependency and PASS/FAIL acceptance test. No user-written technical prompt required.
+
 ## B. Commands by purpose and scientific gate
 
 | User writes | Scope and expected deliverable | Who to invoke when actually available |
