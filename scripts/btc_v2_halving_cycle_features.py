@@ -16,8 +16,9 @@ from __future__ import annotations
 
 from datetime import date
 
-from crypto_intelligence_os.hybrid_forecasting import HALVINGS
 from scripts.btc_v2_news_evidence import utc
+
+from crypto_intelligence_os.hybrid_forecasting import HALVINGS
 
 
 def halving_cycle_snapshot(cutoff_utc: str) -> dict:
