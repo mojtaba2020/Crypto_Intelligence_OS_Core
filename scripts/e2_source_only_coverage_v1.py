@@ -15,8 +15,8 @@ from datetime import UTC, datetime, timedelta
 from itertools import pairwise
 from pathlib import Path
 
-from multitimeframe_lab_v1 import SPECS
-from resample_multitimeframe_ohlcv import _bucket_end, source_data_identity
+from scripts.multitimeframe_lab_v1 import SPECS
+from scripts.resample_multitimeframe_ohlcv import _bucket_end, source_data_identity
 
 EXCHANGES = ("bitstamp", "bitfinex")
 FAMILIES = ("1h", "1d", "1w", "1mo")
@@ -92,6 +92,8 @@ def _source_buckets(
         seen.add(ts)
         last = ts
         open_time = datetime.fromtimestamp(ts, UTC)
+        if open_time >= end:
+            raise ValueError("source row starts outside approved interval")
         if open_time.minute or open_time.second or open_time.microsecond:
             raise ValueError("source not hour-aligned")
         if family != "1h" and open_time.hour:
@@ -217,7 +219,8 @@ def build_metadata_report(real_dir: Path, prepared_dir: Path, window: dict) -> d
         "status": "STAGE6_E2_TWO_VENUE_SOURCE_ONLY_METADATA_REPORT",
         "development_window": window,
         "venues": details,
-        "real_market_data_observed": True,
+        "market_values_checked_for_integrity_only": True,
+        "source_is_real_market_data_independently_verified": False,
         "historical_first_seen_independently_verified": False,
         "protected_oos_boundary_independently_verified": False,
         "eligible_for_model_training_or_stage7": False,
