@@ -3,6 +3,8 @@
 **MANDATORY FIRST READ BEFORE CHANGING THIS REPOSITORY:**
 [PROJECT NORTH STAR AND EXECUTION ROADMAP](docs/PROJECT_NORTH_STAR_AND_EXECUTION_ROADMAP.md).
 
+**FOUNDER ONE-LINE EXECUTION COMMANDS:** [OPERATOR COMMAND CENTER](docs/OPERATOR_COMMAND_CENTER.md). For a user request starting with `قله:`, read the operator command contract and current GitHub stage before selecting work. A `قله: ادامه` request means perform one bounded, verified, allowed next action *now*, not simply return a plan or assume background work. If tools/approval are missing, explain and deliver the safest useful subset.
+
 The founder's primary objective is a scientifically validated **multi-horizon Bitcoin forecast engine**, using technical/historical AND parallel point-in-time fundamentals/macro/on-chain/news features, and eventually an independently evaluated **Human vs AI vs Hybrid** decision system. Do not let narrow BTC4h deployment problems, missing historical candles or attractive new models silently displace that objective.
 
 **Current position (2026-11-20):** product phase 5/6; scientific Stage 6/10. The historical V3 family has **0/24 freeze-ready** models, and Stage 7 has not been authorized. This is a checkpoint; verify subsequent source evidence before changing it.
