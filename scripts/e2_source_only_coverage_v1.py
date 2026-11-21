@@ -196,7 +196,13 @@ def build_metadata_report(real_dir: Path, prepared_dir: Path, window: dict) -> d
         daily = prepared["exchanges"][exchange]
         if hourly.get("exchange") != exchange or daily.get("exchange") != exchange:
             raise ValueError("manifest exchange mismatch")
+        if daily.get("source_granularity") != "native_1d":
+            raise ValueError("missing or invalid native daily source granularity")
+        native_daily_sha = daily.get("source_sha256")
+        if not isinstance(native_daily_sha, str) or len(native_daily_sha) != 64:
+            raise ValueError("missing native daily source SHA-256")
         source = {}
+        lineage = {}
         family_summaries = {}
         for family in FAMILIES:
             if family == "1h":
@@ -215,6 +221,27 @@ def build_metadata_report(real_dir: Path, prepared_dir: Path, window: dict) -> d
             )
             family_summaries[family] = _family_summary(buckets, family, end)
             source[family] = digest
+            # A candle timestamp denotes its market bucket, not when a collector
+            # first observed or published the payload. Never infer source custody.
+            lineage[family] = {
+                "source_path_kind": (
+                    "native_exchange_hourly"
+                    if family == "1h"
+                    else "native_exchange_daily_calendar_aggregation"
+                ),
+                "native_input_granularity": "1h" if family == "1h" else "1d",
+                "native_input_ohlcv_sha256": (
+                    hourly["data_sha256"] if family == "1h" else native_daily_sha
+                ),
+                "family_ohlcv_sha256": digest,
+                "family_coverage_metadata_sha256": coverage_sha,
+                "retrieved_at_utc": None,
+                "historical_first_observed_at_utc": None,
+                "historical_published_at_utc": None,
+                "revision_vintage_id": None,
+                "independent_custody_verified": False,
+                "source_license_verified": False,
+            }
         horizons = {}
         for spec in SPECS:
             if not spec.promotion_eligible:
@@ -234,6 +261,7 @@ def build_metadata_report(real_dir: Path, prepared_dir: Path, window: dict) -> d
             raise ValueError("diverged from 13-horizon charter")
         details[exchange] = {
             "source_sha256_by_family": source,
+            "source_lineage_by_family": lineage,
             "technical_family_coverage": family_summaries,
             "one_origin_per_horizon_at_dev_end": horizons,
         }

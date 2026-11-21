@@ -72,6 +72,8 @@ def fixture(path: Path) -> tuple[Path, Path]:
             }
         prepared_manifest["exchanges"][name] = {
             "exchange": name,
+            "source_granularity": "native_1d",
+            "source_sha256": source_data_identity(daily),
             "timeframes": frame_info,
         }
     (real / "manifest.json").write_text(json.dumps(manifests), encoding="utf-8")
@@ -129,6 +131,46 @@ class SourceOnlyE2Tests(unittest.TestCase):
         self.assertFalse(r["historical_first_seen_independently_verified"])
         for forbidden in ('"open":', '"close":', '"volume":'):
             self.assertNotIn(forbidden, json.dumps(r))
+
+    def test_lineage_marks_native_daily_and_missing_independent_timestamps(self):
+        report = build_metadata_report(self.real, self.prepped, self.window)
+        for venue in report["venues"].values():
+            lineage = venue["source_lineage_by_family"]
+            self.assertEqual(set(lineage), {"1h", "1d", "1w", "1mo"})
+            self.assertEqual(lineage["1h"]["native_input_granularity"], "1h")
+            self.assertEqual(lineage["1w"]["native_input_granularity"], "1d")
+            self.assertEqual(
+                lineage["1w"]["source_path_kind"],
+                "native_exchange_daily_calendar_aggregation",
+            )
+            self.assertIsNotNone(lineage["1w"]["family_coverage_metadata_sha256"])
+            for source in lineage.values():
+                self.assertIsNone(source["historical_first_observed_at_utc"])
+                self.assertIsNone(source["historical_published_at_utc"])
+                self.assertIsNone(source["retrieved_at_utc"])
+                self.assertIsNone(source["revision_vintage_id"])
+                self.assertFalse(source["independent_custody_verified"])
+                self.assertFalse(source["source_license_verified"])
+
+    def test_untrusted_first_seen_manifest_claim_not_promoted(self):
+        manifest_path = self.real / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["exchanges"]["bitstamp"]["first_observed_at"] = "2014-01-01T00:00:00Z"
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        output = build_metadata_report(self.real, self.prepped, self.window)
+        self.assertIsNone(
+            output["venues"]["bitstamp"]["source_lineage_by_family"]["1h"][
+                "historical_first_observed_at_utc"
+            ]
+        )
+
+    def test_native_daily_granularity_missing_fails_closed(self):
+        path = self.prepped / "prepared_manifest.json"
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        del manifest["exchanges"]["bitfinex"]["source_granularity"]
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "native daily source granularity"):
+            build_metadata_report(self.real, self.prepped, self.window)
 
     def test_missing_hour_reported_without_imputation(self):
         path = self.real / "bitstamp_hourly.json"
