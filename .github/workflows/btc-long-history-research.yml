@@ -1,22 +1,8 @@
 name: BTC Long-History Research
 
 on:
-  pull_request:
-    paths:
-      - "scripts/backfill_bitstamp_hourly.py"
-      - "scripts/evaluate_bitstamp_hourly_features_v2.py"
-      - "scripts/confirm_hourly_regime_hypothesis.py"
-      - "scripts/hourly_regime_v1.py"
-      - "tests/test_confirm_hourly_regime_hypothesis.py"
-      - "tests/test_backfill_bitstamp_hourly.py"
-      - "tests/test_hourly_regime_gate_v1.py"
-      - "research/prereg_range_mean_6h_down_low_vol_12h_v1.json"
-      - "scripts/hourly_features_v2.py"
-      - "scripts/attribute_hourly_candle_features_v2.py"
-      - "scripts/ablate_hourly_features_v2.py"
-      - "src/crypto_intelligence_os/adapters/market_data/bitstamp.py"
-      - "src/crypto_intelligence_os/adapters/market_data/historical_archive.py"
-      - ".github/workflows/btc-long-history-research.yml"
+  # Stage-6 safety: prevent PR changes from rerunning locked 2023 confirmation.
+  # Explicit, separately reviewed manual runs only.
   workflow_dispatch:
     inputs:
       start:
