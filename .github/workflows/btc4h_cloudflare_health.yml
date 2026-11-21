@@ -1,0 +1,41 @@
+name: BTC4h Cloudflare remote readiness attestation
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'workers/btc4h-cloudflare/**'
+      - '.github/workflows/btc4h_cloudflare_health.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify_live_deployment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify production Worker code + two gates, without dispatching
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://btc4h-free-scheduler-perflight.moji-nature.workers.dev/__health'
+          for attempt in $(seq 1 24); do
+            if curl --fail --silent --show-error --max-time 10 -H 'Cache-Control: no-cache' "$URL" -o "$RUNNER_TEMP/btc4h-health.json"; then
+              if python - "$RUNNER_TEMP/btc4h-health.json" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          assert d.get("service") == "btc4h-free-scheduler-preflight"
+          assert d.get("version") == "cutover-cron-jitter-v2"
+          assert d.get("armed") is True, "Production flags not both true"
+          assert d.get("dispatches") == 0, "Health request must not dispatch"
+          print("PASS: real Cloudflare production Worker armed; health sent no dispatch")
+          PY
+              then
+                exit 0
+              fi
+            fi
+            echo "Remote deployment not yet attested (attempt $attempt / 24)"
+            sleep 15
+          done
+          echo 'ERROR: Cloudflare live readiness not verified, do not merge schedule cutover.'
+          exit 1
