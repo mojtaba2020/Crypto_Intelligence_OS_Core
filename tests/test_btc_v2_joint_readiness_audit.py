@@ -100,9 +100,7 @@ class JointReadinessTests(unittest.TestCase):
     def test_very_old_missing_bars_do_not_poison_recent_window(self):
         data = payload()
         old = datetime(2011, 1, 1, 1, tzinfo=UTC)
-        data["technical_buckets"]["1h"].insert(
-            0, {"close_at_utc": as_z(old), "is_complete": True}
-        )
+        data["technical_buckets"]["1h"].insert(0, {"close_at_utc": as_z(old), "is_complete": True})
         self.assertEqual(
             audit_joint_readiness(data)["by_horizon"]["4h"]["technical_history_count_ready"],
             1,
@@ -141,9 +139,7 @@ class JointReadinessTests(unittest.TestCase):
         data = payload()
         data["technical_buckets"] = {family: [] for family in MIN_BARS}
         self.assertEqual(
-            audit_joint_readiness(data)["by_horizon"]["1d"][
-                "technical_stale_or_unavailable_count"
-            ],
+            audit_joint_readiness(data)["by_horizon"]["1d"]["technical_stale_or_unavailable_count"],
             1,
         )
 
