@@ -31,11 +31,14 @@ MAX_BUCKETS = 200_000
 
 def next_close(at: datetime, family: str) -> datetime:
     if family == "1mo":
-        return at.replace(year=at.year + 1, month=1) if at.month == 12 else at.replace(
-            month=at.month + 1
+        return (
+            at.replace(year=at.year + 1, month=1)
+            if at.month == 12
+            else at.replace(month=at.month + 1)
         )
-    return at + {"1h": timedelta(hours=1), "1d": timedelta(days=1),
-                 "1w": timedelta(weeks=1)}[family]
+    return (
+        at + {"1h": timedelta(hours=1), "1d": timedelta(days=1), "1w": timedelta(weeks=1)}[family]
+    )
 
 
 def _load_buckets(raw: dict) -> dict[str, tuple[list[datetime], list[int]]]:
@@ -73,7 +76,9 @@ def _load_buckets(raw: dict) -> dict[str, tuple[list[datetime], list[int]]]:
 
 def audit_joint_readiness(payload: dict) -> dict:
     if not isinstance(payload, dict) or set(payload) != {
-        "origins", "observations", "technical_buckets"
+        "origins",
+        "observations",
+        "technical_buckets",
     }:
         raise EvidenceError("joint input requires origins, observations and technical_buckets only")
     if set(HORIZON_SOURCE) != HORIZONS:
@@ -102,9 +107,12 @@ def audit_joint_readiness(payload: dict) -> dict:
                 short_history[horizon] += 1
         if ready:
             technical_ready[horizon] += 1
-        any_fundamental = summarize_fundamentals(
-            payload["observations"], origin["cutoff_utc"]
-        )["available_metric_count"] > 0
+        any_fundamental = (
+            summarize_fundamentals(payload["observations"], origin["cutoff_utc"])[
+                "available_metric_count"
+            ]
+            > 0
+        )
         if any_fundamental:
             fundamental_any[horizon] += 1
         if ready and any_fundamental:
