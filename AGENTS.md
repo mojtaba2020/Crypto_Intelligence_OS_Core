@@ -15,6 +15,8 @@ The founder's primary objective is a scientifically validated **multi-horizon Bi
 
 **Division of work:** Orchestrator; Data/Provenance; Fundamentals/Feature; Model Research; Statistics; Audit; Devil's Advocate; Execution/Reporting (task-specific agents). Codex, when actually available, is a code implementation/review tool, not an independent market-source witness or scientific judge. GitHub/Render/Neon are connectors, not proof that a specific subsystem is deployed. The assistant reports only work actually executed.
 
+**Founder-mandated four-channel execution/reporting (2026-11-21):** For every `قله: ادامه`, follow [Operator Command Center §A.1](docs/OPERATOR_COMMAND_CENTER.md). Check and separately report actual ChatGPT orchestration, actual Codex availability/calls, actual specialized-agent invocations (or `NOT INVOKED`), and real GitHub source/CI/write evidence. Assign the next exact task, responsible actor and PASS/FAIL acceptance criteria for each channel after reporting. Never call a dry-run agent planner, generic ChatGPT role label or green GitHub CI a Codex/specialist-agent execution. A delegation proposal is not dispatched work; no promise of work between messages. Do not activate paid or protected scientific workflows without verified authority and budget.
+
 **Anti-drift before each task:** cite roadmap stage, measurable deliverable, tool/agent, bounded cost, protected artifacts, criteria for completion, and next dependency. If a local blocker consumes effort without moving the critical path, record it and return to the project roadmap.
 
 **Reporting rule:** stage, task, actual actor/tool, code/CI/evidence link, scientific-vs-engineering distinction, costs verified, next step. No empty "progress" claims.
