@@ -69,9 +69,7 @@ def make_artifacts(folder: Path) -> tuple[Path, Path]:
         )
         tframes = {}
         for family, items in (("1d", daily), ("1w", weekly), ("1mo", month)):
-            (output / f"{venue}_{family}.json").write_text(
-                json.dumps(items), encoding="utf-8"
-            )
+            (output / f"{venue}_{family}.json").write_text(json.dumps(items), encoding="utf-8")
             tframes[family] = {
                 "closed_buckets_seen": len(items),
                 "data_sha256": _source_digest(items),
@@ -87,10 +85,7 @@ def make_artifacts(folder: Path) -> tuple[Path, Path]:
 
 
 def origins() -> list[dict]:
-    return [
-        {"horizon": h, "cutoff_utc": "2026-09-27T03:15:00Z"}
-        for h in sorted(HORIZON_SOURCE)
-    ]
+    return [{"horizon": h, "cutoff_utc": "2026-09-27T03:15:00Z"} for h in sorted(HORIZON_SOURCE)]
 
 
 class ExchangeBridgeTests(unittest.TestCase):
@@ -122,9 +117,7 @@ class ExchangeBridgeTests(unittest.TestCase):
         self.assertFalse(report["source_first_seen_independently_witnessed"])
         self.assertFalse(report["train_or_stage7_authorized"])
         self.assertEqual(
-            report["cross_venue_time_span_by_family"]["1h"][
-                "first_common_closed_bucket_end_utc"
-            ],
+            report["cross_venue_time_span_by_family"]["1h"]["first_common_closed_bucket_end_utc"],
             "2026-09-27T01:00:00Z",
         )
         self.assertNotIn('"open":', json.dumps(report))
@@ -161,9 +154,7 @@ class ExchangeBridgeTests(unittest.TestCase):
         report["rows"] = len(rows)
         report["data_sha256"] = _source_digest(rows)
         audit.write_text(json.dumps(report), encoding="utf-8")
-        spans = self._report()["venues"]["bitstamp"]["source_audit"][
-            "time_coverage_by_family"
-        ]
+        spans = self._report()["venues"]["bitstamp"]["source_audit"]["time_coverage_by_family"]
         self.assertEqual(spans["1h"]["nonconsecutive_bucket_break_count"], 1)
         self.assertEqual(spans["1h"]["closed_bucket_count"], 3)
 
@@ -219,9 +210,7 @@ class ExchangeBridgeTests(unittest.TestCase):
         with self.assertRaisesRegex(EvidenceError, "duplicate"):
             self._report()
         with self.assertRaises(EvidenceError):
-            exchange_inventory(
-                "unknown", self.real, self.output, approved_development_end_utc=END
-            )
+            exchange_inventory("unknown", self.real, self.output, approved_development_end_utc=END)
 
     def test_prepared_sha_mismatch_detected_before_audit(self):
         path = self.output / "bitfinex_1mo.json"
