@@ -45,8 +45,11 @@ class HalvingCycleTests(unittest.TestCase):
         self.assertGreater(row["value"], 0)
         self.assertFalse(row["train_eligible"])
 
-    def test_utc_enforced(self):
-        for invalid in ("2024-04-21T00:00:00", "2024-04-21T00:00:00-05:00", "invalid"):
+    def test_timezone_normalization_and_invalid_cutoffs(self):
+        row = halving_cycle_snapshot("2024-04-20T20:00:00-05:00")
+        self.assertEqual(row["cutoff_utc"], "2024-04-21T01:00:00Z")
+        self.assertEqual(row["value"], 1.0)
+        for invalid in ("2024-04-21T00:00:00", "invalid"):
             with self.subTest(invalid=invalid):
                 with self.assertRaises(ValueError):
                     halving_cycle_snapshot(invalid)
