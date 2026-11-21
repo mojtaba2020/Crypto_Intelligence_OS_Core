@@ -6,6 +6,7 @@ from crypto_intelligence_os.adapters.market_data import bitstamp
 from crypto_intelligence_os.adapters.market_data.bitstamp import (
     INSTRUMENT_ID,
     SOURCE_ID,
+    parse_daily_ohlc,
     parse_hourly_ohlc,
 )
 from crypto_intelligence_os.market_data import BarStatus, Timeframe
@@ -200,3 +201,25 @@ def test_fetch_hourly_range_does_not_invent_unavailable_hours(monkeypatch) -> No
     monkeypatch.setattr(bitstamp, "fetch_hourly", fake_fetch)
     bars = bitstamp.fetch_hourly_range(start=base, end=base.replace(hour=4), page_hours=4)
     assert missing not in {bar.open_time for bar in bars}
+
+
+def test_parse_daily_ohlc_uses_daily_contract() -> None:
+    payload = {
+        "data": {
+            "ohlc": [
+                {
+                    "timestamp": "1643587200",
+                    "open": "100",
+                    "high": "110",
+                    "low": "90",
+                    "close": "105",
+                    "volume": "10",
+                }
+            ]
+        }
+    }
+    ingested = datetime(2026, 1, 1, tzinfo=UTC)
+    bar = parse_daily_ohlc(payload, ingested_at=ingested)[0]
+    assert bar.timeframe is Timeframe.ONE_DAY
+    assert (bar.close_time - bar.open_time).days == 1
+    assert bar.available_at == bar.close_time
