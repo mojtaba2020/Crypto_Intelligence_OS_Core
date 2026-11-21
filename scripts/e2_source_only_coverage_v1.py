@@ -299,15 +299,18 @@ def build_metadata_report(real_dir: Path, prepared_dir: Path, window: dict) -> d
             continue
         family = spec.source_timeframe
         streak = 0
+        longest_streak = 0
         origins = 0
         for close in calendars[family]:
             streak = streak + 1 if close in common[family] else 0
+            longest_streak = max(longest_streak, streak)
             if streak >= spec.minimum_history_bars:
                 origins += 1
         matched[spec.label] = {
             "source_timeframe": family,
             "expected_closed_buckets": len(calendars[family]),
             "complete_buckets_on_both_venues": len(common[family]),
+            "longest_consecutive_complete_buckets_on_both_venues": longest_streak,
             "common_closes_with_minimum_history": origins,
         }
     return {
