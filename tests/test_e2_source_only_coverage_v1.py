@@ -62,18 +62,14 @@ def fixture(path: Path) -> tuple[Path, Path]:
         units = {"1d": daily, "1w": weekly, "1mo": monthly}
         frame_info = {}
         for family, rows in units.items():
-            (prepped / f"{name}_{family}.json").write_text(
-                json.dumps(rows), encoding="utf-8"
-            )
+            (prepped / f"{name}_{family}.json").write_text(json.dumps(rows), encoding="utf-8")
             frame_info[family] = {"data_sha256": source_data_identity(rows)}
         prepared_manifest["exchanges"][name] = {
             "exchange": name,
             "timeframes": frame_info,
         }
     (real / "manifest.json").write_text(json.dumps(manifests), encoding="utf-8")
-    (prepped / "prepared_manifest.json").write_text(
-        json.dumps(prepared_manifest), encoding="utf-8"
-    )
+    (prepped / "prepared_manifest.json").write_text(json.dumps(prepared_manifest), encoding="utf-8")
     return real, prepped
 
 
@@ -121,9 +117,7 @@ class SourceOnlyE2Tests(unittest.TestCase):
             self.assertEqual(venue["technical_family_coverage"]["1mo"]["closed_bucket_count"], 0)
             self.assertEqual(venue["technical_family_coverage"]["1h"]["source_gap_breaks"], 0)
             self.assertFalse(
-                venue["one_origin_per_horizon_at_dev_end"]["4h"][
-                    "eligible_technical_origin_at_end"
-                ]
+                venue["one_origin_per_horizon_at_dev_end"]["4h"]["eligible_technical_origin_at_end"]
             )
         self.assertFalse(r["eligible_for_model_training_or_stage7"])
         self.assertFalse(r["historical_first_seen_independently_verified"])

@@ -102,9 +102,7 @@ def _source_buckets(
         if family == "1mo" and open_time.day != 1:
             raise ValueError("monthly bucket not calendar aligned")
         closed = (
-            open_time + timedelta(hours=1)
-            if family == "1h"
-            else _bucket_end(open_time, family)
+            open_time + timedelta(hours=1) if family == "1h" else _bucket_end(open_time, family)
         )
         if closed > end:
             continue
@@ -115,18 +113,14 @@ def _source_buckets(
     return buckets, sha
 
 
-def _family_summary(
-    buckets: list[tuple[datetime, bool]], family: str, end: datetime
-) -> dict:
+def _family_summary(buckets: list[tuple[datetime, bool]], family: str, end: datetime) -> dict:
     sequence: list[tuple[datetime, bool]] = []
     breaks = 0
     previous: datetime | None = None
     for close, complete in buckets:
         if previous is not None:
             next_expected = (
-                previous + timedelta(hours=1)
-                if family == "1h"
-                else _bucket_end(previous, family)
+                previous + timedelta(hours=1) if family == "1h" else _bucket_end(previous, family)
             )
             if close != next_expected:
                 breaks += 1
@@ -149,11 +143,7 @@ def _family_summary(
         and last_end <= end
         and (
             end
-            < (
-                last_end + timedelta(hours=1)
-                if family == "1h"
-                else _bucket_end(last_end, family)
-            )
+            < (last_end + timedelta(hours=1) if family == "1h" else _bucket_end(last_end, family))
             or end == last_end
         )
     )
