@@ -15,6 +15,7 @@ import json
 import math
 from bisect import bisect_left
 from datetime import UTC, datetime, timedelta
+from itertools import pairwise
 from pathlib import Path
 
 from scripts.btc_v2_joint_readiness_audit import audit_joint_readiness
@@ -110,7 +111,7 @@ def _verified_source(
     if not isinstance(expected_sha, str) or len(expected_sha) != 64:
         raise EvidenceError("missing or malformed V1 source identity")
     starts = [_start(row["timestamp"], family) for row in rows]
-    if any(curr <= prev for prev, curr in zip(starts, starts[1:])):
+    if any(curr <= prev for prev, curr in pairwise(starts)):
         raise EvidenceError("duplicate, descending or reordered source timestamps")
     if any(_end(start, family) > cutoff for start in starts):
         raise EvidenceError("input contains an unclosed or unapproved development period")
@@ -217,7 +218,7 @@ def _verified_prepared(
     rows: list[dict], info: dict, family: str
 ) -> tuple[list[datetime], str]:
     starts = [_start(row["timestamp"], family) for row in rows]
-    if any(curr <= prev for prev, curr in zip(starts, starts[1:])):
+    if any(curr <= prev for prev, curr in pairwise(starts)):
         raise EvidenceError("duplicate or descending prepared timestamps")
     if info.get("closed_buckets_seen") != len(rows):
         raise EvidenceError("V1 prepared bucket count mismatch")
@@ -260,7 +261,8 @@ def audit_both_venues(
         "venues": reports,
         "official_13_horizons": True,
         "source_first_seen_independently_witnessed": False,
-        "locked_test_read_or_used": False,
+        "locked_test_isolation_independently_verified": False,
+        "operator_declared_development_cutoff_requires_scientific_approval": True,
         "train_or_stage7_authorized": False,
         "no_live_download_or_costly_workflow_triggered": True,
     }
