@@ -12,7 +12,6 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import UTC, datetime, timedelta
-from itertools import pairwise
 from pathlib import Path
 
 from scripts.multitimeframe_lab_v1 import SPECS
