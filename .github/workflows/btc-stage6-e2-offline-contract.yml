@@ -5,6 +5,8 @@ on:
   pull_request:
     paths:
       - "scripts/e2_source_only_coverage_v1.py"
+      - "scripts/resample_multitimeframe_ohlcv.py"
+      - "scripts/prepare_multitimeframe_real_data_v1.py"
       - "tests/test_e2_source_only_coverage_v1.py"
       - ".github/workflows/btc-stage6-e2-offline-contract.yml"
   workflow_dispatch:

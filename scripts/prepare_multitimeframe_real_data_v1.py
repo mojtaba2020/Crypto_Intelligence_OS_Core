@@ -7,7 +7,12 @@ import argparse
 import json
 from pathlib import Path
 
-from resample_multitimeframe_ohlcv import aggregate, audit_source_rows, source_data_identity
+from resample_multitimeframe_ohlcv import (
+    aggregate,
+    audit_source_rows,
+    coverage_metadata_identity,
+    source_data_identity,
+)
 
 TIMEFRAMES = ("1d", "1w", "1mo")
 EXCHANGES = ("bitstamp", "bitfinex")
@@ -48,6 +53,7 @@ def prepare_exchange(
             "incomplete_buckets": incomplete_count,
             "dropped_incomplete_buckets": 0,
             "data_sha256": source_data_identity(all_closed),
+            "coverage_metadata_sha256": coverage_metadata_identity(all_closed),
             "first_timestamp": int(all_closed[0]["timestamp"]),
             "last_timestamp": int(all_closed[-1]["timestamp"]),
             "gap_policy": "preserve_calendar_grid_mark_incomplete_no_imputation",

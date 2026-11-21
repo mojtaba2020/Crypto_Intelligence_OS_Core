@@ -15,7 +15,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from scripts.multitimeframe_lab_v1 import SPECS
-from scripts.resample_multitimeframe_ohlcv import _bucket_end, source_data_identity
+from scripts.resample_multitimeframe_ohlcv import (
+    _bucket_end,
+    coverage_metadata_identity,
+    source_data_identity,
+)
 
 EXCHANGES = ("bitstamp", "bitfinex")
 FAMILIES = ("1h", "1d", "1w", "1mo")
@@ -70,7 +74,12 @@ def _load_json(path: Path) -> object:
 
 
 def _source_buckets(
-    path: Path, family: str, expected_sha: str, end: datetime
+    path: Path,
+    family: str,
+    expected_sha: str,
+    end: datetime,
+    *,
+    expected_coverage_sha: str | None = None,
 ) -> tuple[list[tuple[datetime, bool]], str]:
     rows = _load_json(path)
     if not isinstance(rows, list):
@@ -78,6 +87,8 @@ def _source_buckets(
     sha = source_data_identity(rows)
     if sha != expected_sha:
         raise ValueError("data hash mismatch")
+    if family != "1h" and not expected_coverage_sha:
+        raise ValueError("missing prepared coverage metadata digest")
     buckets: list[tuple[datetime, bool]] = []
     seen: set[int] = set()
     last: int | None = None
@@ -104,12 +115,27 @@ def _source_buckets(
         closed = (
             open_time + timedelta(hours=1) if family == "1h" else _bucket_end(open_time, family)
         )
-        if closed > end:
-            continue
         complete = True if family == "1h" else row.get("is_complete")
         if type(complete) is not bool:
             raise ValueError("malformed complete flag")
+        if family != "1h":
+            count = row.get("source_bars")
+            expected = row.get("expected_source_bars")
+            actual_expected = (closed - open_time).days
+            if (
+                type(count) is not int
+                or type(expected) is not int
+                or expected != actual_expected
+                or not 0 <= count <= expected
+            ):
+                raise ValueError("invalid prepared bar counts")
+            if complete != (count == expected):
+                raise ValueError("inconsistent prepared completeness")
+        if closed > end:
+            continue
         buckets.append((closed, complete))
+    if family != "1h" and coverage_metadata_identity(rows) != expected_coverage_sha:
+        raise ValueError("coverage metadata hash mismatch")
     return buckets, sha
 
 
@@ -179,7 +205,14 @@ def build_metadata_report(real_dir: Path, prepared_dir: Path, window: dict) -> d
             else:
                 path = prepared_dir / f"{exchange}_{family}.json"
                 identity = daily["timeframes"][family]["data_sha256"]
-            buckets, digest = _source_buckets(path, family, identity, end)
+            coverage_sha = (
+                None
+                if family == "1h"
+                else daily["timeframes"][family].get("coverage_metadata_sha256")
+            )
+            buckets, digest = _source_buckets(
+                path, family, identity, end, expected_coverage_sha=coverage_sha
+            )
             family_summaries[family] = _family_summary(buckets, family, end)
             source[family] = digest
         horizons = {}

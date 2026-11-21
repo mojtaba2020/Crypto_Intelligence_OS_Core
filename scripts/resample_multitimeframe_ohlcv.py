@@ -74,6 +74,21 @@ def source_data_identity(rows: list[dict[str, float]]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def coverage_metadata_identity(rows: list[dict[str, float]]) -> str:
+    """Stable digest of completeness metadata, separate from price/volume identity."""
+    normalized = [
+        {
+            "timestamp": int(row["timestamp"]),
+            "source_bars": row["source_bars"],
+            "expected_source_bars": row["expected_source_bars"],
+            "is_complete": row["is_complete"],
+        }
+        for row in sorted(rows, key=lambda item: int(item["timestamp"]))
+    ]
+    payload = json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
 def _bucket_start(ts: int, timeframe: str) -> datetime:
     dt = datetime.fromtimestamp(ts, UTC)
     if timeframe == "1d":

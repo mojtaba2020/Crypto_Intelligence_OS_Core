@@ -13,7 +13,10 @@ from scripts.e2_source_only_coverage_v1 import (
     build_metadata_report,
     validate_window,
 )
-from scripts.resample_multitimeframe_ohlcv import source_data_identity
+from scripts.resample_multitimeframe_ohlcv import (
+    coverage_metadata_identity,
+    source_data_identity,
+)
 
 START = "2020-01-01T00:00:00Z"
 END = "2020-01-04T00:00:00Z"
@@ -63,7 +66,10 @@ def fixture(path: Path) -> tuple[Path, Path]:
         frame_info = {}
         for family, rows in units.items():
             (prepped / f"{name}_{family}.json").write_text(json.dumps(rows), encoding="utf-8")
-            frame_info[family] = {"data_sha256": source_data_identity(rows)}
+            frame_info[family] = {
+                "data_sha256": source_data_identity(rows),
+                "coverage_metadata_sha256": coverage_metadata_identity(rows),
+            }
         prepared_manifest["exchanges"][name] = {
             "exchange": name,
             "timeframes": frame_info,
@@ -144,6 +150,40 @@ class SourceOnlyE2Tests(unittest.TestCase):
         del rows[0]["is_complete"]
         path.write_text(json.dumps(rows), encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "malformed complete flag"):
+            build_metadata_report(self.real, self.prepped, self.window)
+
+    def test_prepared_completeness_flip_fails_closed(self):
+        path = self.prepped / "bitstamp_1d.json"
+        rows = json.loads(path.read_text(encoding="utf-8"))
+        rows[0]["is_complete"] = False
+        path.write_text(json.dumps(rows), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "inconsistent prepared completeness"):
+            build_metadata_report(self.real, self.prepped, self.window)
+
+    def test_rewritten_consistent_counts_fail_metadata_digest(self):
+        path = self.prepped / "bitstamp_1d.json"
+        rows = json.loads(path.read_text(encoding="utf-8"))
+        rows[0]["source_bars"] = 0
+        rows[0]["is_complete"] = False
+        path.write_text(json.dumps(rows), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "coverage metadata hash mismatch"):
+            build_metadata_report(self.real, self.prepped, self.window)
+
+    def test_prepared_wrong_calendar_expected_count_rejected(self):
+        path = self.prepped / "bitstamp_1d.json"
+        rows = json.loads(path.read_text(encoding="utf-8"))
+        rows[0]["expected_source_bars"] = 2
+        rows[0]["is_complete"] = False
+        path.write_text(json.dumps(rows), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "invalid prepared bar counts"):
+            build_metadata_report(self.real, self.prepped, self.window)
+
+    def test_prepared_missing_coverage_digest_rejected(self):
+        manifest = self.prepped / "prepared_manifest.json"
+        rows = json.loads(manifest.read_text(encoding="utf-8"))
+        del rows["exchanges"]["bitstamp"]["timeframes"]["1d"]["coverage_metadata_sha256"]
+        manifest.write_text(json.dumps(rows), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "missing prepared coverage metadata digest"):
             build_metadata_report(self.real, self.prepped, self.window)
 
     def test_tampered_source_digest_fails(self):
