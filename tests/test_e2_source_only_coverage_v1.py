@@ -186,10 +186,10 @@ class SourceOnlyE2Tests(unittest.TestCase):
         self.assertEqual(hourly["source_gap_breaks"], 1)
         self.assertEqual(hourly["closed_bucket_count"], 71)
 
-    def test_opposite_missing_endpoints_use_the_requested_calendar(self):
+    def test_disjoint_gaps_use_the_requested_calendar(self):
         manifest = self.real / "manifest.json"
         raw = json.loads(manifest.read_text())
-        for venue, index in zip(EXCHANGES, (0, -1), strict=True):
+        for venue, index in zip(EXCHANGES, (0, 36), strict=True):
             path = self.real / f"{venue}_hourly.json"
             rows = json.loads(path.read_text())
             rows.pop(index)
@@ -204,6 +204,9 @@ class SourceOnlyE2Tests(unittest.TestCase):
         self.assertEqual(len(coverage), 13)
         self.assertEqual(coverage["4h"]["expected_closed_buckets"], 72)
         self.assertEqual(coverage["4h"]["complete_buckets_on_both_venues"], 70)
+        metric = "longest_consecutive_complete_buckets_on_both_venues"
+        self.assertEqual(coverage["4h"][metric], 35)
+        self.assertEqual(coverage["1w"][metric], 0)
         self.assertEqual(coverage["4h"]["common_closes_with_minimum_history"], 0)
         self.assertEqual(coverage["1w"]["expected_closed_buckets"], 0)
 
