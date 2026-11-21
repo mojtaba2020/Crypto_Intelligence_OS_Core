@@ -1,0 +1,29 @@
+name: BTC Stage6 E2 Offline Coverage Contract
+
+# Synthetic-only unit tests; no market-data fetch, protected OOS judge, or model scoring.
+on:
+  pull_request:
+    paths:
+      - "scripts/e2_source_only_coverage_v1.py"
+      - "tests/test_e2_source_only_coverage_v1.py"
+      - ".github/workflows/btc-stage6-e2-offline-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2-offline-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Run deterministic E2 synthetic coverage tests (stdlib only)
+        run: python -m unittest discover -s tests -p test_e2_source_only_coverage_v1.py -v
