@@ -121,6 +121,12 @@ class ExchangeBridgeTests(unittest.TestCase):
             )
         self.assertFalse(report["source_first_seen_independently_witnessed"])
         self.assertFalse(report["train_or_stage7_authorized"])
+        self.assertEqual(
+            report["cross_venue_time_span_by_family"]["1h"][
+                "first_common_closed_bucket_end_utc"
+            ],
+            "2026-09-27T01:00:00Z",
+        )
         self.assertNotIn('"open":', json.dumps(report))
         self.assertNotIn('"close":', json.dumps(report))
 
@@ -144,6 +150,22 @@ class ExchangeBridgeTests(unittest.TestCase):
         self.assertEqual(record["unclosed_prepared_buckets_excluded"]["1mo"], 1)
         self.assertEqual(len(record["technical_buckets"]["1w"]), 1)
         self.assertEqual(record["technical_buckets"]["1w"][0]["is_complete"], False)
+
+    def test_missing_hour_is_reported_as_break_not_fabricated(self):
+        path = self.real / "bitstamp_hourly.json"
+        rows = json.loads(path.read_text(encoding="utf-8"))
+        del rows[1]
+        path.write_text(json.dumps(rows), encoding="utf-8")
+        audit = self.real / "bitstamp_hourly_audit.json"
+        report = json.loads(audit.read_text(encoding="utf-8"))
+        report["rows"] = len(rows)
+        report["data_sha256"] = _source_digest(rows)
+        audit.write_text(json.dumps(report), encoding="utf-8")
+        spans = self._report()["venues"]["bitstamp"]["source_audit"][
+            "time_coverage_by_family"
+        ]
+        self.assertEqual(spans["1h"]["nonconsecutive_bucket_break_count"], 1)
+        self.assertEqual(spans["1h"]["closed_bucket_count"], 3)
 
     def test_source_sha_mismatch_fails_closed(self):
         path = self.real / "bitstamp_hourly_audit.json"
