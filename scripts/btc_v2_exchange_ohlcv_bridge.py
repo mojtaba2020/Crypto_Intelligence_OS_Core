@@ -158,6 +158,23 @@ def _prepared_bucket_meta(
     return result, dropped_unclosed
 
 
+def _bucket_span(buckets: list[dict], family: str) -> dict:
+    closes = [utc(row["close_at_utc"]) for row in buckets]
+    breaks = sum(
+        _end(previous, family) != current
+        for previous, current in pairwise(closes)
+    )
+    return {
+        "first_closed_bucket_end_utc": _z(closes[0]) if closes else None,
+        "last_closed_bucket_end_utc": _z(closes[-1]) if closes else None,
+        "closed_bucket_count": len(closes),
+        "explicitly_incomplete_bucket_count": sum(
+            not row["is_complete"] for row in buckets
+        ),
+        "nonconsecutive_bucket_break_count": breaks,
+    }
+
+
 def exchange_inventory(
     exchange: str,
     real_dir: Path,
@@ -207,6 +224,9 @@ def exchange_inventory(
         "exchange": exchange,
         "technical_buckets": buckets,
         "source_sha256_by_family": data_digests,
+        "time_coverage_by_family": {
+            family: _bucket_span(buckets[family], family) for family in FAMILIES
+        },
         "approved_development_end_utc": _z(cutoff),
         "unclosed_prepared_buckets_excluded": dropped,
         "source_vintages_independently_attested": False,
@@ -256,9 +276,28 @@ def audit_both_venues(
         )
         del inventory["technical_buckets"]  # Do not publish full time-series metadata.
         reports[exchange] = {"source_audit": inventory, "joint_readiness": result}
+    common_spans: dict[str, dict] = {}
+    for family in FAMILIES:
+        a = reports["bitstamp"]["source_audit"]["time_coverage_by_family"][family]
+        b = reports["bitfinex"]["source_audit"]["time_coverage_by_family"][family]
+        starts = [a["first_closed_bucket_end_utc"], b["first_closed_bucket_end_utc"]]
+        ends = [a["last_closed_bucket_end_utc"], b["last_closed_bucket_end_utc"]]
+        valid = all(value is not None for value in starts + ends)
+        left = max(starts) if valid else None
+        right = min(ends) if valid else None
+        common_spans[family] = {
+            "first_common_closed_bucket_end_utc": (
+                left if valid and left <= right else None
+            ),
+            "last_common_closed_bucket_end_utc": (
+                right if valid and left <= right else None
+            ),
+            "is_span_only_not_matched_or_gap_free": True,
+        }
     return {
         "status": "STAGE6_TWO_EXCHANGE_RECONSTRUCTED_E2_FEASIBILITY_ONLY",
         "venues": reports,
+        "cross_venue_time_span_by_family": common_spans,
         "official_13_horizons": True,
         "source_first_seen_independently_witnessed": False,
         "locked_test_isolation_independently_verified": False,
