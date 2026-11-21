@@ -20,6 +20,12 @@ Do not share, publish, copy, redistribute, or expose any files, research, logic,
 - `research/` — Private market research
 - `private-data/` — Proprietary datasets and internal records
 
+## Project North Star and Roadmap
+
+**Required reference for all assistant, Codex, and agent work:** [PROJECT NORTH STAR AND EXECUTION ROADMAP](docs/PROJECT_NORTH_STAR_AND_EXECUTION_ROADMAP.md).
+
+Read [AGENTS.md](AGENTS.md) before modifying project code. The canonical plan keeps the historical/multitimeframe BTC prediction goal and parallel fundamental/macro research in focus; currently product Phase 5/6 and scientific Stage 6/10 (verify subsequent checkpoint changes). Preserve protected experiments and the combined USD $10 experimental paid-service ceiling.
+
 ## Project Status
 
 Active development.
