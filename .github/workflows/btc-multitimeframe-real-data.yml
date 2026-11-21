@@ -2,14 +2,8 @@ name: BTC Multi-Timeframe Real Data Audit
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - "scripts/fetch_multitimeframe_exchange_audit_v1.py"
-      - "scripts/resample_multitimeframe_ohlcv.py"
-      - "scripts/prepare_multitimeframe_real_data_v1.py"
-      - "scripts/run_real_multitimeframe_judge_v1.py"
-      - "scripts/audit_multitimeframe_sample_coverage_v1.py"
-      - ".github/workflows/btc-multitimeframe-real-data.yml"
+  # Stage-6 safety: PR updates must never launch historic locked OOS judge.
+  # Explicit, separately reviewed manual runs only.
 
 permissions:
   contents: read
