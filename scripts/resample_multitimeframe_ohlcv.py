@@ -151,7 +151,8 @@ def aggregate(
         if as_of_timestamp is not None:
             end_ts = int(_bucket_end(start, timeframe).timestamp())
             if end_ts > as_of_timestamp:
-                continue
+                # Future buckets also close after the cutoff; do not spin.
+                break
         group = buckets.get(key, [])
         if require_complete_buckets:
             end = _bucket_end(start, timeframe)
@@ -164,6 +165,8 @@ def aggregate(
                 missing = len(expected_timestamps - actual_timestamps)
                 extra = len(actual_timestamps - expected_timestamps)
                 if incomplete_policy == "drop":
+                    # Skip this bucket and advance to the next UTC boundary.
+                    key = int(end.timestamp())
                     continue
                 raise ValueError(
                     f"Incomplete {timeframe} bucket at {key}: "

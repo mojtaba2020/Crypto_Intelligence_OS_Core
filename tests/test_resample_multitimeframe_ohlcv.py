@@ -138,3 +138,50 @@ def test_aggregate_preserves_fully_missing_calendar_bucket_as_invalid_marker() -
     assert result[1]["source_bars"] == 0
     assert result[1]["is_complete"] is False
     assert result[2]["is_complete"] is True
+
+
+def test_as_of_early_cutoff_returns_empty_without_looping() -> None:
+    start = _ts(2026, 9, 28)
+    rows = [_row(start + hour * 3600, 100.0 + hour) for hour in range(48)]
+    assert aggregate(rows, "1d", as_of_timestamp=start + 12 * 3600) == []
+
+
+def test_as_of_skips_unclosed_weekly_and_monthly_buckets() -> None:
+    start = _ts(2026, 9, 21)  # Monday
+    rows = [_row(start + day * 86400, 100.0 + day) for day in range(16)]
+    cutoff = _ts(2026, 9, 30)
+    weekly = aggregate(
+        rows, "1w", as_of_timestamp=cutoff, source_interval_seconds=86400
+    )
+    monthly = aggregate(
+        rows, "1mo", as_of_timestamp=cutoff, source_interval_seconds=86400
+    )
+    assert [bar["timestamp"] for bar in weekly] == [start]
+    assert monthly == []
+
+
+def test_drop_incomplete_bucket_advances_to_next_complete_day() -> None:
+    start = _ts(2026, 9, 28)
+    rows = [
+        _row(start + hour * 3600, 100.0 + hour)
+        for hour in range(48)
+        if hour != 7
+    ]
+    result = aggregate(
+        rows, "1d", require_complete_buckets=True, incomplete_policy="drop"
+    )
+    assert [bar["timestamp"] for bar in result] == [start + 86400]
+    assert result[0]["is_complete"] is True
+
+
+def test_drop_empty_middle_bucket_does_not_repeat_indefinitely() -> None:
+    start = _ts(2026, 9, 27)
+    rows = [
+        _row(start + hour * 3600, 100.0 + hour)
+        for hour in range(72)
+        if not (24 <= hour < 48)
+    ]
+    result = aggregate(
+        rows, "1d", require_complete_buckets=True, incomplete_policy="drop"
+    )
+    assert [bar["timestamp"] for bar in result] == [start, start + 172800]
