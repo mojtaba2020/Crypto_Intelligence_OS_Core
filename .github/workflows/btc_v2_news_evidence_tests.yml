@@ -9,6 +9,7 @@ on:
       - 'scripts/btc_v2_fundamental_features.py'
       - 'scripts/btc_v2_fundamental_coverage_audit.py'
       - 'scripts/btc_v2_halving_cycle_features.py'
+      - 'scripts/btc_v2_joint_readiness_audit.py'
       - 'scripts/btc_v2_news_features.py'
       - 'scripts/btc_v2_news_dataset.py'
       - 'scripts/btc_v2_source_registry.py'
@@ -17,6 +18,7 @@ on:
       - 'tests/test_btc_v2_fundamental_features.py'
       - 'tests/test_btc_v2_fundamental_coverage_audit.py'
       - 'tests/test_btc_v2_halving_cycle_features.py'
+      - 'tests/test_btc_v2_joint_readiness_audit.py'
       - 'tests/test_btc_v2_news_features.py'
       - 'tests/test_btc_v2_news_dataset.py'
       - 'tests/test_btc_v2_rss_collector.py'
@@ -24,6 +26,8 @@ on:
   pull_request:
     paths:
       - 'scripts/btc_v2_news_evidence.py'
+      - 'scripts/btc_v2_joint_readiness_audit.py'
+      - 'tests/test_btc_v2_joint_readiness_audit.py'
       - 'tests/test_btc_v2_news_evidence.py'
       - '.github/workflows/btc_v2_news_evidence_tests.yml'
   workflow_dispatch:
