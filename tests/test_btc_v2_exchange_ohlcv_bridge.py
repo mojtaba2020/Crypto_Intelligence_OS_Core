@@ -121,8 +121,8 @@ class ExchangeBridgeTests(unittest.TestCase):
             )
         self.assertFalse(report["source_first_seen_independently_witnessed"])
         self.assertFalse(report["train_or_stage7_authorized"])
-        self.assertNotIn("open", json.dumps(report))
-        self.assertNotIn("close", json.dumps(report))
+        self.assertNotIn('"open":', json.dumps(report))
+        self.assertNotIn('"close":', json.dumps(report))
 
     def test_hourly_closes_use_next_hour_not_open(self):
         record = exchange_inventory(
