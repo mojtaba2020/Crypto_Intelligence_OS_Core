@@ -48,7 +48,7 @@ def fixture(path: Path) -> tuple[Path, Path]:
     prepped.mkdir()
     date = datetime(2020, 1, 1, tzinfo=UTC)
     hourly = [bar(date + timedelta(hours=i)) for i in range(72)]
-    daily = [bar(date + timedelta(days=i)) for i in range(3)]
+    daily = [prepared(date + timedelta(days=i), 1, 1) for i in range(3)]
     weekly = [prepared(datetime(2019, 12, 30, tzinfo=UTC), 3, 7)]
     monthly = [prepared(datetime(2020, 1, 1, tzinfo=UTC), 3, 31)]
     manifests: dict = {"exchanges": {}}
@@ -137,6 +137,14 @@ class SourceOnlyE2Tests(unittest.TestCase):
         hourly = cov["venues"]["bitstamp"]["technical_family_coverage"]["1h"]
         self.assertEqual(hourly["source_gap_breaks"], 1)
         self.assertEqual(hourly["closed_bucket_count"], 71)
+
+    def test_missing_prepared_completeness_flag_rejected(self):
+        path = self.prepped / "bitstamp_1d.json"
+        rows = json.loads(path.read_text(encoding="utf-8"))
+        del rows[0]["is_complete"]
+        path.write_text(json.dumps(rows), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "malformed complete flag"):
+            build_metadata_report(self.real, self.prepped, self.window)
 
     def test_tampered_source_digest_fails(self):
         manifest = self.real / "manifest.json"
