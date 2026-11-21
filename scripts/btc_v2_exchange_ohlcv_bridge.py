@@ -56,11 +56,14 @@ def _end(start: datetime, family: str) -> datetime:
             if start.month == 12
             else start.replace(month=start.month + 1)
         )
-    return start + {
-        "1h": timedelta(hours=1),
-        "1d": timedelta(days=1),
-        "1w": timedelta(days=7),
-    }[family]
+    return (
+        start
+        + {
+            "1h": timedelta(hours=1),
+            "1d": timedelta(days=1),
+            "1w": timedelta(days=7),
+        }[family]
+    )
 
 
 def _z(at: datetime) -> str:
@@ -160,17 +163,12 @@ def _prepared_bucket_meta(
 
 def _bucket_span(buckets: list[dict], family: str) -> dict:
     closes = [utc(row["close_at_utc"]) for row in buckets]
-    breaks = sum(
-        _end(previous, family) != current
-        for previous, current in pairwise(closes)
-    )
+    breaks = sum(_end(previous, family) != current for previous, current in pairwise(closes))
     return {
         "first_closed_bucket_end_utc": _z(closes[0]) if closes else None,
         "last_closed_bucket_end_utc": _z(closes[-1]) if closes else None,
         "closed_bucket_count": len(closes),
-        "explicitly_incomplete_bucket_count": sum(
-            not row["is_complete"] for row in buckets
-        ),
+        "explicitly_incomplete_bucket_count": sum(not row["is_complete"] for row in buckets),
         "nonconsecutive_bucket_break_count": breaks,
     }
 
@@ -197,12 +195,8 @@ def exchange_inventory(
         raise EvidenceError("V1 prepared exchange or granularity mismatch")
     hour = _rows(_read(real_dir / f"{exchange}_hourly.json"))
     day = _rows(_read(real_dir / f"{exchange}_daily_native.json"))
-    hour_starts, hourly_digest = _verified_source(
-        hour, audit.get("data_sha256"), "1h", cutoff
-    )
-    day_starts, daily_digest = _verified_source(
-        day, record.get("source_sha256"), "1d", cutoff
-    )
+    hour_starts, hourly_digest = _verified_source(hour, audit.get("data_sha256"), "1h", cutoff)
+    day_starts, daily_digest = _verified_source(day, record.get("source_sha256"), "1d", cutoff)
     if audit.get("rows") != len(hour):
         raise EvidenceError("V1 hourly row count mismatch")
     buckets = {
@@ -213,9 +207,11 @@ def exchange_inventory(
     for family in FAMILIES[1:]:
         dataset = _rows(_read(prepared_dir / f"{exchange}_{family}.json"))
         info = record.get("timeframes", {}).get(family, {})
-        starts, data_digests[family] = _verified_source(
-            dataset, info.get("data_sha256"), family, cutoff
-        ) if family == "1d" else _verified_prepared(dataset, info, family)
+        starts, data_digests[family] = (
+            _verified_source(dataset, info.get("data_sha256"), family, cutoff)
+            if family == "1d"
+            else _verified_prepared(dataset, info, family)
+        )
         del starts  # All downstream joins use source counts, never prices.
         buckets[family], dropped[family] = _prepared_bucket_meta(
             dataset, family, cutoff, day_starts
@@ -234,9 +230,7 @@ def exchange_inventory(
     }
 
 
-def _verified_prepared(
-    rows: list[dict], info: dict, family: str
-) -> tuple[list[datetime], str]:
+def _verified_prepared(rows: list[dict], info: dict, family: str) -> tuple[list[datetime], str]:
     starts = [_start(row["timestamp"], family) for row in rows]
     if any(curr <= prev for prev, curr in pairwise(starts)):
         raise EvidenceError("duplicate or descending prepared timestamps")
@@ -286,12 +280,8 @@ def audit_both_venues(
         left = max(starts) if valid else None
         right = min(ends) if valid else None
         common_spans[family] = {
-            "first_common_closed_bucket_end_utc": (
-                left if valid and left <= right else None
-            ),
-            "last_common_closed_bucket_end_utc": (
-                right if valid and left <= right else None
-            ),
+            "first_common_closed_bucket_end_utc": (left if valid and left <= right else None),
+            "last_common_closed_bucket_end_utc": (right if valid and left <= right else None),
             "is_span_only_not_matched_or_gap_free": True,
         }
     return {
@@ -319,9 +309,7 @@ def main() -> None:
     origin_input = _read(args.origins_json)
     if not isinstance(origin_input, dict) or set(origin_input) != {"origins"}:
         raise EvidenceError("origin file must contain only origins")
-    fundamentals = (
-        _read(args.fundamentals_json) if args.fundamentals_json else {"observations": []}
-    )
+    fundamentals = _read(args.fundamentals_json) if args.fundamentals_json else {"observations": []}
     if not isinstance(fundamentals, dict) or set(fundamentals) != {"observations"}:
         raise EvidenceError("fundamental input must contain only observations")
     report = audit_both_venues(
