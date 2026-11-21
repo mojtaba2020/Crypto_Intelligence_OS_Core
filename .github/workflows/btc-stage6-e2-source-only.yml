@@ -1,0 +1,88 @@
+name: BTC Stage6 E2 Source-Only Development Audit
+
+# Deliberately MANUAL ONLY. Do not use the older workflow which invokes a locked OOS judge.
+on:
+  workflow_dispatch:
+    inputs:
+      range_start_utc:
+        description: "Reviewed development-only start UTC midnight (>= 2014-01-01)"
+        required: true
+        type: string
+      range_end_utc:
+        description: "Reviewed development-only exclusive end UTC midnight"
+        required: true
+        type: string
+      approved_development_end_utc:
+        description: "Independently reviewed development boundary, not self-attestation"
+        required: true
+        type: string
+      development_only_ack:
+        description: "Type YES_ONLY_SOURCE_METADATA_NO_LOCKED_JUDGE to confirm isolation"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: btc-stage6-e2-source-only
+  cancel-in-progress: false
+
+jobs:
+  source-only:
+    if: ${{ inputs.development_only_ack == 'YES_ONLY_SOURCE_METADATA_NO_LOCKED_JUDGE' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RANGE_START: ${{ inputs.range_start_utc }}
+      RANGE_END: ${{ inputs.range_end_utc }}
+      REVIEWED_DEV_END: ${{ inputs.approved_development_end_utc }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install research dependencies
+        run: python -m pip install -e ".[research]"
+
+      - name: Fail closed on invalid or unapproved declared window
+        run: |
+          PYTHONPATH=. python -m scripts.e2_source_only_coverage_v1 \
+            --start "$RANGE_START" --end "$RANGE_END" \
+            --approved-development-end "$REVIEWED_DEV_END" \
+            --output artifacts/e2/collection_window.json
+
+      - name: Fetch bounded public BTC/USD exchange candles ONLY
+        run: |
+          PYTHONPATH=src:scripts python scripts/fetch_multitimeframe_exchange_audit_v1.py \
+            --start "$RANGE_START" --end "$RANGE_END" \
+            --output-dir artifacts/real-data
+
+      - name: Build gap-preserving 1d 1w 1mo research artifacts ONLY
+        run: |
+          PYTHONPATH=src:scripts python scripts/prepare_multitimeframe_real_data_v1.py \
+            --input-dir artifacts/real-data \
+            --output-dir artifacts/prepared
+
+      - name: Report source SHA-256 and 13-horizon coverage without model outcomes
+        run: |
+          PYTHONPATH=. python -m scripts.e2_source_only_coverage_v1 \
+            --start "$RANGE_START" --end "$RANGE_END" \
+            --approved-development-end "$REVIEWED_DEV_END" \
+            --real-dir artifacts/real-data --prepared-dir artifacts/prepared \
+            --output artifacts/e2/exchange_13_horizon_metadata.json
+
+      # No raw OHLCV, model scores, protected outcomes or vendor files uploaded.
+      - name: Upload small audit metadata only
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage6-e2-source-only-metadata
+          path: |
+            artifacts/e2/collection_window.json
+            artifacts/e2/exchange_13_horizon_metadata.json
+          if-no-files-found: error
+          retention-days: 7
