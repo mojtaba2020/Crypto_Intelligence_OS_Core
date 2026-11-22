@@ -44,10 +44,14 @@ class FundamentalIntegration(unittest.TestCase):
             with self.subTest(case=name), tempfile.TemporaryDirectory() as directory:
                 source = Path(directory) / "input.json"
                 result = Path(directory) / "output.json"
-                origins = [{"horizon": label, "cutoff_utc": "2020-01-02T12:00:00Z"} for label in AUDITED_LABELS]
+                origins = [
+                    {"horizon": label, "cutoff_utc": "2020-01-02T12:00:00Z"}
+                    for label in AUDITED_LABELS
+                ]
                 payload = {"origins": origins, "observations": observations}
                 source.write_text(json.dumps(payload), encoding="utf-8")
-                subprocess.run(
+                # CI checks out a pinned producer; this invokes its fixed module without a shell.
+                subprocess.run(  # noqa: S603
                     [
                         sys.executable,
                         "-E",
