@@ -88,12 +88,16 @@ def fixture(path: Path) -> tuple[Path, Path]:
 def fundamental_audit_fixture() -> dict:
     """Synthetic PR #117 audit result. No observed market or publisher data."""
     families = {
-        "macro": "macro_cpi_surprise macro_fed_policy_rate macro_payrolls_surprise "
-        "macro_dollar_index macro_real_yield macro_global_liquidity",
+        "macro": (
+            "macro_cpi_surprise macro_fed_policy_rate macro_payrolls_surprise "
+            "macro_dollar_index macro_real_yield macro_global_liquidity"
+        ),
         "etf": "btc_spot_etf_net_flow_usd",
         "derivatives": "btc_futures_funding_rate btc_open_interest_usd btc_options_skew",
-        "onchain": "btc_active_addresses btc_exchange_netflow_btc btc_hashrate "
-        "btc_miner_outflow_btc btc_supply_issued_btc",
+        "onchain": (
+            "btc_active_addresses btc_exchange_netflow_btc btc_hashrate "
+            "btc_miner_outflow_btc btc_supply_issued_btc"
+        ),
         "market": "btc_market_liquidity_usd",
         "cycle": "btc_halving_elapsed_days",
         "narrative": "btc_news_sentiment",
@@ -283,7 +287,9 @@ class SourceOnlyE2Tests(unittest.TestCase):
 
     def test_fundamental_audit_reports_checked_and_eligible_separately(self):
         absent = requested_horizon_readiness(self.window)
-        rows = requested_horizon_readiness(self.window, fundamental_audit=fundamental_audit_fixture())
+        rows = requested_horizon_readiness(
+            self.window, fundamental_audit=fundamental_audit_fixture()
+        )
         self.assertIsNone(absent["2h"]["fundamental_checked_origins"])
         self.assertIsNone(absent["2h"]["fundamental_eligible_origins"])
         self.assertEqual(rows["1h"]["fundamental_checked_origins"], 2)
@@ -304,9 +310,17 @@ class SourceOnlyE2Tests(unittest.TestCase):
             with self.subTest(with_prices=with_prices):
                 output = Path(self.tmp.name) / f"readiness-{with_prices}.json"
                 argv = [
-                    "e2_source_only_coverage_v1", "--start", START, "--end", END,
-                    "--approved-development-end", APPROVED, "--output", str(output),
-                    "--fundamental-audit", str(audit_file),
+                    "e2_source_only_coverage_v1",
+                    "--start",
+                    START,
+                    "--end",
+                    END,
+                    "--approved-development-end",
+                    APPROVED,
+                    "--output",
+                    str(output),
+                    "--fundamental-audit",
+                    str(audit_file),
                 ]
                 if with_prices:
                     argv.extend(["--real-dir", str(self.real), "--prepared-dir", str(self.prepped)])
@@ -382,4 +396,3 @@ class SourceOnlyE2Tests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
