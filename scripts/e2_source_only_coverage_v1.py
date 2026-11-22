@@ -17,6 +17,7 @@ from pathlib import Path
 from scripts.multitimeframe_lab_v1 import SPECS
 from scripts.resample_multitimeframe_ohlcv import (
     _bucket_end,
+    _bucket_start,
     coverage_metadata_identity,
     source_data_identity,
 )
@@ -184,13 +185,110 @@ def _family_summary(buckets: list[tuple[datetime, bool]], family: str, end: date
     }
 
 
-def build_metadata_report(real_dir: Path, prepared_dir: Path, window: dict) -> dict:
+def _calendar_closes(start: datetime, end: datetime, family: str) -> list[datetime]:
+    """Close times of full UTC buckets contained in the requested interval."""
+    cursor = start if family == "1h" else _bucket_start(int(start.timestamp()), family)
+    closes = []
+    while cursor < end:
+        following = cursor + timedelta(hours=1) if family == "1h" else _bucket_end(cursor, family)
+        if cursor >= start and following <= end:
+            closes.append(following)
+        cursor = following
+    return closes
+
+
+def _fundamental_origin_counts(audit: dict) -> dict:
+    """Read PR #117's per-origin union, including its non-displayed 12h row."""
+    expected_status = "STAGE6_LABEL_BLIND_UNATTESTED_COVERAGE_ONLY"
+    if not isinstance(audit, dict) or audit.get("status") != expected_status:
+        raise ValueError("expected a PR #117 fundamental coverage audit")
+    rows = audit.get("horizons")
+    if not isinstance(rows, dict):
+        raise ValueError("missing fundamental audit horizons")
+    counts = {}
+    for label, row in rows.items():
+        if not isinstance(row, dict):
+            raise ValueError("invalid fundamental audit row")
+        checked = row.get("scheduled_origins")
+        eligible = row.get("origins_with_any_metric")
+        if type(checked) is not int or type(eligible) is not int or not 0 <= eligible <= checked:
+            raise ValueError("invalid fundamental origin counts")
+        counts[label] = (eligible, checked)
+    total = audit.get("input_origin_count")
+    if type(total) is not int or total != sum(checked for _, checked in counts.values()):
+        raise ValueError("fundamental audit origin total mismatch")
+    return counts
+
+
+def requested_horizon_readiness(
+    window: dict, matched: dict | None = None, fundamental_audit: dict | None = None
+) -> dict:
+    """Describe the requested horizons in units of complete source candles."""
+    start = utc_timestamp(window["requested_start_utc"])
+    end = utc_timestamp(window["requested_end_utc"])
+    capacities = {family: len(_calendar_closes(start, end, family)) for family in FAMILIES}
+    rows = {}
+    fundamental_counts = (
+        _fundamental_origin_counts(fundamental_audit) if fundamental_audit is not None else {}
+    )
+    labels = "1h 2h 3h 4h 1d 2d 3d 1w 2w 3w 1mo 3mo 6mo 1y".split()
+    for spec in SPECS:
+        if spec.label not in labels:
+            continue
+        family = spec.source_timeframe
+        expected = capacities[family]
+        # Coverage and run length are identical for horizons using the same source candles.
+        row = {
+            "source_timeframe": family,
+            "classification": "پژوهشی" if spec.promotion_eligible else "اکتشافی",
+            "expected_bars": expected,
+            "minimum_history_bars": spec.minimum_history_bars,
+            "minimum_deficit_even_with_full_coverage": max(0, spec.minimum_history_bars - expected),
+            "price_status": "اندازه‌گیری نشده",
+            "fundamental_status": "اندازه‌گیری نشده",
+            "fundamental_checked_origins": None,
+            "fundamental_eligible_origins": None,
+            "complete_shared_bars": None,
+            "longest_shared_run_bars": None,
+            "missing_or_incomplete_shared_bars": None,
+            "history_deficit_bars": None,
+        }
+        # The audit has its own schedule. These counts do not establish an
+        # intersection with the price window or independently attest first-seen dates.
+        eligible, checked = fundamental_counts.get(spec.label, (0, 0))
+        if checked:
+            row.update(
+                fundamental_status=f"{eligible} از {checked} زمان بررسی‌شده",
+                fundamental_checked_origins=checked,
+                fundamental_eligible_origins=eligible,
+            )
+        if matched is not None:
+            metrics = matched[family]
+            complete = metrics["complete_buckets_on_both_venues"]
+            longest = metrics["longest_consecutive_complete_buckets_on_both_venues"]
+            row.update(
+                price_status="محاسبه از فایل‌های ورودی",
+                complete_shared_bars=complete,
+                longest_shared_run_bars=longest,
+                missing_or_incomplete_shared_bars=expected - complete,
+                history_deficit_bars=max(0, spec.minimum_history_bars - longest),
+            )
+        rows[spec.label] = row
+    return rows
+
+
+def build_metadata_report(
+    real_dir: Path, prepared_dir: Path, window: dict, fundamental_audit: dict | None = None
+) -> dict:
+    start = utc_timestamp(window["requested_start_utc"])
     end = utc_timestamp(window["requested_end_utc"])
     manifest = _load_json(real_dir / "manifest.json")
     prepared = _load_json(prepared_dir / "prepared_manifest.json")
     if not isinstance(manifest, dict) or not isinstance(prepared, dict):
         raise ValueError("missing upstream V1 source manifests")
     details: dict[str, dict] = {}
+    calendars = {family: _calendar_closes(start, end, family) for family in FAMILIES}
+    common = {family: set(grid) for family, grid in calendars.items()}
     for exchange in EXCHANGES:
         hourly = manifest["exchanges"][exchange]
         daily = prepared["exchanges"][exchange]
@@ -219,7 +317,19 @@ def build_metadata_report(real_dir: Path, prepared_dir: Path, window: dict) -> d
             buckets, digest = _source_buckets(
                 path, family, identity, end, expected_coverage_sha=coverage_sha
             )
-            family_summaries[family] = _family_summary(buckets, family, end)
+            grid = calendars[family]
+            full_closes = set(grid)
+            if family in {"1h", "1d"} and any(close <= start for close, _ in buckets):
+                raise ValueError("source row starts outside approved interval")
+            buckets = [(close, complete) for close, complete in buckets if close in full_closes]
+            complete_closes = {close for close, complete in buckets if complete}
+            common[family].intersection_update(complete_closes)
+            family_summaries[family] = {
+                **_family_summary(buckets, family, end),
+                "expected_closed_bucket_count": len(grid),
+                "missing_closed_bucket_count": len(grid) - len(buckets),
+                "complete_closed_bucket_count": len(complete_closes),
+            }
             source[family] = digest
             # A candle timestamp denotes its market bucket, not when a collector
             # first observed or published the payload. Never infer source custody.
@@ -265,10 +375,34 @@ def build_metadata_report(real_dir: Path, prepared_dir: Path, window: dict) -> d
             "technical_family_coverage": family_summaries,
             "one_origin_per_horizon_at_dev_end": horizons,
         }
+    matched = {}
+    for spec in SPECS:
+        if not spec.promotion_eligible:
+            continue
+        family = spec.source_timeframe
+        streak = 0
+        longest_streak = 0
+        origins = 0
+        for close in calendars[family]:
+            streak = streak + 1 if close in common[family] else 0
+            longest_streak = max(longest_streak, streak)
+            if streak >= spec.minimum_history_bars:
+                origins += 1
+        matched[spec.label] = {
+            "source_timeframe": family,
+            "expected_closed_buckets": len(calendars[family]),
+            "complete_buckets_on_both_venues": len(common[family]),
+            "longest_consecutive_complete_buckets_on_both_venues": longest_streak,
+            "common_closes_with_minimum_history": origins,
+        }
     return {
         "status": "STAGE6_E2_TWO_VENUE_SOURCE_ONLY_METADATA_REPORT",
         "development_window": window,
         "venues": details,
+        "requested_horizon_readiness": requested_horizon_readiness(
+            window, matched, fundamental_audit
+        ),
+        "two_venue_calendar_coverage_by_horizon": matched,
         "market_values_checked_for_integrity_only": True,
         "source_is_real_market_data_independently_verified": False,
         "historical_first_seen_independently_verified": False,
@@ -285,18 +419,36 @@ def main() -> None:
     p.add_argument("--approved-development-end", required=True)
     p.add_argument("--real-dir", type=Path)
     p.add_argument("--prepared-dir", type=Path)
+    p.add_argument(
+        "--fundamental-audit",
+        type=Path,
+        help="PR #117 coverage JSON; counts describe its own forecast schedule",
+    )
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
     window = validate_window(args.start, args.end, args.approved_development_end)
     if (args.real_dir is None) != (args.prepared_dir is None):
         p.error("both real and prepared directories are required for report")
+    audit = None
+    if args.fundamental_audit is not None:
+        if args.fundamental_audit.resolve() == args.output.resolve():
+            p.error("fundamental audit and output must be different paths")
+        audit = _load_json(args.fundamental_audit)
+        if not isinstance(audit, dict):
+            p.error("fundamental audit must be a JSON object")
     report = (
-        build_metadata_report(args.real_dir, args.prepared_dir, window)
+        build_metadata_report(args.real_dir, args.prepared_dir, window, audit)
         if args.real_dir is not None and args.prepared_dir is not None
-        else window
+        else {
+            **window,
+            "requested_horizon_readiness": requested_horizon_readiness(
+                window, fundamental_audit=audit
+            ),
+        }
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    payload = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True)
+    args.output.write_text(payload + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,40 @@
+name: E2 fundamentals producer integration
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/pr117-fundamentals-integration.yml"
+      - "scripts/e2_source_only_coverage_v1.py"
+      - "scripts/multitimeframe_lab_v1.py"
+      - "scripts/resample_multitimeframe_ohlcv.py"
+      - "tests/integration_pr117_fundamentals.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fundamental-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check out the pinned PR 117 audit producer
+        uses: actions/checkout@v4
+        with:
+          repository: mojtaba2020/Crypto_Intelligence_OS_Core
+          ref: bd49df9672f108156205d5cade6ec80d05116941
+          path: producer
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Verify synthetic producer-to-consumer coverage
+        env:
+          PR117_PRODUCER_DIR: ${{ github.workspace }}/producer
+        run: python -m unittest discover -s tests -p integration_pr117_fundamentals.py -v
