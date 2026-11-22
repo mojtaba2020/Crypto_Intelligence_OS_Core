@@ -197,12 +197,37 @@ def _calendar_closes(start: datetime, end: datetime, family: str) -> list[dateti
     return closes
 
 
-def requested_horizon_readiness(window: dict, matched: dict | None = None) -> dict:
+def _fundamental_origin_counts(audit: dict) -> dict:
+    """Read PR #117's per-origin union, including its non-displayed 12h row."""
+    if not isinstance(audit, dict) or audit.get("status") != "STAGE6_LABEL_BLIND_UNATTESTED_COVERAGE_ONLY":
+        raise ValueError("expected a PR #117 fundamental coverage audit")
+    rows = audit.get("horizons")
+    if not isinstance(rows, dict):
+        raise ValueError("missing fundamental audit horizons")
+    counts = {}
+    for label, row in rows.items():
+        if not isinstance(row, dict):
+            raise ValueError("invalid fundamental audit row")
+        checked = row.get("scheduled_origins")
+        eligible = row.get("origins_with_any_metric")
+        if type(checked) is not int or type(eligible) is not int or not 0 <= eligible <= checked:
+            raise ValueError("invalid fundamental origin counts")
+        counts[label] = (eligible, checked)
+    total = audit.get("input_origin_count")
+    if type(total) is not int or total != sum(checked for _, checked in counts.values()):
+        raise ValueError("fundamental audit origin total mismatch")
+    return counts
+
+
+def requested_horizon_readiness(
+    window: dict, matched: dict | None = None, fundamental_audit: dict | None = None
+) -> dict:
     """Describe the requested horizons in units of complete source candles."""
     start = utc_timestamp(window["requested_start_utc"])
     end = utc_timestamp(window["requested_end_utc"])
     capacities = {family: len(_calendar_closes(start, end, family)) for family in FAMILIES}
     rows = {}
+    fundamental_counts = _fundamental_origin_counts(fundamental_audit) if fundamental_audit is not None else {}
     labels = "1h 2h 3h 4h 1d 2d 3d 1w 2w 3w 1mo 3mo 6mo 1y".split()
     for spec in SPECS:
         if spec.label not in labels:
@@ -218,11 +243,22 @@ def requested_horizon_readiness(window: dict, matched: dict | None = None) -> di
             "minimum_deficit_even_with_full_coverage": max(0, spec.minimum_history_bars - expected),
             "price_status": "اندازه‌گیری نشده",
             "fundamental_status": "اندازه‌گیری نشده",
+            "fundamental_checked_origins": None,
+            "fundamental_eligible_origins": None,
             "complete_shared_bars": None,
             "longest_shared_run_bars": None,
             "missing_or_incomplete_shared_bars": None,
             "history_deficit_bars": None,
         }
+        # The audit has its own schedule. These counts do not establish an
+        # intersection with the price window or independently attest first-seen dates.
+        eligible, checked = fundamental_counts.get(spec.label, (0, 0))
+        if checked:
+            row.update(
+                fundamental_status=f"{eligible} از {checked} زمان بررسی‌شده",
+                fundamental_checked_origins=checked,
+                fundamental_eligible_origins=eligible,
+            )
         if matched is not None:
             metrics = matched[family]
             complete = metrics["complete_buckets_on_both_venues"]
@@ -238,7 +274,9 @@ def requested_horizon_readiness(window: dict, matched: dict | None = None) -> di
     return rows
 
 
-def build_metadata_report(real_dir: Path, prepared_dir: Path, window: dict) -> dict:
+def build_metadata_report(
+    real_dir: Path, prepared_dir: Path, window: dict, fundamental_audit: dict | None = None
+) -> dict:
     start = utc_timestamp(window["requested_start_utc"])
     end = utc_timestamp(window["requested_end_utc"])
     manifest = _load_json(real_dir / "manifest.json")
@@ -358,7 +396,7 @@ def build_metadata_report(real_dir: Path, prepared_dir: Path, window: dict) -> d
         "status": "STAGE6_E2_TWO_VENUE_SOURCE_ONLY_METADATA_REPORT",
         "development_window": window,
         "venues": details,
-        "requested_horizon_readiness": requested_horizon_readiness(window, matched),
+        "requested_horizon_readiness": requested_horizon_readiness(window, matched, fundamental_audit),
         "two_venue_calendar_coverage_by_horizon": matched,
         "market_values_checked_for_integrity_only": True,
         "source_is_real_market_data_independently_verified": False,
@@ -376,15 +414,24 @@ def main() -> None:
     p.add_argument("--approved-development-end", required=True)
     p.add_argument("--real-dir", type=Path)
     p.add_argument("--prepared-dir", type=Path)
+    p.add_argument("--fundamental-audit", type=Path,
+                   help="PR #117 coverage JSON; counts describe its own forecast schedule")
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
     window = validate_window(args.start, args.end, args.approved_development_end)
     if (args.real_dir is None) != (args.prepared_dir is None):
         p.error("both real and prepared directories are required for report")
+    audit = None
+    if args.fundamental_audit is not None:
+        if args.fundamental_audit.resolve() == args.output.resolve():
+            p.error("fundamental audit and output must be different paths")
+        audit = _load_json(args.fundamental_audit)
+        if not isinstance(audit, dict):
+            p.error("fundamental audit must be a JSON object")
     report = (
-        build_metadata_report(args.real_dir, args.prepared_dir, window)
+        build_metadata_report(args.real_dir, args.prepared_dir, window, audit)
         if args.real_dir is not None and args.prepared_dir is not None
-        else {**window, "requested_horizon_readiness": requested_horizon_readiness(window)}
+        else {**window, "requested_horizon_readiness": requested_horizon_readiness(window, fundamental_audit=audit)}
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True)
@@ -393,3 +440,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
