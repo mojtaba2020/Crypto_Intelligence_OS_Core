@@ -11,6 +11,7 @@ from pathlib import Path
 from scripts.e2_source_only_coverage_v1 import (
     EXCHANGES,
     build_metadata_report,
+    requested_horizon_readiness,
     validate_window,
 )
 from scripts.resample_multitimeframe_ohlcv import (
@@ -205,10 +206,32 @@ class SourceOnlyE2Tests(unittest.TestCase):
         self.assertEqual(coverage["4h"]["expected_closed_buckets"], 72)
         self.assertEqual(coverage["4h"]["complete_buckets_on_both_venues"], 70)
         metric = "longest_consecutive_complete_buckets_on_both_venues"
+        row = report["requested_horizon_readiness"]["2h"]
+        self.assertEqual(row["complete_shared_bars"], 70)
+        self.assertEqual(row["missing_or_incomplete_shared_bars"], 2)
+        self.assertEqual(row["longest_shared_run_bars"], 36)
+        self.assertEqual(row["history_deficit_bars"], 2164)
         self.assertEqual(coverage["4h"][metric], 36)
         self.assertEqual(coverage["1w"][metric], 0)
         self.assertEqual(coverage["4h"]["common_closes_with_minimum_history"], 0)
         self.assertEqual(coverage["1w"]["expected_closed_buckets"], 0)
+
+    def test_requested_report_distinguishes_unknown_from_measured_zero(self):
+        empty = requested_horizon_readiness(self.window)
+        report = build_metadata_report(self.real, self.prepped, self.window)
+        measured = report["requested_horizon_readiness"]
+        labels = "1h 2h 3h 4h 1d 2d 3d 1w 2w 3w 1mo 3mo 6mo 1y".split()
+        self.assertEqual(list(measured), labels)
+        self.assertEqual(list(empty), labels)
+        for label in labels:
+            self.assertEqual(empty[label]["price_status"], "اندازه‌گیری نشده")
+            self.assertIsNone(empty[label]["complete_shared_bars"])
+            self.assertIsNone(empty[label]["history_deficit_bars"])
+            self.assertEqual(measured[label]["fundamental_status"], "اندازه‌گیری نشده")
+        for label in ("6mo", "1y"):
+            self.assertEqual(measured[label]["classification"], "اکتشافی")
+            self.assertEqual(measured[label]["complete_shared_bars"], 0)
+            self.assertEqual(measured[label]["history_deficit_bars"], 120)
 
     def test_missing_prepared_completeness_flag_rejected(self):
         path = self.prepped / "bitstamp_1d.json"
