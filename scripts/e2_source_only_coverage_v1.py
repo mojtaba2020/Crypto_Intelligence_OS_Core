@@ -387,7 +387,8 @@ def main() -> None:
         else {**window, "requested_horizon_readiness": requested_horizon_readiness(window)}
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    payload = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True)
+    args.output.write_text(payload + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":
