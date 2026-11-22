@@ -199,7 +199,8 @@ def _calendar_closes(start: datetime, end: datetime, family: str) -> list[dateti
 
 def _fundamental_origin_counts(audit: dict) -> dict:
     """Read PR #117's per-origin union, including its non-displayed 12h row."""
-    if not isinstance(audit, dict) or audit.get("status") != "STAGE6_LABEL_BLIND_UNATTESTED_COVERAGE_ONLY":
+    expected_status = "STAGE6_LABEL_BLIND_UNATTESTED_COVERAGE_ONLY"
+    if not isinstance(audit, dict) or audit.get("status") != expected_status:
         raise ValueError("expected a PR #117 fundamental coverage audit")
     rows = audit.get("horizons")
     if not isinstance(rows, dict):
@@ -227,7 +228,9 @@ def requested_horizon_readiness(
     end = utc_timestamp(window["requested_end_utc"])
     capacities = {family: len(_calendar_closes(start, end, family)) for family in FAMILIES}
     rows = {}
-    fundamental_counts = _fundamental_origin_counts(fundamental_audit) if fundamental_audit is not None else {}
+    fundamental_counts = (
+        _fundamental_origin_counts(fundamental_audit) if fundamental_audit is not None else {}
+    )
     labels = "1h 2h 3h 4h 1d 2d 3d 1w 2w 3w 1mo 3mo 6mo 1y".split()
     for spec in SPECS:
         if spec.label not in labels:
@@ -396,7 +399,9 @@ def build_metadata_report(
         "status": "STAGE6_E2_TWO_VENUE_SOURCE_ONLY_METADATA_REPORT",
         "development_window": window,
         "venues": details,
-        "requested_horizon_readiness": requested_horizon_readiness(window, matched, fundamental_audit),
+        "requested_horizon_readiness": requested_horizon_readiness(
+            window, matched, fundamental_audit
+        ),
         "two_venue_calendar_coverage_by_horizon": matched,
         "market_values_checked_for_integrity_only": True,
         "source_is_real_market_data_independently_verified": False,
@@ -414,8 +419,11 @@ def main() -> None:
     p.add_argument("--approved-development-end", required=True)
     p.add_argument("--real-dir", type=Path)
     p.add_argument("--prepared-dir", type=Path)
-    p.add_argument("--fundamental-audit", type=Path,
-                   help="PR #117 coverage JSON; counts describe its own forecast schedule")
+    p.add_argument(
+        "--fundamental-audit",
+        type=Path,
+        help="PR #117 coverage JSON; counts describe its own forecast schedule",
+    )
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
     window = validate_window(args.start, args.end, args.approved_development_end)
@@ -431,7 +439,12 @@ def main() -> None:
     report = (
         build_metadata_report(args.real_dir, args.prepared_dir, window, audit)
         if args.real_dir is not None and args.prepared_dir is not None
-        else {**window, "requested_horizon_readiness": requested_horizon_readiness(window, fundamental_audit=audit)}
+        else {
+            **window,
+            "requested_horizon_readiness": requested_horizon_readiness(
+                window, fundamental_audit=audit
+            ),
+        }
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True)
@@ -440,4 +453,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
