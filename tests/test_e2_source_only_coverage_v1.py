@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import json
+import sys
 import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.e2_source_only_coverage_v1 import (
     EXCHANGES,
     build_metadata_report,
+    main,
     requested_horizon_readiness,
     validate_window,
 )
@@ -80,6 +83,51 @@ def fixture(path: Path) -> tuple[Path, Path]:
     (real / "manifest.json").write_text(json.dumps(manifests), encoding="utf-8")
     (prepped / "prepared_manifest.json").write_text(json.dumps(prepared_manifest), encoding="utf-8")
     return real, prepped
+
+
+def fundamental_audit_fixture() -> dict:
+    """Synthetic PR #117 audit result. No observed market or publisher data."""
+    families = {
+        "macro": "macro_cpi_surprise macro_fed_policy_rate macro_payrolls_surprise "
+        "macro_dollar_index macro_real_yield macro_global_liquidity",
+        "etf": "btc_spot_etf_net_flow_usd",
+        "derivatives": "btc_futures_funding_rate btc_open_interest_usd btc_options_skew",
+        "onchain": "btc_active_addresses btc_exchange_netflow_btc btc_hashrate "
+        "btc_miner_outflow_btc btc_supply_issued_btc",
+        "market": "btc_market_liquidity_usd",
+        "cycle": "btc_halving_elapsed_days",
+        "narrative": "btc_news_sentiment",
+        "ecosystem": "btc_developer_activity",
+    }
+    metrics = [metric for names in families.values() for metric in names.split()]
+    horizons = {}
+    for horizon in "1h 2h 3h 4h 12h 1d 2d 3d 1w 2w 3w 1mo 3mo".split():
+        scheduled = 2 if horizon in {"1h", "2h"} else 0
+        eligible = int(horizon == "1h")
+        horizons[horizon] = {
+            "scheduled_origins": scheduled,
+            "origins_with_any_metric": eligible,
+            "metric_coverage_counts": {
+                metric: eligible if metric == "macro_fed_policy_rate" else 0 for metric in metrics
+            },
+            "group_any_coverage_counts": {
+                family: eligible if family == "macro" else 0 for family in families
+            },
+            "late_observations_excluded": scheduled - eligible,
+            "stale_observations_excluded": 0,
+            "covered_origin_fraction": eligible / scheduled if scheduled else None,
+        }
+    return {
+        "status": "STAGE6_LABEL_BLIND_UNATTESTED_COVERAGE_ONLY",
+        "horizons": horizons,
+        "registered_metrics": len(metrics),
+        "input_origin_count": 4,
+        "input_observation_count": 1,
+        "source_first_seen_independently_verified": False,
+        "labels_or_future_outcomes_used": False,
+        "power_or_predictive_edge_established": False,
+        "training_or_freeze_authorized": False,
+    }
 
 
 class SourceOnlyE2Tests(unittest.TestCase):
@@ -233,6 +281,42 @@ class SourceOnlyE2Tests(unittest.TestCase):
             self.assertEqual(measured[label]["complete_shared_bars"], 0)
             self.assertEqual(measured[label]["history_deficit_bars"], 120)
 
+    def test_fundamental_audit_reports_checked_and_eligible_separately(self):
+        absent = requested_horizon_readiness(self.window)
+        rows = requested_horizon_readiness(self.window, fundamental_audit=fundamental_audit_fixture())
+        self.assertIsNone(absent["2h"]["fundamental_checked_origins"])
+        self.assertIsNone(absent["2h"]["fundamental_eligible_origins"])
+        self.assertEqual(rows["1h"]["fundamental_checked_origins"], 2)
+        self.assertEqual(rows["1h"]["fundamental_eligible_origins"], 1)
+        self.assertEqual(rows["2h"]["fundamental_checked_origins"], 2)
+        self.assertEqual(rows["2h"]["fundamental_eligible_origins"], 0)
+        self.assertIsNone(rows["1h"]["complete_shared_bars"])
+        self.assertNotIn("12h", rows)
+        for label in ("6mo", "1y"):
+            self.assertEqual(rows[label]["classification"], "اکتشافی")
+            self.assertIsNone(rows[label]["fundamental_checked_origins"])
+            self.assertIsNone(rows[label]["fundamental_eligible_origins"])
+
+    def test_cli_reads_optional_fundamental_audit(self):
+        audit_file = Path(self.tmp.name) / "fundamental-audit.json"
+        audit_file.write_text(json.dumps(fundamental_audit_fixture()), encoding="utf-8")
+        for with_prices in (False, True):
+            with self.subTest(with_prices=with_prices):
+                output = Path(self.tmp.name) / f"readiness-{with_prices}.json"
+                argv = [
+                    "e2_source_only_coverage_v1", "--start", START, "--end", END,
+                    "--approved-development-end", APPROVED, "--output", str(output),
+                    "--fundamental-audit", str(audit_file),
+                ]
+                if with_prices:
+                    argv.extend(["--real-dir", str(self.real), "--prepared-dir", str(self.prepped)])
+                with patch.object(sys, "argv", argv):
+                    main()
+                rows = json.loads(output.read_text(encoding="utf-8"))["requested_horizon_readiness"]
+                self.assertEqual(rows["1h"]["fundamental_eligible_origins"], 1)
+                self.assertEqual(rows["2h"]["fundamental_checked_origins"], 2)
+                self.assertEqual(rows["1h"]["complete_shared_bars"], 72 if with_prices else None)
+
     def test_missing_prepared_completeness_flag_rejected(self):
         path = self.prepped / "bitstamp_1d.json"
         rows = json.loads(path.read_text(encoding="utf-8"))
@@ -298,3 +382,4 @@ class SourceOnlyE2Tests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
