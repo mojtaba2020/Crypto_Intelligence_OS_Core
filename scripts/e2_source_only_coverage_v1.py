@@ -197,6 +197,47 @@ def _calendar_closes(start: datetime, end: datetime, family: str) -> list[dateti
     return closes
 
 
+def requested_horizon_readiness(window: dict, matched: dict | None = None) -> dict:
+    """Describe the requested horizons in units of complete source candles."""
+    start = utc_timestamp(window["requested_start_utc"])
+    end = utc_timestamp(window["requested_end_utc"])
+    capacities = {family: len(_calendar_closes(start, end, family)) for family in FAMILIES}
+    rows = {}
+    labels = "1h 2h 3h 4h 1d 2d 3d 1w 2w 3w 1mo 3mo 6mo 1y".split()
+    for spec in SPECS:
+        if spec.label not in labels:
+            continue
+        family = spec.source_timeframe
+        expected = capacities[family]
+        # Coverage and run length are identical for horizons using the same source candles.
+        row = {
+            "source_timeframe": family,
+            "classification": "پژوهشی" if spec.promotion_eligible else "اکتشافی",
+            "expected_bars": expected,
+            "minimum_history_bars": spec.minimum_history_bars,
+            "minimum_deficit_even_with_full_coverage": max(0, spec.minimum_history_bars - expected),
+            "price_status": "اندازه‌گیری نشده",
+            "fundamental_status": "اندازه‌گیری نشده",
+            "complete_shared_bars": None,
+            "longest_shared_run_bars": None,
+            "missing_or_incomplete_shared_bars": None,
+            "history_deficit_bars": None,
+        }
+        if matched is not None:
+            metrics = matched[family]
+            complete = metrics["complete_buckets_on_both_venues"]
+            longest = metrics["longest_consecutive_complete_buckets_on_both_venues"]
+            row.update(
+                price_status="محاسبه از فایل‌های ورودی",
+                complete_shared_bars=complete,
+                longest_shared_run_bars=longest,
+                missing_or_incomplete_shared_bars=expected - complete,
+                history_deficit_bars=max(0, spec.minimum_history_bars - longest),
+            )
+        rows[spec.label] = row
+    return rows
+
+
 def build_metadata_report(real_dir: Path, prepared_dir: Path, window: dict) -> dict:
     start = utc_timestamp(window["requested_start_utc"])
     end = utc_timestamp(window["requested_end_utc"])
@@ -317,6 +358,7 @@ def build_metadata_report(real_dir: Path, prepared_dir: Path, window: dict) -> d
         "status": "STAGE6_E2_TWO_VENUE_SOURCE_ONLY_METADATA_REPORT",
         "development_window": window,
         "venues": details,
+        "requested_horizon_readiness": requested_horizon_readiness(window, matched),
         "two_venue_calendar_coverage_by_horizon": matched,
         "market_values_checked_for_integrity_only": True,
         "source_is_real_market_data_independently_verified": False,
@@ -342,10 +384,10 @@ def main() -> None:
     report = (
         build_metadata_report(args.real_dir, args.prepared_dir, window)
         if args.real_dir is not None and args.prepared_dir is not None
-        else window
+        else {**window, "requested_horizon_readiness": requested_horizon_readiness(window)}
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":
