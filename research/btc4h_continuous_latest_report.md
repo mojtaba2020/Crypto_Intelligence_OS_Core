@@ -1,8 +1,8 @@
 # گزارش وضعیت واقعی BTC/USD
 
-Run ID: 45612768786؛ UTC: 2026-11-25T12:20:32.275397+00:00
+Run ID: 45651524406؛ UTC: 2026-11-25T16:10:44.048598+00:00
 
-اعتبار heartbeat تا UTC: 2026-11-25T16:50:32.275397+00:00
+اعتبار heartbeat تا UTC: 2026-11-25T20:40:44.048598+00:00
 
 ## آزمایش رسمی منجمد — بدون تغییر
 
@@ -18,9 +18,9 @@ Run ID: 45612768786؛ UTC: 2026-11-25T12:20:32.275397+00:00
 
 ## مسیر rolling — مستقل از آزمایش رسمی
 
-نوبت موعدرسیده: 79؛ انتشار تأییدشده: 57؛ چهارساعت معتبر: 54؛ ازدست‌رفته: 25
+نوبت موعدرسیده: 79؛ انتشار تأییدشده: 58؛ چهارساعت معتبر: 55؛ ازدست‌رفته: 25
 
-آخرین صدور UTC: 2026-11-25T12:10:00.014086Z؛ افق واقعی: 245.00 دقیقه.
+آخرین صدور UTC: 2026-11-25T16:10:38.353395Z؛ افق واقعی: 244.36 دقیقه.
 
 نوع: چهارساعته
 
@@ -34,20 +34,34 @@ score_pending: نتیجه معتبر ثبت نشده؛ نتیجه حدس زده 
 
 GitHub cron تضمین زمان ندارد؛ missed_due_to_late_dispatch موفقیت صدور نیست.
 
-issue: اجرا نشده یا issue_failed
+issue: {
+  "early_prefetch_started": false,
+  "newly_issued": 1,
+  "newly_scored": 0,
+  "note": "Never backfill missed origins; GitHub schedule delivery is not guaranteed.",
+  "observed_run_at_utc": "2026-11-25T16:10:34.593099Z",
+  "origin_utc": "2026-11-25T16:00:00Z",
+  "overdue_targets_unavailable_in_api_window": 0,
+  "phase": "issue",
+  "real_forward_issue_proof_independent": false,
+  "research_status": "issued",
+  "total_issued": 58,
+  "total_scored": 0
+}
+
 
 score: {
   "early_prefetch_started": false,
   "newly_issued": 0,
-  "newly_scored": 1,
+  "newly_scored": 0,
   "note": "Never backfill missed origins; GitHub schedule delivery is not guaranteed.",
-  "observed_run_at_utc": "2026-11-25T12:20:29.281917Z",
-  "origin_utc": "2026-11-25T12:00:00Z",
+  "observed_run_at_utc": "2026-11-25T16:10:43.222689Z",
+  "origin_utc": "2026-11-25T16:00:00Z",
   "overdue_targets_unavailable_in_api_window": 0,
   "phase": "score",
   "real_forward_issue_proof_independent": false,
-  "research_status": "score_matured",
-  "total_issued": 57,
+  "research_status": "score_pending",
+  "total_issued": 58,
   "total_scored": 56
 }
 
