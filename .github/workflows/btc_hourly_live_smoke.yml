@@ -28,7 +28,7 @@ jobs:
             --ledger "${RUNNER_TEMP}/hourly_forecasts.jsonl" \
             --scores-ledger "${RUNNER_TEMP}/hourly_scores.jsonl" \
             --report "${RUNNER_TEMP}/hourly_report.json"
-          python -c 'import json,os,pathlib; p=pathlib.Path(os.environ["RUNNER_TEMP"])/"hourly_report.json"; r=json.loads(p.read_text()); assert {x["horizon_hours"] for x in r["issued"]} == {1, 2, 4, 12, 24}, r; assert all(x["forecast_usd"] > 0 for x in r["issued"]); print("LIVE HOURLY SMOKE PASS", r["origin_hour_utc"])'
+          python -c 'import json,os,pathlib; p=pathlib.Path(os.environ["RUNNER_TEMP"])/"hourly_report.json"; r=json.loads(p.read_text()); assert {x["horizon_hours"] for x in r["issued"]} == {1, 2, 3, 4, 12, 24}, r; assert all(x["forecast_usd"] > 0 for x in r["issued"]); print("LIVE HOURLY SMOKE PASS", r["origin_hour_utc"])'
       - name: Upload live report
         if: always()
         uses: actions/upload-artifact@v4
