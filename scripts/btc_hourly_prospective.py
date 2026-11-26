@@ -16,7 +16,7 @@ from pathlib import Path
 from crypto_intelligence_os.hybrid_forecasting import _estimate, _fit
 
 API = "https://api.exchange.coinbase.com/products/BTC-USD/candles"
-HORIZONS = (1, 2, 4, 12, 24)
+HORIZONS = (1, 2, 3, 4, 12, 24)
 VERSION = "hourly-hybrid-ridge-v2"
 FEATURE_WINDOWS = (1, 4, 12, 24, 72, 168)
 
@@ -139,10 +139,10 @@ def run(now: datetime, ledger: Path, report: Path, scores_ledger: Path | None = 
                 "research_only": True,
             }
         )
-    # Stamp the two-bar receipt after training, immediately before ledger append.
+    # Stamp the two- and three-bar receipts after training, immediately before ledger append.
     # A fetch/fit spanning the next close must not issue from a stale candle.
     for row in new.copy():
-        if row["horizon_hours"] == 2:
+        if row["horizon_hours"] in (2, 3):
             issued = _utc_now()
             origin_close = origin + timedelta(hours=1)
             if not origin_close <= issued < origin_close + timedelta(hours=1):
