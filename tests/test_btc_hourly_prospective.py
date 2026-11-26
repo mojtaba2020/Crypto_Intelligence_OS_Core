@@ -5,7 +5,6 @@ import math
 from datetime import UTC, datetime, timedelta
 
 import pytest
-
 from scripts import btc_hourly_prospective as hourly
 
 
