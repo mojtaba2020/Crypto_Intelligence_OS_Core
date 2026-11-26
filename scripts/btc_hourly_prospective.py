@@ -16,7 +16,7 @@ from pathlib import Path
 from crypto_intelligence_os.hybrid_forecasting import _estimate, _fit
 
 API = "https://api.exchange.coinbase.com/products/BTC-USD/candles"
-HORIZONS = (1, 4, 12, 24)
+HORIZONS = (1, 2, 4, 12, 24)
 VERSION = "hourly-hybrid-ridge-v2"
 FEATURE_WINDOWS = (1, 4, 12, 24, 72, 168)
 
@@ -101,6 +101,10 @@ def train(candles: list[tuple[datetime, float]], horizon: int) -> tuple[float, f
     return blend * signal, blend, len(examples)
 
 
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
 def run(now: datetime, ledger: Path, report: Path, scores_ledger: Path | None = None) -> dict:
     if now.tzinfo is None:
         raise ValueError("UTC-aware issuance time required")
@@ -135,6 +139,18 @@ def run(now: datetime, ledger: Path, report: Path, scores_ledger: Path | None = 
                 "research_only": True,
             }
         )
+    # Stamp the two-bar receipt after training, immediately before ledger append.
+    # A fetch/fit spanning the next close must not issue from a stale candle.
+    for row in new.copy():
+        if row["horizon_hours"] == 2:
+            issued = _utc_now()
+            origin_close = origin + timedelta(hours=1)
+            if not origin_close <= issued < origin_close + timedelta(hours=1):
+                new.remove(row)
+                continue
+            row["issued_at_utc"] = issued.isoformat()
+            target_close = datetime.fromisoformat(row["target_close_utc"])
+            row["issue_to_target_seconds"] = (target_close - issued).total_seconds()
     if new:
         ledger.parent.mkdir(parents=True, exist_ok=True)
         with ledger.open("a", encoding="utf-8") as output:
