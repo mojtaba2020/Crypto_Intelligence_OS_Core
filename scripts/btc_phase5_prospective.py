@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from itertools import pairwise
 from math import isfinite
 from pathlib import Path
@@ -19,7 +19,7 @@ from pathlib import Path
 from crypto_intelligence_os.ai_forecasting import Observation
 from crypto_intelligence_os.hybrid_forecasting import predict_hybrid, train_hybrid
 
-HORIZONS = (1, 3, 7, 14, 21, 30, 90, 180, 365)
+HORIZONS = (1, 2, 3, 7, 14, 21, 30, 90, 180, 365)
 VERSION = "phase5-hybrid-all-ridge100-v2"
 
 
@@ -38,6 +38,10 @@ def load_ledger(path: Path) -> list[dict]:
     if not path.exists():
         return []
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 def issue(
@@ -77,6 +81,21 @@ def issue(
                 "research_only": True,
             }
         )
+        keys.add(key)
+    # Take the 2-day issuance clock after fitting all requested horizons.
+    for row in created.copy():
+        if row["horizon_days"] == 2:
+            issued = _utc_now()
+            if issued.date() != origin.day + timedelta(days=1):
+                created.remove(row)
+                continue
+            target_day = date.fromisoformat(row["target_day"])
+            target_close = datetime.combine(target_day + timedelta(days=1), time.min, UTC)
+            row.update(
+                issued_at_utc=issued.isoformat(),
+                target_close_utc=target_close.isoformat(),
+                issue_to_target_seconds=(target_close - issued).total_seconds(),
+            )
     if created:
         ledger.parent.mkdir(parents=True, exist_ok=True)
         with ledger.open("a", encoding="utf-8") as output:
