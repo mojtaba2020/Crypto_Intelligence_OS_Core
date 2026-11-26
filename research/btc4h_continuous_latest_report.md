@@ -1,8 +1,8 @@
 # گزارش وضعیت واقعی BTC/USD
 
-Run ID: 45727999979؛ UTC: 2026-11-26T00:20:26.563135+00:00
+Run ID: 45753275555؛ UTC: 2026-11-26T04:10:04.459065+00:00
 
-اعتبار heartbeat تا UTC: 2026-11-26T04:50:26.563135+00:00
+اعتبار heartbeat تا UTC: 2026-11-26T08:40:04.459065+00:00
 
 ## آزمایش رسمی منجمد — بدون تغییر
 
@@ -18,9 +18,9 @@ Run ID: 45727999979؛ UTC: 2026-11-26T00:20:26.563135+00:00
 
 ## مسیر rolling — مستقل از آزمایش رسمی
 
-نوبت موعدرسیده: 82؛ انتشار تأییدشده: 60؛ چهارساعت معتبر: 57؛ ازدست‌رفته: 25
+نوبت موعدرسیده: 82؛ انتشار تأییدشده: 61؛ چهارساعت معتبر: 58؛ ازدست‌رفته: 25
 
-آخرین صدور UTC: 2026-11-26T00:10:00.011826Z؛ افق واقعی: 245.00 دقیقه.
+آخرین صدور UTC: 2026-11-26T04:10:00.019184Z؛ افق واقعی: 245.00 دقیقه.
 
 نوع: چهارساعته
 
@@ -34,20 +34,34 @@ score_pending: نتیجه معتبر ثبت نشده؛ نتیجه حدس زده 
 
 GitHub cron تضمین زمان ندارد؛ missed_due_to_late_dispatch موفقیت صدور نیست.
 
-issue: اجرا نشده یا issue_failed
+issue: {
+  "early_prefetch_started": true,
+  "newly_issued": 1,
+  "newly_scored": 0,
+  "note": "Never backfill missed origins; GitHub schedule delivery is not guaranteed.",
+  "observed_run_at_utc": "2026-11-26T04:08:30.097601Z",
+  "origin_utc": "2026-11-26T04:00:00Z",
+  "overdue_targets_unavailable_in_api_window": 0,
+  "phase": "issue",
+  "real_forward_issue_proof_independent": false,
+  "research_status": "issued",
+  "total_issued": 61,
+  "total_scored": 0
+}
+
 
 score: {
   "early_prefetch_started": false,
   "newly_issued": 0,
-  "newly_scored": 1,
+  "newly_scored": 0,
   "note": "Never backfill missed origins; GitHub schedule delivery is not guaranteed.",
-  "observed_run_at_utc": "2026-11-26T00:20:24.059300Z",
-  "origin_utc": "2026-11-26T00:00:00Z",
+  "observed_run_at_utc": "2026-11-26T04:10:03.793319Z",
+  "origin_utc": "2026-11-26T04:00:00Z",
   "overdue_targets_unavailable_in_api_window": 0,
   "phase": "score",
   "real_forward_issue_proof_independent": false,
-  "research_status": "score_matured",
-  "total_issued": 60,
+  "research_status": "score_pending",
+  "total_issued": 61,
   "total_scored": 59
 }
 
