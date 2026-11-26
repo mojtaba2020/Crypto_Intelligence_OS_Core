@@ -36,7 +36,7 @@ jobs:
         run: python scripts/stage0_prospective_audit.py --forecasts research/hourly_forecasts.jsonl --scores research/hourly_scores.jsonl --report .research/prospective_audit.json
       - name: Validate generated ledger
         run: |
-          python -c 'import json,pathlib; p=pathlib.Path("research/hourly_forecasts.jsonl"); rows=[json.loads(x) for x in p.read_text().splitlines() if x.strip()]; assert len(rows)>=4; assert all(x["forecast_usd"]>0 for x in rows[-4:]); print("Validated hourly ledger",len(rows))'
+          python -c 'import json,pathlib; p=pathlib.Path("research/hourly_forecasts.jsonl"); rows=[json.loads(x) for x in p.read_text().splitlines() if x.strip()]; issued=json.loads(pathlib.Path(".research/hourly_report.json").read_text())["issued"]; assert all(x in rows and x["forecast_usd"]>0 for x in issued); print("Validated hourly ledger",len(rows))'
       - name: Commit hourly ledger
         run: |
           if [ -n "$(git status --porcelain -- research/hourly_forecasts.jsonl research/hourly_scores.jsonl)" ]; then
