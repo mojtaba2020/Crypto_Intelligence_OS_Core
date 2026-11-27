@@ -1,8 +1,8 @@
 # گزارش وضعیت واقعی BTC/USD
 
-Run ID: 45996668791؛ UTC: 2026-11-27T12:12:31.147965+00:00
+Run ID: 45996944136؛ UTC: 2026-11-27T12:14:26.322011+00:00
 
-اعتبار heartbeat تا UTC: 2026-11-27T16:42:31.147965+00:00
+اعتبار heartbeat تا UTC: 2026-11-27T16:44:26.322011+00:00
 
 ## آزمایش رسمی منجمد — بدون تغییر
 
@@ -39,7 +39,7 @@ issue: {
   "newly_issued": 0,
   "newly_scored": 0,
   "note": "Never backfill missed origins; GitHub schedule delivery is not guaranteed.",
-  "observed_run_at_utc": "2026-11-27T12:12:29.993002Z",
+  "observed_run_at_utc": "2026-11-27T12:14:24.772204Z",
   "origin_utc": "2026-11-27T12:00:00Z",
   "overdue_targets_unavailable_in_api_window": 0,
   "phase": "issue",
@@ -55,7 +55,7 @@ score: {
   "newly_issued": 0,
   "newly_scored": 0,
   "note": "Never backfill missed origins; GitHub schedule delivery is not guaranteed.",
-  "observed_run_at_utc": "2026-11-27T12:12:30.537246Z",
+  "observed_run_at_utc": "2026-11-27T12:14:25.439451Z",
   "origin_utc": "2026-11-27T12:00:00Z",
   "overdue_targets_unavailable_in_api_window": 0,
   "phase": "score",
